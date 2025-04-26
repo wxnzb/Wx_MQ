@@ -36,7 +36,7 @@ struct infoResponse{
 
 service Server_Operations{
     PushResponse push(1:PushRequest req)
-    PullResponse pill(1:PullRequest req)
+    PullResponse pull(1:PullRequest req)
     infoResponse info(1:infoRequest req)
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。

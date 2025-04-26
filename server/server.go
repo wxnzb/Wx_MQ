@@ -17,8 +17,7 @@ func (s *Server) make() {
 	s.groups["defalut"] = Group{}
 }
 func (s *Server) HanderInfo(ip_port string) error {
-	it := co.WithHostPorts(ip_port)
-	client, err := client_operations.NewClient("client", it)
+	client, err := client_operations.NewClient("client", co.WithHostPorts(ip_port))
 	if err == nil {
 		//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
 		s.groups["default"].consumers[ip_port] = &client

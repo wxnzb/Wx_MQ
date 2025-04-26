@@ -345,7 +345,7 @@ var fieldIDToName_PingpongResponse = map[int16]string{
 type Server_Operations interface {
 	Push(ctx context.Context, req *PushRequest) (r *PushResponse, err error)
 
-	Pill(ctx context.Context, req *PullRequest) (r *PullResponse, err error)
+	Pull(ctx context.Context, req *PullRequest) (r *PullResponse, err error)
 
 	Info(ctx context.Context, req *InfoRequest) (r *InfoResponse, err error)
 }
@@ -426,79 +426,79 @@ var fieldIDToName_Server_OperationsPushResult = map[int16]string{
 	0: "success",
 }
 
-type Server_OperationsPillArgs struct {
+type Server_OperationsPullArgs struct {
 	Req *PullRequest `thrift:"req,1" frugal:"1,default,PullRequest" json:"req"`
 }
 
-func NewServer_OperationsPillArgs() *Server_OperationsPillArgs {
-	return &Server_OperationsPillArgs{}
+func NewServer_OperationsPullArgs() *Server_OperationsPullArgs {
+	return &Server_OperationsPullArgs{}
 }
 
-func (p *Server_OperationsPillArgs) InitDefault() {
+func (p *Server_OperationsPullArgs) InitDefault() {
 }
 
-var Server_OperationsPillArgs_Req_DEFAULT *PullRequest
+var Server_OperationsPullArgs_Req_DEFAULT *PullRequest
 
-func (p *Server_OperationsPillArgs) GetReq() (v *PullRequest) {
+func (p *Server_OperationsPullArgs) GetReq() (v *PullRequest) {
 	if !p.IsSetReq() {
-		return Server_OperationsPillArgs_Req_DEFAULT
+		return Server_OperationsPullArgs_Req_DEFAULT
 	}
 	return p.Req
 }
-func (p *Server_OperationsPillArgs) SetReq(val *PullRequest) {
+func (p *Server_OperationsPullArgs) SetReq(val *PullRequest) {
 	p.Req = val
 }
 
-func (p *Server_OperationsPillArgs) IsSetReq() bool {
+func (p *Server_OperationsPullArgs) IsSetReq() bool {
 	return p.Req != nil
 }
 
-func (p *Server_OperationsPillArgs) String() string {
+func (p *Server_OperationsPullArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Server_OperationsPillArgs(%+v)", *p)
+	return fmt.Sprintf("Server_OperationsPullArgs(%+v)", *p)
 }
 
-var fieldIDToName_Server_OperationsPillArgs = map[int16]string{
+var fieldIDToName_Server_OperationsPullArgs = map[int16]string{
 	1: "req",
 }
 
-type Server_OperationsPillResult struct {
+type Server_OperationsPullResult struct {
 	Success *PullResponse `thrift:"success,0,optional" frugal:"0,optional,PullResponse" json:"success,omitempty"`
 }
 
-func NewServer_OperationsPillResult() *Server_OperationsPillResult {
-	return &Server_OperationsPillResult{}
+func NewServer_OperationsPullResult() *Server_OperationsPullResult {
+	return &Server_OperationsPullResult{}
 }
 
-func (p *Server_OperationsPillResult) InitDefault() {
+func (p *Server_OperationsPullResult) InitDefault() {
 }
 
-var Server_OperationsPillResult_Success_DEFAULT *PullResponse
+var Server_OperationsPullResult_Success_DEFAULT *PullResponse
 
-func (p *Server_OperationsPillResult) GetSuccess() (v *PullResponse) {
+func (p *Server_OperationsPullResult) GetSuccess() (v *PullResponse) {
 	if !p.IsSetSuccess() {
-		return Server_OperationsPillResult_Success_DEFAULT
+		return Server_OperationsPullResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *Server_OperationsPillResult) SetSuccess(x interface{}) {
+func (p *Server_OperationsPullResult) SetSuccess(x interface{}) {
 	p.Success = x.(*PullResponse)
 }
 
-func (p *Server_OperationsPillResult) IsSetSuccess() bool {
+func (p *Server_OperationsPullResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *Server_OperationsPillResult) String() string {
+func (p *Server_OperationsPullResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("Server_OperationsPillResult(%+v)", *p)
+	return fmt.Sprintf("Server_OperationsPullResult(%+v)", *p)
 }
 
-var fieldIDToName_Server_OperationsPillResult = map[int16]string{
+var fieldIDToName_Server_OperationsPullResult = map[int16]string{
 	0: "success",
 }
 

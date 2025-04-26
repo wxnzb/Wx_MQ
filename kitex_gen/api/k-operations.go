@@ -1428,7 +1428,7 @@ func (p *Server_OperationsPushResult) field0Length() int {
 	return l
 }
 
-func (p *Server_OperationsPillArgs) FastRead(buf []byte) (int, error) {
+func (p *Server_OperationsPullArgs) FastRead(buf []byte) (int, error) {
 
 	var err error
 	var offset int
@@ -1472,12 +1472,12 @@ func (p *Server_OperationsPillArgs) FastRead(buf []byte) (int, error) {
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Server_OperationsPillArgs[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Server_OperationsPullArgs[fieldId]), err)
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
-func (p *Server_OperationsPillArgs) FastReadField1(buf []byte) (int, error) {
+func (p *Server_OperationsPullArgs) FastReadField1(buf []byte) (int, error) {
 	offset := 0
 	_field := NewPullRequest()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
@@ -1489,11 +1489,11 @@ func (p *Server_OperationsPillArgs) FastReadField1(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *Server_OperationsPillArgs) FastWrite(buf []byte) int {
+func (p *Server_OperationsPullArgs) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
 
-func (p *Server_OperationsPillArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+func (p *Server_OperationsPullArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
 		offset += p.fastWriteField1(buf[offset:], w)
@@ -1502,7 +1502,7 @@ func (p *Server_OperationsPillArgs) FastWriteNocopy(buf []byte, w thrift.NocopyW
 	return offset
 }
 
-func (p *Server_OperationsPillArgs) BLength() int {
+func (p *Server_OperationsPullArgs) BLength() int {
 	l := 0
 	if p != nil {
 		l += p.field1Length()
@@ -1511,21 +1511,21 @@ func (p *Server_OperationsPillArgs) BLength() int {
 	return l
 }
 
-func (p *Server_OperationsPillArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
+func (p *Server_OperationsPullArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
 	offset += p.Req.FastWriteNocopy(buf[offset:], w)
 	return offset
 }
 
-func (p *Server_OperationsPillArgs) field1Length() int {
+func (p *Server_OperationsPullArgs) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += p.Req.BLength()
 	return l
 }
 
-func (p *Server_OperationsPillResult) FastRead(buf []byte) (int, error) {
+func (p *Server_OperationsPullResult) FastRead(buf []byte) (int, error) {
 
 	var err error
 	var offset int
@@ -1569,12 +1569,12 @@ func (p *Server_OperationsPillResult) FastRead(buf []byte) (int, error) {
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Server_OperationsPillResult[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Server_OperationsPullResult[fieldId]), err)
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
-func (p *Server_OperationsPillResult) FastReadField0(buf []byte) (int, error) {
+func (p *Server_OperationsPullResult) FastReadField0(buf []byte) (int, error) {
 	offset := 0
 	_field := NewPullResponse()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
@@ -1586,11 +1586,11 @@ func (p *Server_OperationsPillResult) FastReadField0(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *Server_OperationsPillResult) FastWrite(buf []byte) int {
+func (p *Server_OperationsPullResult) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
 
-func (p *Server_OperationsPillResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+func (p *Server_OperationsPullResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
 		offset += p.fastWriteField0(buf[offset:], w)
@@ -1599,7 +1599,7 @@ func (p *Server_OperationsPillResult) FastWriteNocopy(buf []byte, w thrift.Nocop
 	return offset
 }
 
-func (p *Server_OperationsPillResult) BLength() int {
+func (p *Server_OperationsPullResult) BLength() int {
 	l := 0
 	if p != nil {
 		l += p.field0Length()
@@ -1608,7 +1608,7 @@ func (p *Server_OperationsPillResult) BLength() int {
 	return l
 }
 
-func (p *Server_OperationsPillResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
+func (p *Server_OperationsPullResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetSuccess() {
 		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 0)
@@ -1617,7 +1617,7 @@ func (p *Server_OperationsPillResult) fastWriteField0(buf []byte, w thrift.Nocop
 	return offset
 }
 
-func (p *Server_OperationsPillResult) field0Length() int {
+func (p *Server_OperationsPullResult) field0Length() int {
 	l := 0
 	if p.IsSetSuccess() {
 		l += thrift.Binary.FieldBeginLength()
@@ -2030,11 +2030,11 @@ func (p *Server_OperationsPushResult) GetResult() interface{} {
 	return p.Success
 }
 
-func (p *Server_OperationsPillArgs) GetFirstArgument() interface{} {
+func (p *Server_OperationsPullArgs) GetFirstArgument() interface{} {
 	return p.Req
 }
 
-func (p *Server_OperationsPillResult) GetResult() interface{} {
+func (p *Server_OperationsPullResult) GetResult() interface{} {
 	return p.Success
 }
 

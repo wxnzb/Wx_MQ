@@ -20,10 +20,10 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"pill": kitex.NewMethodInfo(
-		pillHandler,
-		newServer_OperationsPillArgs,
-		newServer_OperationsPillResult,
+	"pull": kitex.NewMethodInfo(
+		pullHandler,
+		newServer_OperationsPullArgs,
+		newServer_OperationsPullResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -118,22 +118,22 @@ func newServer_OperationsPushResult() interface{} {
 	return api.NewServer_OperationsPushResult()
 }
 
-func pillHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.Server_OperationsPillArgs)
-	realResult := result.(*api.Server_OperationsPillResult)
-	success, err := handler.(api.Server_Operations).Pill(ctx, realArg.Req)
+func pullHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Server_OperationsPullArgs)
+	realResult := result.(*api.Server_OperationsPullResult)
+	success, err := handler.(api.Server_Operations).Pull(ctx, realArg.Req)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newServer_OperationsPillArgs() interface{} {
-	return api.NewServer_OperationsPillArgs()
+func newServer_OperationsPullArgs() interface{} {
+	return api.NewServer_OperationsPullArgs()
 }
 
-func newServer_OperationsPillResult() interface{} {
-	return api.NewServer_OperationsPillResult()
+func newServer_OperationsPullResult() interface{} {
+	return api.NewServer_OperationsPullResult()
 }
 
 func infoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -174,11 +174,11 @@ func (p *kClient) Push(ctx context.Context, req *api.PushRequest) (r *api.PushRe
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) Pill(ctx context.Context, req *api.PullRequest) (r *api.PullResponse, err error) {
-	var _args api.Server_OperationsPillArgs
+func (p *kClient) Pull(ctx context.Context, req *api.PullRequest) (r *api.PullResponse, err error) {
+	var _args api.Server_OperationsPullArgs
 	_args.Req = req
-	var _result api.Server_OperationsPillResult
-	if err = p.c.Call(ctx, "pill", &_args, &_result); err != nil {
+	var _result api.Server_OperationsPullResult
+	if err = p.c.Call(ctx, "pull", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
