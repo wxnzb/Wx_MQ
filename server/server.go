@@ -3,7 +3,7 @@ package server
 import (
 	"Wx_MQ/kitex_gen/api/client_operations"
 
-	co "github.com/cloudwego/kitex/client"
+	cl "github.com/cloudwego/kitex/client"
 )
 
 type Server struct {
@@ -17,7 +17,7 @@ func (s *Server) make() {
 	s.groups["defalut"] = Group{}
 }
 func (s *Server) HanderInfo(ip_port string) error {
-	client, err := client_operations.NewClient("client", co.WithHostPorts(ip_port))
+	client, err := client_operations.NewClient("client", cl.WithHostPorts(ip_port))
 	if err == nil {
 		//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
 		s.groups["default"].consumers[ip_port] = &client
