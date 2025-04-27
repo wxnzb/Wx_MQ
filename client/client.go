@@ -1,4 +1,4 @@
-package client
+package main
 
 import (
 	api "Wx_MQ/kitex_gen/api"
@@ -18,6 +18,13 @@ import (
 type Server struct {
 }
 
+// 感觉下面这个暂时没用上,我现在也不太清楚这个是干啥的
+func (s *Server) Pub(ctx context.Context, req *api.PubRequest) (r *api.PubResponse, err error) {
+	fmt.Println(req.Msg)
+	return &api.PubResponse{
+		Ret: true,
+	}, nil
+}
 func (s *Server) Pingpong(ctx context.Context, req *api.PingpongRequest) (r *api.PingpongResponse, err error) {
 	return &api.PingpongResponse{
 		Pong: true,
@@ -43,7 +50,9 @@ func start_server(port string) {
 	}
 }
 func main() {
-	go start_server(":8888")
+	//pub and pingpong
+	go start_server(":8889")
+	//push pull info
 	client, err := server_operations.NewClient("client", cl.WithHostPorts("0.0.0.0:8888"))
 	//他返回的是Client接口，长这样
 	// type Client interface {
@@ -52,21 +61,24 @@ func main() {
 	// 	Info(ctx context.Context, req *api.InfoRequest, callOptions ...callopt.Option) (r *api.InfoResponse, err error)
 	// }
 	if err != nil {
-		println(err.Error())
+		fmt.Println(err)
 	}
 	info := &api.InfoRequest{
-		IpPort: "0.0.0.0:8888",
+		IpPort: "0.0.0.0:8889",
 	}
+	//这个是为了反向代理，当broker有消息要发给这个中转站的时候就能找到了
 	resp, err := client.Info(context.Background(), info)
 	if err != nil {
-		println(resp)
+		fmt.Println(err)
+	} else {
+		fmt.Println(resp)
 	}
 	for {
 		req := &api.PushRequest{
 			ProducerId: 1,
-			Topic:      "wuxi",
-			Key:        "hah",
-			Message:    "kk",
+			Topic:      "name",
+			Key:        "wuxi",
+			Message:    "like playing",
 		}
 		resp, err := client.Push(context.Background(), req)
 		if err != nil {

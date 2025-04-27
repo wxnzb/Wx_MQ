@@ -1,16 +1,32 @@
 package main
 
+//这个就是创建一个broker服务器
 import (
-	api "Wx_MQ/kitex_gen/api/client_operations"
-	"log"
+	//api "Wx_MQ/kitex_gen/api/client_operations"
+	//"log"
+	"net"
+	//这两个之间必须要给一个重新起一个名字，不然都是server.，那就会起冲突
+	Server "Wx_MQ/server"
+
+	"fmt"
+
+	"github.com/cloudwego/kitex/server"
 )
 
 func main() {
-	svr := api.NewServer(new(Client_OperationsImpl))
+	// svr := api.NewServer(new(Client_OperationsImpl))
 
-	err := svr.Run()
+	// err := svr.Run()
 
+	// if err != nil {
+	// 	log.Println(err.Error())
+	// }
+	addr, _ := net.ResolveTCPAddr("tcp", ":8888")
+	var opts []server.Option
+	opts = append(opts, server.WithServiceAddr(addr))
+	rpcServer := new(Server.RPCServer)
+	err := rpcServer.Start(opts)
 	if err != nil {
-		log.Println(err.Error())
+		fmt.Println(err.Error())
 	}
 }
