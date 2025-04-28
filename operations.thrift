@@ -56,3 +56,6 @@ struct PingpongResponse{
 service Client_Operations{
     PingpongResponse pingpong(1:PingpongRequest req)
 }
+struct SubscribeRequest{
+    1:int
+}
