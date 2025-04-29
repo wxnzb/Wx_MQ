@@ -28,6 +28,16 @@ struct infoRequest{
 struct infoResponse{
     1:bool ret
 }
+//消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
+struct SubRequest{
+    1:string consumer
+    2:string topic
+    3:string key//这里为什么要用key，感觉用分区就行了
+    4:i8 option
+}
+struct SubResponse{
+    1:bool ret
+}
 //服务器接口
 //在thrift中service相当于给operation_server定义了一个接口
 // push	处理生产者发来的推送消息
@@ -38,6 +48,7 @@ service Server_Operations{
     PushResponse push(1:PushRequest req)
     PullResponse pull(1:PullRequest req)
     infoResponse info(1:infoRequest req)
+    SubResponse sub(1:SubRequest req)
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。
 //PubRequest 是服务端→客户端，用于回调、下发、通知、甚至测试心跳机制。
@@ -54,8 +65,7 @@ struct PingpongResponse{
     1:bool pong
 }
 service Client_Operations{
+    PubResponse pub(1:PubRequest req)
     PingpongResponse pingpong(1:PingpongRequest req)
 }
-struct SubscribeRequest{
-    1:int
-}
+

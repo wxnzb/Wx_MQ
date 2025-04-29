@@ -226,6 +226,91 @@ var fieldIDToName_InfoResponse = map[int16]string{
 	1: "ret",
 }
 
+type SubRequest struct {
+	Consumer string `thrift:"consumer,1" frugal:"1,default,string" json:"consumer"`
+	Topic    string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
+	Key      string `thrift:"key,3" frugal:"3,default,string" json:"key"`
+	Option   int8   `thrift:"option,4" frugal:"4,default,i8" json:"option"`
+}
+
+func NewSubRequest() *SubRequest {
+	return &SubRequest{}
+}
+
+func (p *SubRequest) InitDefault() {
+}
+
+func (p *SubRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
+
+func (p *SubRequest) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *SubRequest) GetKey() (v string) {
+	return p.Key
+}
+
+func (p *SubRequest) GetOption() (v int8) {
+	return p.Option
+}
+func (p *SubRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
+func (p *SubRequest) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *SubRequest) SetKey(val string) {
+	p.Key = val
+}
+func (p *SubRequest) SetOption(val int8) {
+	p.Option = val
+}
+
+func (p *SubRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SubRequest(%+v)", *p)
+}
+
+var fieldIDToName_SubRequest = map[int16]string{
+	1: "consumer",
+	2: "topic",
+	3: "key",
+	4: "option",
+}
+
+type SubResponse struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewSubResponse() *SubResponse {
+	return &SubResponse{}
+}
+
+func (p *SubResponse) InitDefault() {
+}
+
+func (p *SubResponse) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *SubResponse) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *SubResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SubResponse(%+v)", *p)
+}
+
+var fieldIDToName_SubResponse = map[int16]string{
+	1: "ret",
+}
+
 type PubRequest struct {
 	Msg string `thrift:"msg,1" frugal:"1,default,string" json:"msg"`
 }
@@ -348,6 +433,8 @@ type Server_Operations interface {
 	Pull(ctx context.Context, req *PullRequest) (r *PullResponse, err error)
 
 	Info(ctx context.Context, req *InfoRequest) (r *InfoResponse, err error)
+
+	Sub(ctx context.Context, req *SubRequest) (r *SubResponse, err error)
 }
 
 type Server_OperationsPushArgs struct {
@@ -578,8 +665,162 @@ var fieldIDToName_Server_OperationsInfoResult = map[int16]string{
 	0: "success",
 }
 
+type Server_OperationsSubArgs struct {
+	Req *SubRequest `thrift:"req,1" frugal:"1,default,SubRequest" json:"req"`
+}
+
+func NewServer_OperationsSubArgs() *Server_OperationsSubArgs {
+	return &Server_OperationsSubArgs{}
+}
+
+func (p *Server_OperationsSubArgs) InitDefault() {
+}
+
+var Server_OperationsSubArgs_Req_DEFAULT *SubRequest
+
+func (p *Server_OperationsSubArgs) GetReq() (v *SubRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsSubArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsSubArgs) SetReq(val *SubRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsSubArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsSubArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsSubArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsSubArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsSubResult struct {
+	Success *SubResponse `thrift:"success,0,optional" frugal:"0,optional,SubResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsSubResult() *Server_OperationsSubResult {
+	return &Server_OperationsSubResult{}
+}
+
+func (p *Server_OperationsSubResult) InitDefault() {
+}
+
+var Server_OperationsSubResult_Success_DEFAULT *SubResponse
+
+func (p *Server_OperationsSubResult) GetSuccess() (v *SubResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsSubResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsSubResult) SetSuccess(x interface{}) {
+	p.Success = x.(*SubResponse)
+}
+
+func (p *Server_OperationsSubResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsSubResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsSubResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsSubResult = map[int16]string{
+	0: "success",
+}
+
 type Client_Operations interface {
+	Pub(ctx context.Context, req *PubRequest) (r *PubResponse, err error)
+
 	Pingpong(ctx context.Context, req *PingpongRequest) (r *PingpongResponse, err error)
+}
+
+type Client_OperationsPubArgs struct {
+	Req *PubRequest `thrift:"req,1" frugal:"1,default,PubRequest" json:"req"`
+}
+
+func NewClient_OperationsPubArgs() *Client_OperationsPubArgs {
+	return &Client_OperationsPubArgs{}
+}
+
+func (p *Client_OperationsPubArgs) InitDefault() {
+}
+
+var Client_OperationsPubArgs_Req_DEFAULT *PubRequest
+
+func (p *Client_OperationsPubArgs) GetReq() (v *PubRequest) {
+	if !p.IsSetReq() {
+		return Client_OperationsPubArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Client_OperationsPubArgs) SetReq(val *PubRequest) {
+	p.Req = val
+}
+
+func (p *Client_OperationsPubArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Client_OperationsPubArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Client_OperationsPubArgs(%+v)", *p)
+}
+
+var fieldIDToName_Client_OperationsPubArgs = map[int16]string{
+	1: "req",
+}
+
+type Client_OperationsPubResult struct {
+	Success *PubResponse `thrift:"success,0,optional" frugal:"0,optional,PubResponse" json:"success,omitempty"`
+}
+
+func NewClient_OperationsPubResult() *Client_OperationsPubResult {
+	return &Client_OperationsPubResult{}
+}
+
+func (p *Client_OperationsPubResult) InitDefault() {
+}
+
+var Client_OperationsPubResult_Success_DEFAULT *PubResponse
+
+func (p *Client_OperationsPubResult) GetSuccess() (v *PubResponse) {
+	if !p.IsSetSuccess() {
+		return Client_OperationsPubResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Client_OperationsPubResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PubResponse)
+}
+
+func (p *Client_OperationsPubResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Client_OperationsPubResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Client_OperationsPubResult(%+v)", *p)
+}
+
+var fieldIDToName_Client_OperationsPubResult = map[int16]string{
+	0: "success",
 }
 
 type Client_OperationsPingpongArgs struct {

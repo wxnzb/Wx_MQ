@@ -13,6 +13,13 @@ import (
 var errInvalidMessageType = errors.New("invalid message type for service method handler")
 
 var serviceMethods = map[string]kitex.MethodInfo{
+	"pub": kitex.NewMethodInfo(
+		pubHandler,
+		newClient_OperationsPubArgs,
+		newClient_OperationsPubResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"pingpong": kitex.NewMethodInfo(
 		pingpongHandler,
 		newClient_OperationsPingpongArgs,
@@ -86,6 +93,24 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	return svcInfo
 }
 
+func pubHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Client_OperationsPubArgs)
+	realResult := result.(*api.Client_OperationsPubResult)
+	success, err := handler.(api.Client_Operations).Pub(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newClient_OperationsPubArgs() interface{} {
+	return api.NewClient_OperationsPubArgs()
+}
+
+func newClient_OperationsPubResult() interface{} {
+	return api.NewClient_OperationsPubResult()
+}
+
 func pingpongHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.Client_OperationsPingpongArgs)
 	realResult := result.(*api.Client_OperationsPingpongResult)
@@ -112,6 +137,16 @@ func newServiceClient(c client.Client) *kClient {
 	return &kClient{
 		c: c,
 	}
+}
+
+func (p *kClient) Pub(ctx context.Context, req *api.PubRequest) (r *api.PubResponse, err error) {
+	var _args api.Client_OperationsPubArgs
+	_args.Req = req
+	var _result api.Client_OperationsPubResult
+	if err = p.c.Call(ctx, "pub", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
 }
 
 func (p *kClient) Pingpong(ctx context.Context, req *api.PingpongRequest) (r *api.PingpongResponse, err error) {

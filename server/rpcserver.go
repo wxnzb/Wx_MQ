@@ -64,3 +64,19 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 		Ret: true,
 	}, nil
 }
+func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubResponse, err error) {
+	err := s.server.SubHandle(sub{
+		consumer: req.Consumer,
+		topic:    req.Topic,
+		key:      req.Key,
+		option:   req.Option,
+	})
+	if err == nil {
+		return &api.SubResponse{
+			Ret: true,
+		}, nil
+	}
+	return &api.SubResponse{
+		Ret: false,
+	}, err
+}

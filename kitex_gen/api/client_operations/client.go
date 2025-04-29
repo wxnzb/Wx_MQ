@@ -11,6 +11,7 @@ import (
 
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
+	Pub(ctx context.Context, req *api.PubRequest, callOptions ...callopt.Option) (r *api.PubResponse, err error)
 	Pingpong(ctx context.Context, req *api.PingpongRequest, callOptions ...callopt.Option) (r *api.PingpongResponse, err error)
 }
 
@@ -41,6 +42,11 @@ func MustNewClient(destService string, opts ...client.Option) Client {
 
 type kClient_OperationsClient struct {
 	*kClient
+}
+
+func (p *kClient_OperationsClient) Pub(ctx context.Context, req *api.PubRequest, callOptions ...callopt.Option) (r *api.PubResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Pub(ctx, req)
 }
 
 func (p *kClient_OperationsClient) Pingpong(ctx context.Context, req *api.PingpongRequest, callOptions ...callopt.Option) (r *api.PingpongResponse, err error) {
