@@ -47,39 +47,40 @@ func (p *Partition) Release(s *Server) {
 		go p.Pub(cl)
 	}
 }
-func (p *Partition) Pub(cl *Client) {
+func (p *Partition) Pub(con *Consumer) {
 	//要是客户端活着，先得到消息
 	for {
-		cl.rmu.RLock()
+		con.rmu.RLock()
 		//cl.state=="alive写成这样可以吗
-		if cl.state == ALIVE {
-			name := cl.name
-			cl.rmu.RUnlock()
+		if con.state == ALIVE {
+			name := con.name
+			con.rmu.RUnlock()
 			p.rmu.RLock()
 			offset := p.consumer_offset[name]
 			msg := p.queue[offset]
 			p.rmu.Unlock()
-			ret := cl.Pub(msg)
+			ret := con.Pub(msg)
 			if ret {
 				p.rmu.Lock()
 				p.consumer_offset[name] = offset + 1
 				p.rmu.Unlock()
 			}
 		} else {
-			cl.rmu.Unlock()
+			con.rmu.Unlock()
 			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
 // ///////////////
-func (t *Topic) AddScription(sub Sub) (*SubScription, error) {
-	ret := t.getStringFromSub(sub)
+func (t *Topic) AddScription(req Sub) (*SubScription, error) {
+	ret := t.getStringFromSub(req)
+	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
 	subScription, ok := t.SubList[ret]
 	if ok {
-
+		subScription.AddConsumer(req)
 	} else {
-		subScription = NewSubScription(sub)
+		subScription = NewSubScription(req)
 	}
 	return subScription, nil
 }
@@ -99,6 +100,25 @@ func (t *Topic) getStringFromSub(sub Sub) string {
 	return ret
 }
 
+// 将消费者加入到这个订阅队列里面
+func (sub *SubScription) AddConsumer(req Sub) {
+	switch req.option {
+	//点对点订阅
+	case TOPIC_NIL_PTP:
+		{
+			//sub.groups[0].consumers[req.consumer]=true
+			sub.groups[0].AddClient(req.consumer)
+		}
+	//按key发布的订阅
+	case TOPIC_KEY_PSB:
+		{
+			group := NewGroup(req.topic, req.consumer)
+			sub.groups = append(sub.groups, group)
+			sub.consumer_partition[req.consumer] = req.key
+		}
+	}
+}
+
 // // 现在要我想，他就需要在哪个topic以及哪个分区，感觉没了
 //
 //	type SubScription struct {
@@ -108,6 +128,8 @@ func (t *Topic) getStringFromSub(sub Sub) string {
 //		groups             []*Group
 //		option             int8
 //	}
+//
+// 这里默认就是TOPIC_KEY_PSB形式
 func NewSubScription(sub Sub) *SubScription {
 	subScription := &SubScription{
 		rmu:                sync.RWMutex{},

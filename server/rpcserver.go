@@ -64,8 +64,8 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 		Ret: true,
 	}, nil
 }
-func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubResponse, err error) {
-	err := s.server.SubHandle(sub{
+func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubResponse, error) {
+	err := s.server.SubHandle(Sub{
 		consumer: req.Consumer,
 		topic:    req.Topic,
 		key:      req.Key,

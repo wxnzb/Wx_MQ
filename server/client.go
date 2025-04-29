@@ -23,8 +23,8 @@ const (
 	DONE  = "done"
 )
 
-// 这是一个客户端，他需要他唯一的名字，他现在的状态，还有他订阅的东西，
-type Client struct {
+// 这是一个消费者实体，他需要他唯一的名字，他现在的状态，还有他订阅的东西，
+type Consumer struct {
 	rmu      sync.RWMutex
 	name     string
 	state    string
@@ -33,8 +33,8 @@ type Client struct {
 }
 
 // 向服务器发消息
-func (cl *Client) Pub(msg string) bool {
-	resp, err := cl.consumer.Pub(context.Background(), &api.PubRequest{
+func (con *Consumer) Pub(msg string) bool {
+	resp, err := con.consumer.Pub(context.Background(), &api.PubRequest{
 		Msg: msg,
 	})
 	if err != nil || resp.Ret == false {
@@ -49,4 +49,14 @@ func NewGroup(topic, consumer string) *Group {
 	}
 	group.consumers[consumer] = true
 	return group
+}
+func (g *Group) AddClient(cli_name string) {
+	g.rmu.Lock()
+	defer g.rmu.Unlock()
+	g.consumers[cli_name] = true
+}
+func (con *Consumer) AddScription(sub *SubScription) {
+	con.rmu.Lock()
+	defer con.rmu.Unlock()
+	con.subList = append(con.subList, sub)
 }

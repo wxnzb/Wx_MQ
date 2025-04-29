@@ -45,6 +45,13 @@ func (s *Server) InfoHandle(ip_port string) error {
 }
 func (s *Server) PushHandle() {}
 func (s *Server) PullHandle() {}
-func (s *Server) SubHandle(sub Sub) {
-
+func (s *Server) SubHandle(req Sub) error {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	sub, err := s.topics[req.topic].AddScription(req)
+	if err != nil {
+		return err
+	}
+	s.consumers[req.consumer].AddScription(sub)
+	return nil
 }
