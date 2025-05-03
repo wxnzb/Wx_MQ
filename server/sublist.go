@@ -13,6 +13,7 @@ const (
 
 // 一个Topic下面对应多个分区，通过map以分区名字将分区连接，没个分区需要由读写锁还有一个byte的队列
 type Topic struct {
+	rmu     sync.RWMutex
 	Parts   map[string]*Partition    //key一般是分区的名字，value是分区的指针
 	SubList map[string]*SubScription //key是topicname+option类型，value是消费者订阅的信息
 }
@@ -44,6 +45,7 @@ func (p *Partition) Release(s *Server) {
 		s.rmu.Lock()
 		cl := s.consumers[consumer_name]
 		s.rmu.Unlock()
+		//开启新的携程服务端主动向消费者推送消息
 		go p.Pub(cl)
 	}
 }
@@ -66,7 +68,7 @@ func (p *Partition) Pub(con *Consumer) {
 				p.rmu.Unlock()
 			}
 		} else {
-			con.rmu.Unlock()
+			con.rmu.RUnlock()
 			time.Sleep(5 * time.Second)
 		}
 	}
@@ -141,4 +143,66 @@ func NewSubScription(sub Sub) *SubScription {
 	subScription.groups = append(subScription.groups, group)
 	subScription.consumer_partition[sub.consumer] = sub.key
 	return subScription
+}
+
+// PushRequest
+func (topic *Topic) AddMessage(s *Server, push Push) error {
+	part, ok := topic.Parts[push.key]
+	if !ok {
+		//要是没有这个分区，就要创建一个新的分区
+		part := NewPartition(push)
+		//这句还需要在理解
+		//先在这是一个分区，要是有消费者订阅，通过这个携程可以及时推送给他
+		go part.Release(s)
+		topic.Parts[push.key] = part
+
+	} else {
+		part.rmu.Lock()
+		part.queue = append(part.queue, push.message)
+		part.rmu.Unlock()
+	}
+	return nil
+}
+
+// 创建一个新的topic
+func NewTopic(push Push) *Topic {
+	topic := &Topic{
+		rmu:     sync.RWMutex{},
+		Parts:   make(map[string]*Partition),
+		SubList: make(map[string]*SubScription),
+	}
+	topic.Parts[push.key] = NewPartition(push)
+	return topic
+}
+
+// 创建一个新的分区
+func NewPartition(push Push) *Partition {
+	part := &Partition{
+		rmu:             sync.RWMutex{},
+		key:             push.key,
+		queue:           make([]string, 40),
+		consumer_offset: make(map[string]int),
+	}
+	part.queue = append(part.queue, push.message)
+	return part
+}
+func (sub *SubScription) shutDownConsumer(consumer_name string) {
+	sub.rmu.Lock()
+	switch sub.option {
+	case TOPIC_NIL_PTP:
+		{
+			sub.groups[0].DownConsumer(consumer_name)
+		}
+	case TOPIC_KEY_PSB:
+		{
+			for _, group := range sub.groups {
+				group.DownConsumer(consumer_name)
+			}
+		}
+	}
+	sub.rmu.Unlock()
+	sub.Rebalance()
+}
+func (sub *SubScription) Rebalance() {
+
 }

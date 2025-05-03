@@ -11,7 +11,7 @@ import (
 type Server struct {
 	topics map[string]*Topic
 	//groups map[string]Group
-	consumers map[string]*Client
+	consumers map[string]*Consumer
 	rmu       sync.RWMutex
 }
 type Sub struct {
@@ -23,7 +23,7 @@ type Sub struct {
 
 func (s *Server) make() {
 	s.topics = make(map[string]*Topic)
-	s.consumers = make(map[string]*Client)
+	s.consumers = make(map[string]*Consumer)
 	s.rmu = sync.RWMutex{}
 	s.StartRelease()
 }
@@ -39,12 +39,61 @@ func (s *Server) InfoHandle(ip_port string) error {
 	if err == nil {
 		//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
 		//s.groups["default"].consumers[ip_port] = &client
+		s.rmu.Lock()
+		consumer, ok := s.consumers[ip_port]
+		if !ok {
+			consumer = NewConsumer(ip_port, client)
+			s.consumers[ip_port] = consumer
+		}
+		go s.CheckConsumer(consumer)
+		s.rmu.Unlock()
 		return nil
 	}
 	return err
 }
-func (s *Server) PushHandle() {}
-func (s *Server) PullHandle() {}
+func (s *Server) CheckConsumer(consumer *Consumer) {
+	shutDown := consumer.CheckConsumer()
+	if shutDown {
+		consumer.rmu.Lock()
+		for _, subscription := range consumer.subList {
+			subscription.shutDownConsumer(consumer.name)
+		}
+		consumer.rmu.Unlock()
+	}
+}
+
+type Push struct {
+	producerId int64
+	topic      string
+	key        string
+	message    string
+}
+
+func (s *Server) PushHandle(push Push) error {
+	topic, ok := s.topics[push.topic]
+	if !ok {
+		//创建一个新的topic
+		topic := NewTopic(push)
+		s.rmu.Lock()
+		s.topics[push.topic] = topic
+		s.rmu.Unlock()
+	}
+	topic.AddMessage(s, push)
+	return nil
+}
+
+type PullRequest struct {
+	consumerId int64
+	topic      string
+	key        string
+}
+type PullResponse struct {
+	message string
+}
+
+func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
+	return PullResponse{message: "haha"}, nil
+}
 func (s *Server) SubHandle(req Sub) error {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()

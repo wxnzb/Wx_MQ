@@ -5,6 +5,7 @@ import (
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"context"
 	"sync"
+	"time"
 )
 
 // 这是消费组，一个消费组可以消费多个topic
@@ -59,4 +60,37 @@ func (con *Consumer) AddScription(sub *SubScription) {
 	con.rmu.Lock()
 	defer con.rmu.Unlock()
 	con.subList = append(con.subList, sub)
+}
+func NewConsumer(ip_port string, consumer client_operations.Client) *Consumer {
+	return &Consumer{
+		rmu:      sync.RWMutex{},
+		name:     ip_port,
+		state:    ALIVE,
+		subList:  make([]*SubScription, 0),
+		consumer: consumer,
+	}
+}
+func (con *Consumer) CheckConsumer() bool {
+	con.rmu = sync.RWMutex{}
+	for {
+		resp, err := con.consumer.Pingpong(context.Background(), &api.PingpongRequest{Ping: true})
+		if resp.Pong == false || err != nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	con.rmu.Lock()
+	con.state = DONE
+	con.rmu.Unlock()
+	return true
+}
+
+// 将消费者标记为不活跃
+func (g *Group) DownConsumer(consumer_name string) {
+	g.rmu.Lock()
+	//这里为什么不直接写成g.consumers[consumer_name] = false
+	if _, ok := g.consumers[consumer_name]; ok {
+		g.consumers[consumer_name] = false
+	}
+	g.rmu.Unlock()
 }

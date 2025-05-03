@@ -39,22 +39,43 @@ func (s *RPCServer) Start(opts []server.Option) error {
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
 	//打印要推送的消息
 	fmt.Println(req)
+	err = s.server.PushHandle(Push{
+		producerId: req.ProducerId,
+		topic:      req.Topic,
+		key:        req.Key,
+		message:    req.Message,
+	})
+	if err == nil {
+		return &api.PushResponse{
+			Ret: true,
+		}, nil
+	}
 	return &api.PushResponse{
-		Ret: true,
-	}, nil
+		Ret: false,
+	}, err
 }
 
 func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.PullResponse, err error) {
 	//打印要拉取的topic和分区
 	fmt.Println(req)
 	//打印拉取到的消息
+	ret, err := s.server.PullHandle(PullRequest{
+		consumerId: req.ConsumerId,
+		topic:      req.Topic,
+		key:        req.Key,
+	})
+	if err == nil {
+		return &api.PullResponse{
+			Message: ret.message,
+		}, nil
+	}
 	return &api.PullResponse{
 		Message: "Wx,you are good!",
-	}, nil
+	}, err
 }
 
 func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.InfoResponse, err error) {
-	err = s.server.HanderInfo(req.IpPort)
+	err = s.server.InfoHandle(req.IpPort)
 	if err != nil {
 		return &api.InfoResponse{
 			Ret: false,
