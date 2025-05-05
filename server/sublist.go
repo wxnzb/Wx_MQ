@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -28,11 +29,15 @@ type Partition struct {
 
 // 现在要我想，他就需要在哪个topic以及哪个分区，感觉没了
 type SubScription struct {
+	name               string //topicname+option类型
 	rmu                sync.RWMutex
 	topic_name         string
 	consumer_partition map[string]string //一个消费者可以属于多个消费者组
 	groups             []*Group
 	option             int8
+	consistent         *Consistent
+}
+type Consistent struct {
 }
 
 func (t *Topic) StartRelease(s *Server) {
@@ -43,10 +48,10 @@ func (t *Topic) StartRelease(s *Server) {
 func (p *Partition) Release(s *Server) {
 	for consumer_name := range p.consumer_offset {
 		s.rmu.Lock()
-		cl := s.consumers[consumer_name]
+		con := s.consumers[consumer_name]
 		s.rmu.Unlock()
 		//开启新的携程服务端主动向消费者推送消息
-		go p.Pub(cl)
+		go p.Pub(con)
 	}
 }
 func (p *Partition) Pub(con *Consumer) {
@@ -75,16 +80,40 @@ func (p *Partition) Pub(con *Consumer) {
 }
 
 // ///////////////
-func (t *Topic) AddScription(req Sub) (*SubScription, error) {
+func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
 	ret := t.getStringFromSub(req)
 	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
+	t.rmu.RLock()
 	subScription, ok := t.SubList[ret]
+	t.rmu.RUnlock()
 	if ok {
 		subScription.AddConsumer(req)
 	} else {
-		subScription = NewSubScription(req)
+		subScription = NewSubScription(req, ret)
+		//更新订阅列表
+		t.rmu.Lock()
+		t.SubList[ret] = subScription
+		t.rmu.Unlock()
 	}
+	//t.Parts.AddConsumer(con)??这个记得明天写一下，加上con就是为他服务的
+	t.Rebalance()
 	return subScription, nil
+}
+
+// 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
+func (t *Topic) ReduceScription(req Sub) (string, error) {
+	ret := t.getStringFromSub(req)
+	t.rmu.Lock()
+	_, ok := t.SubList[ret]
+	t.rmu.RUnlock()
+	if ok {
+		delete(t.SubList, ret)
+	} else {
+		errors.New("订阅不存在")
+	}
+	t.rmu.Unlock()
+	t.Rebalance()
+	return ret, nil
 }
 
 // topic + "nil" + "ptp" (point to point consumer比partition为 1 : n)
@@ -109,7 +138,7 @@ func (sub *SubScription) AddConsumer(req Sub) {
 	case TOPIC_NIL_PTP:
 		{
 			//sub.groups[0].consumers[req.consumer]=true
-			sub.groups[0].AddClient(req.consumer)
+			sub.groups[0].AddConsumer(req.consumer)
 		}
 	//按key发布的订阅
 	case TOPIC_KEY_PSB:
@@ -132,17 +161,30 @@ func (sub *SubScription) AddConsumer(req Sub) {
 //	}
 //
 // 这里默认就是TOPIC_KEY_PSB形式
-func NewSubScription(sub Sub) *SubScription {
+func NewSubScription(sub Sub, ret string) *SubScription {
 	subScription := &SubScription{
 		rmu:                sync.RWMutex{},
 		topic_name:         sub.topic,
 		consumer_partition: make(map[string]string),
 		option:             sub.option,
+		name:               ret,
 	}
 	group := NewGroup(sub.topic, sub.consumer)
 	subScription.groups = append(subScription.groups, group)
 	subScription.consumer_partition[sub.consumer] = sub.key
+	//直接在这里加上点对点还是先有点问题
+	if sub.option == TOPIC_NIL_PTP {
+		//初始化哈希，然后将这个消费者加进去
+		subScription.consistent = NewConsistent()
+		subScription.consistent.Add(sub.consumer)
+	}
 	return subScription
+}
+func NewConsistent() *Consistent {
+
+}
+func (cons *Consistent) Add(consumer string) {
+
 }
 
 // PushRequest
@@ -153,6 +195,7 @@ func (topic *Topic) AddMessage(s *Server, push Push) error {
 		part := NewPartition(push)
 		//这句还需要在理解
 		//先在这是一个分区，要是有消费者订阅，通过这个携程可以及时推送给他
+		//这里真的需要用携程吗？
 		go part.Release(s)
 		topic.Parts[push.key] = part
 
@@ -186,7 +229,7 @@ func NewPartition(push Push) *Partition {
 	part.queue = append(part.queue, push.message)
 	return part
 }
-func (sub *SubScription) shutDownConsumer(consumer_name string) {
+func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	sub.rmu.Lock()
 	switch sub.option {
 	case TOPIC_NIL_PTP:
@@ -202,7 +245,14 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) {
 	}
 	sub.rmu.Unlock()
 	sub.Rebalance()
+	return sub.topic_name
 }
 func (sub *SubScription) Rebalance() {
+
+}
+func (t *Topic) Rebalance() {
+
+}
+func (t *Topic) RecoverConsumer(sub_name string, con *Consumer) {
 
 }

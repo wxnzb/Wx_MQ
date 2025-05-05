@@ -5,6 +5,8 @@ import (
 
 	"sync"
 
+	"errors"
+
 	cl "github.com/cloudwego/kitex/client"
 )
 
@@ -46,6 +48,7 @@ func (s *Server) InfoHandle(ip_port string) error {
 			s.consumers[ip_port] = consumer
 		}
 		go s.CheckConsumer(consumer)
+		go s.RecoverConsumer(consumer)
 		s.rmu.Unlock()
 		return nil
 	}
@@ -56,10 +59,25 @@ func (s *Server) CheckConsumer(consumer *Consumer) {
 	if shutDown {
 		consumer.rmu.Lock()
 		for _, subscription := range consumer.subList {
-			subscription.shutDownConsumer(consumer.name)
+			topic_name := subscription.shutDownConsumer(consumer.name)
+			//我现在感觉s.topics[subscription.topic_name].Rebalance()这样写不是更简单吗,还不用给shutDownConsumer这个函数加返回值
+			s.topics[topic_name].Rebalance()
 		}
 		consumer.rmu.Unlock()
 	}
+}
+
+// 上面的要是失败了死了就取消，现在又要将他变成活得
+func (s *Server) RecoverConsumer(consumer *Consumer) {
+	s.rmu.Lock()
+	consumer.rmu.Lock()
+	//这里为什么又要将他变成活着的状态
+	consumer.state = ALIVE
+	for sub_name, sub := range consumer.subList {
+		go s.topics[sub.topic_name].RecoverConsumer(sub_name, consumer)
+	}
+	consumer.rmu.Unlock()
+	s.rmu.Unlock()
 }
 
 type Push struct {
@@ -97,10 +115,31 @@ func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
 func (s *Server) SubHandle(req Sub) error {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	sub, err := s.topics[req.topic].AddScription(req)
+	//这里还得先判断一下这个topic有没有
+	topic, ok := s.topics[req.topic]
+	if !ok {
+		return errors.New("topic not exist")
+	}
+	//sub, err := s.topics[req.topic].AddScription(req)
+	sub, err := topic.AddScription(req, s.consumers[req.consumer])
 	if err != nil {
 		return err
 	}
 	s.consumers[req.consumer].AddScription(sub)
+	return nil
+}
+func (s *Server) UnSubHandle(req Sub) error {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	//这里还得先判断一下这个topic有没有
+	topic, ok := s.topics[req.topic]
+	if !ok {
+		return errors.New("topic not exist")
+	}
+	sub_name, err := topic.ReduceScription(req)
+	if err != nil {
+		return err
+	}
+	s.consumers[req.consumer].ReduceScription(sub_name)
 	return nil
 }

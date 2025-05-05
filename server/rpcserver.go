@@ -70,7 +70,7 @@ func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.Pull
 		}, nil
 	}
 	return &api.PullResponse{
-		Message: "Wx,you are good!",
+		Message: "error",
 	}, err
 }
 
