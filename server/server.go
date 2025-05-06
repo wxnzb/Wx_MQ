@@ -16,12 +16,6 @@ type Server struct {
 	consumers map[string]*Consumer
 	rmu       sync.RWMutex
 }
-type Sub struct {
-	consumer string
-	topic    string
-	key      string
-	option   int8
-}
 
 func (s *Server) make() {
 	s.topics = make(map[string]*Topic)
@@ -112,6 +106,14 @@ type PullResponse struct {
 func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
 	return PullResponse{message: "haha"}, nil
 }
+
+type Sub struct {
+	consumer string
+	topic    string
+	key      string
+	option   int8
+}
+
 func (s *Server) SubHandle(req Sub) error {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()

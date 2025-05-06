@@ -2,48 +2,142 @@ package server
 
 import (
 	"errors"
+	"hash/crc32"
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
 
 const (
+	OFFSET        = 0
 	TOPIC_NIL_PTP = 1
 	TOPIC_NIL_PSB = 2
 	TOPIC_KEY_PSB = 3
 )
 
-// 一个Topic下面对应多个分区，通过map以分区名字将分区连接，没个分区需要由读写锁还有一个byte的队列
 type Topic struct {
 	rmu     sync.RWMutex
-	Parts   map[string]*Partition    //key一般是分区的名字，value是分区的指针
-	SubList map[string]*SubScription //key是topicname+option类型，value是消费者订阅的信息
+	Parts   map[string]*Partition    //分区列表
+	SubList map[string]*SubScription //订阅列表
 }
 
-// 一个分区需要哪些信息？这个分区肯定要有自己的名字，这个分区肯定存了很多信息在队列，这里先用string类型，这个分区里面可定有很多消费者，每个消费者都应该知道他消费到哪条信息了，因此还需要偏移量
-type Partition struct {
-	rmu             sync.RWMutex
-	key             string
-	queue           []string
-	consumer_offset map[string]int //这里string是某个消费者的唯一标识，int就是他消费到的偏移量
+// 创建一个新的topic
+func NewTopic(push Push) *Topic {
+	topic := &Topic{
+		rmu:     sync.RWMutex{},
+		Parts:   make(map[string]*Partition),
+		SubList: make(map[string]*SubScription),
+	}
+	topic.Parts[push.key] = NewPartition(push)
+	return topic
 }
 
-// 现在要我想，他就需要在哪个topic以及哪个分区，感觉没了
-type SubScription struct {
-	name               string //topicname+option类型
-	rmu                sync.RWMutex
-	topic_name         string
-	consumer_partition map[string]string //一个消费者可以属于多个消费者组
-	groups             []*Group
-	option             int8
-	consistent         *Consistent
-}
-type Consistent struct {
-}
-
+// 开始server.make()的时候调用
 func (t *Topic) StartRelease(s *Server) {
 	for _, part := range t.Parts {
 		part.Release(s)
 	}
+}
+
+// PushRequest
+func (topic *Topic) AddMessage(s *Server, push Push) error {
+	part, ok := topic.Parts[push.key]
+	if !ok {
+		//要是没有这个分区，就要创建一个新的分区
+		part := NewPartition(push)
+		//这句还需要在理解
+		//先在这是一个分区，要是有消费者订阅，通过这个携程可以及时推送给他
+		//这里真的需要用携程吗？
+		go part.Release(s)
+		topic.Parts[push.key] = part
+
+	} else {
+		part.rmu.Lock()
+		part.queue = append(part.queue, push.message)
+		part.rmu.Unlock()
+	}
+	return nil
+}
+
+// 增加一个新的订阅
+func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
+	ret := t.getStringFromSub(req)
+	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
+	t.rmu.RLock()
+	subScription, ok := t.SubList[ret]
+	t.rmu.RUnlock()
+	if ok {
+		subScription.AddConsumer(req)
+	} else {
+		subScription = NewSubScription(req, ret)
+		//更新订阅列表
+		t.rmu.Lock()
+		t.SubList[ret] = subScription
+		t.rmu.Unlock()
+	}
+	//t.Parts.AddConsumer(con)这个现在还不太清楚，先把他删了把
+	t.Rebalance()
+	return subScription, nil
+}
+
+// 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
+func (t *Topic) ReduceScription(req Sub) (string, error) {
+	ret := t.getStringFromSub(req)
+	t.rmu.RLock()
+	_, ok := t.SubList[ret]
+	t.rmu.RUnlock()
+	if ok {
+		delete(t.SubList, ret)
+	} else {
+		errors.New("订阅不存在")
+	}
+	t.rmu.Unlock()
+	t.Rebalance()
+	return ret, nil
+}
+
+// topic + "nil" + "ptp" (point to point consumer比partition为 1 : n)
+// topic + key   + "psb" (pub and sub consumer比partition为 n : 1)
+// topic + "nil" + "psb" (pub and sub consumer比partition为 n : n)
+func (t *Topic) getStringFromSub(sub Sub) string {
+	ret := sub.topic
+	if sub.option == TOPIC_NIL_PTP {
+		ret = ret + "nil" + "ptp"
+	} else if sub.option == TOPIC_NIL_PSB {
+		ret = ret + "nil" + "psb"
+	} else if sub.option == TOPIC_KEY_PSB {
+		ret = ret + sub.key + "psb"
+	}
+	return ret
+}
+func (t *Topic) Rebalance() {
+
+}
+func (t *Topic) RecoverConsumer(sub_name string, con *Consumer) {
+
+}
+
+// ---------------------------------------------------------------------------
+type Partition struct {
+	rmu             sync.RWMutex
+	key             string               //分区名字
+	queue           []string             //分区里面存的消息队列
+	consumer_offset map[string]int       //消费者偏移列表
+	consumer        map[string]*Consumer //消费者列表
+}
+
+// 创建一个新的分区
+func NewPartition(req Push) *Partition {
+	part := &Partition{
+		rmu:             sync.RWMutex{},
+		key:             req.key,
+		queue:           make([]string, 40),
+		consumer_offset: make(map[string]int),
+		//consumer:make(map[string]*Consumer),不用加这句吗
+	}
+	part.queue = append(part.queue, req.message)
+	return part
 }
 func (p *Partition) Release(s *Server) {
 	for consumer_name := range p.consumer_offset {
@@ -79,56 +173,44 @@ func (p *Partition) Pub(con *Consumer) {
 	}
 }
 
-// ///////////////
-func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
-	ret := t.getStringFromSub(req)
-	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
-	t.rmu.RLock()
-	subScription, ok := t.SubList[ret]
-	t.rmu.RUnlock()
-	if ok {
-		subScription.AddConsumer(req)
-	} else {
-		subScription = NewSubScription(req, ret)
-		//更新订阅列表
-		t.rmu.Lock()
-		t.SubList[ret] = subScription
-		t.rmu.Unlock()
-	}
-	//t.Parts.AddConsumer(con)??这个记得明天写一下，加上con就是为他服务的
-	t.Rebalance()
-	return subScription, nil
+// 将消费者添加到这个分区
+func (p *Partition) AddConsumer(con *Consumer) {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	p.consumer[con.name] = con
+	p.consumer_offset[con.name] = OFFSET
 }
 
-// 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
-func (t *Topic) ReduceScription(req Sub) (string, error) {
-	ret := t.getStringFromSub(req)
-	t.rmu.Lock()
-	_, ok := t.SubList[ret]
-	t.rmu.RUnlock()
-	if ok {
-		delete(t.SubList, ret)
-	} else {
-		errors.New("订阅不存在")
-	}
-	t.rmu.Unlock()
-	t.Rebalance()
-	return ret, nil
+// -----------------------------------------------------------
+type SubScription struct {
+	name               string //topicname+option类型
+	rmu                sync.RWMutex
+	topic_name         string
+	consumer_partition map[string]string //一个消费者可以属于多个消费者组
+	groups             []*Group
+	option             int8
+	consistent         *Consistent
 }
 
-// topic + "nil" + "ptp" (point to point consumer比partition为 1 : n)
-// topic + key   + "psb" (pub and sub consumer比partition为 n : 1)
-// topic + "nil" + "psb" (pub and sub consumer比partition为 n : n)
-func (t *Topic) getStringFromSub(sub Sub) string {
-	ret := sub.topic
+// 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
+func NewSubScription(sub Sub, ret string) *SubScription {
+	subScription := &SubScription{
+		rmu:                sync.RWMutex{},
+		topic_name:         sub.topic,
+		consumer_partition: make(map[string]string),
+		option:             sub.option,
+		name:               ret,
+	}
+	group := NewGroup(sub.topic, sub.consumer)
+	subScription.groups = append(subScription.groups, group)
+	subScription.consumer_partition[sub.consumer] = sub.key
+	//直接在这里加上点对点还是先有点问题
 	if sub.option == TOPIC_NIL_PTP {
-		ret = ret + "nil" + "ptp"
-	} else if sub.option == TOPIC_NIL_PSB {
-		ret = ret + "nil" + "psb"
-	} else if sub.option == TOPIC_KEY_PSB {
-		ret = ret + sub.key + "psb"
+		//初始化哈希，然后将这个消费者加进去
+		subScription.consistent = NewConsistent()
+		subScription.consistent.Add(sub.consumer)
 	}
-	return ret
+	return subScription
 }
 
 // 将消费者加入到这个订阅队列里面
@@ -150,85 +232,7 @@ func (sub *SubScription) AddConsumer(req Sub) {
 	}
 }
 
-// // 现在要我想，他就需要在哪个topic以及哪个分区，感觉没了
-//
-//	type SubScription struct {
-//		mu                 sync.RWMutex
-//		topic_name         string
-//		consumer_partition map[string]string //一个消费者可以属于多个消费者组
-//		groups             []*Group
-//		option             int8
-//	}
-//
-// 这里默认就是TOPIC_KEY_PSB形式
-func NewSubScription(sub Sub, ret string) *SubScription {
-	subScription := &SubScription{
-		rmu:                sync.RWMutex{},
-		topic_name:         sub.topic,
-		consumer_partition: make(map[string]string),
-		option:             sub.option,
-		name:               ret,
-	}
-	group := NewGroup(sub.topic, sub.consumer)
-	subScription.groups = append(subScription.groups, group)
-	subScription.consumer_partition[sub.consumer] = sub.key
-	//直接在这里加上点对点还是先有点问题
-	if sub.option == TOPIC_NIL_PTP {
-		//初始化哈希，然后将这个消费者加进去
-		subScription.consistent = NewConsistent()
-		subScription.consistent.Add(sub.consumer)
-	}
-	return subScription
-}
-func NewConsistent() *Consistent {
-
-}
-func (cons *Consistent) Add(consumer string) {
-
-}
-
-// PushRequest
-func (topic *Topic) AddMessage(s *Server, push Push) error {
-	part, ok := topic.Parts[push.key]
-	if !ok {
-		//要是没有这个分区，就要创建一个新的分区
-		part := NewPartition(push)
-		//这句还需要在理解
-		//先在这是一个分区，要是有消费者订阅，通过这个携程可以及时推送给他
-		//这里真的需要用携程吗？
-		go part.Release(s)
-		topic.Parts[push.key] = part
-
-	} else {
-		part.rmu.Lock()
-		part.queue = append(part.queue, push.message)
-		part.rmu.Unlock()
-	}
-	return nil
-}
-
-// 创建一个新的topic
-func NewTopic(push Push) *Topic {
-	topic := &Topic{
-		rmu:     sync.RWMutex{},
-		Parts:   make(map[string]*Partition),
-		SubList: make(map[string]*SubScription),
-	}
-	topic.Parts[push.key] = NewPartition(push)
-	return topic
-}
-
-// 创建一个新的分区
-func NewPartition(push Push) *Partition {
-	part := &Partition{
-		rmu:             sync.RWMutex{},
-		key:             push.key,
-		queue:           make([]string, 40),
-		consumer_offset: make(map[string]int),
-	}
-	part.queue = append(part.queue, push.message)
-	return part
-}
+// 将消费者从订阅队列里面移除
 func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	sub.rmu.Lock()
 	switch sub.option {
@@ -250,9 +254,91 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 func (sub *SubScription) Rebalance() {
 
 }
-func (t *Topic) Rebalance() {
 
+// -------------------------------------------------------------
+type Consistent struct {
+	rmu              sync.RWMutex
+	hashSortNodes    []uint32          //排序的虚拟节点
+	circleNodes      map[uint32]string //虚拟节点对应的世纪节点
+	virtualNodeCount int               //虚拟节点数量
+	nodes            map[string]bool   //已绑定的世纪节点为true，这个还不太了解
 }
-func (t *Topic) RecoverConsumer(sub_name string, con *Consumer) {
 
+func NewConsistent() *Consistent {
+	return &Consistent{
+		rmu:              sync.RWMutex{},
+		hashSortNodes:    make([]uint32, 0),
+		circleNodes:      make(map[uint32]string),
+		virtualNodeCount: 10,
+		nodes:            make(map[string]bool),
+	}
+}
+func (c *Consistent) hashKey(key string) uint32 {
+	return crc32.ChecksumIEEE([]byte(key))
+}
+func (c *Consistent) Add(node string) error {
+	if node == "" {
+		return nil
+	}
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	ok := c.nodes[node]
+	if ok {
+		return errors.New("node already exist")
+	}
+	c.nodes[node] = true
+	for i := 0; i < c.virtualNodeCount; i++ {
+		virtualnode := c.hashKey(node + strconv.Itoa(i))
+		c.circleNodes[virtualnode] = node
+		c.hashSortNodes = append(c.hashSortNodes, virtualnode)
+	}
+	sort.Slice(c.hashSortNodes, func(i, j int) bool {
+		return c.hashSortNodes[i] < c.hashSortNodes[j]
+	})
+	return nil
+}
+func (c *Consistent) Reduce(node string) error {
+	if node == "" {
+		return nil
+	}
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	ok := c.nodes[node]
+	if !ok {
+		return errors.New("node not exist")
+	}
+	c.nodes[node] = false
+	for i := 0; i < c.virtualNodeCount; i++ {
+		virtualnode := c.hashKey(node + strconv.Itoa(i))
+		delete(c.circleNodes, virtualnode)
+		for j := 0; j < len(c.hashSortNodes); j++ {
+			if c.hashSortNodes[j] == virtualnode && j != len(c.hashSortNodes)-1 {
+				c.hashSortNodes = append(c.hashSortNodes[:j], c.hashSortNodes[j+1:]...)
+			} else if c.hashSortNodes[j] == virtualnode && j == len(c.hashSortNodes)-1 {
+				c.hashSortNodes = c.hashSortNodes[:j]
+			}
+		}
+	}
+	sort.Slice(c.hashSortNodes, func(i, j int) bool {
+		return c.hashSortNodes[i] < c.hashSortNodes[j]
+	})
+	return nil
+}
+
+// 一致性哈希环的顺时针查找最近节点
+func (c *Consistent) GetNode(key string) string {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	hashKey := c.hashKey(key)
+	i := c.getposition(hashKey)
+	return c.circleNodes[c.hashSortNodes[i]]
+}
+func (c *Consistent) getposition(hashKey uint32) int {
+	i := sort.Search(len(c.hashSortNodes), func(i int) bool {
+		return c.hashSortNodes[i] >= hashKey
+	})
+	if i == len(c.hashSortNodes) {
+		return 0
+	}
+	return i
 }
