@@ -139,6 +139,8 @@ func NewPartition(req Push) *Partition {
 	part.queue = append(part.queue, req.message)
 	return part
 }
+
+// 发布消息给所有分区的消费者
 func (p *Partition) Release(s *Server) {
 	for consumer_name := range p.consumer_offset {
 		s.rmu.Lock()
@@ -148,6 +150,8 @@ func (p *Partition) Release(s *Server) {
 		go p.Pub(con)
 	}
 }
+
+// 发布消息给特定的消费者，根据消费者的状态决定是否继续发送消息
 func (p *Partition) Pub(con *Consumer) {
 	//要是客户端活着，先得到消息
 	for {
@@ -179,6 +183,12 @@ func (p *Partition) AddConsumer(con *Consumer) {
 	defer p.rmu.Unlock()
 	p.consumer[con.name] = con
 	p.consumer_offset[con.name] = OFFSET
+}
+func (p *Partition) DeleteConsumer(con *Consumer) {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	delete(p.consumer, con.name)
+	delete(p.consumer_offset, con.name)
 }
 
 // -----------------------------------------------------------
@@ -213,6 +223,7 @@ func NewSubScription(sub Sub, ret string) *SubScription {
 	return subScription
 }
 
+// ---这个也不要了吗
 // 将消费者加入到这个订阅队列里面
 func (sub *SubScription) AddConsumer(req Sub) {
 	switch req.option {
@@ -232,13 +243,15 @@ func (sub *SubScription) AddConsumer(req Sub) {
 	}
 }
 
-// 将消费者从订阅队列里面移除
+// 将消费者从订阅队列里面移除，这里没有真正删除，只是将他标为不活跃
 func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	sub.rmu.Lock()
 	switch sub.option {
 	case TOPIC_NIL_PTP:
 		{
 			sub.groups[0].DownConsumer(consumer_name)
+			sub.consistent.Reduce(consumer_name)
+
 		}
 	case TOPIC_KEY_PSB:
 		{
@@ -248,8 +261,45 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 		}
 	}
 	sub.rmu.Unlock()
-	sub.Rebalance()
+	//sub.Rebalance()好像不需要这句
 	return sub.topic_name
+}
+func (sub *SubScription) ReduceConsumer(consumer_name string) {
+	sub.rmu.Lock()
+	switch sub.option {
+	case TOPIC_NIL_PTP:
+		{
+			sub.groups[0].DeleteConsumer(consumer_name)
+			sub.consistent.Reduce(consumer_name)
+
+		}
+	case TOPIC_KEY_PSB:
+		{
+			for _, group := range sub.groups {
+				group.DeleteConsumer(consumer_name)
+			}
+		}
+	}
+	sub.rmu.Unlock()
+}
+
+// 恢复消费者
+func (sub *SubScription) RecoverConsumer(req Sub) {
+	sub.rmu.Lock()
+	switch sub.option {
+	case TOPIC_NIL_PTP:
+		{
+			sub.groups[0].RecoverConsumer(req.consumer)
+			sub.consistent.Add(req.consumer)
+		}
+	case TOPIC_KEY_PSB:
+		{
+			group := NewGroup(req.topic, req.consumer)
+			sub.groups = append(sub.groups, group)
+			sub.consumer_partition[req.consumer] = req.key
+		}
+	}
+	sub.rmu.Unlock()
 }
 func (sub *SubScription) Rebalance() {
 

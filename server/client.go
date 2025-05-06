@@ -4,6 +4,7 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
@@ -106,4 +107,22 @@ func (g *Group) DeleteConsumer(consumer_name string) {
 		delete(g.consumers, consumer_name)
 	}
 	g.rmu.Unlock()
+}
+
+// 恢复消费者
+func (g *Group) RecoverConsumer(consumer_name string) {
+	g.rmu.Lock()
+	defer g.rmu.Unlock()
+	_, ok := g.consumers[consumer_name]
+	//先看这个消费这存在这不
+	if ok {
+		if g.consumers[consumer_name] {
+			errors.New("consumer is alive")
+		} else {
+			g.consumers[consumer_name] = true
+		}
+
+	} else {
+		errors.New("no such consumer")
+	}
 }
