@@ -88,6 +88,13 @@ func (con *Consumer) CheckConsumer() bool {
 	return true
 }
 
+// 移除订阅
+func (con *Consumer) ReduceScription(sub_name string) {
+	con.rmu.Lock()
+	defer con.rmu.Unlock()
+	delete(con.subList, sub_name)
+}
+
 // 将消费者标记为不活跃，现在是当消费者不能发送ping的时候就找到的他所有的订阅，然后将他的所有订阅的组里都标记为不活跃，为什么不直接删除？？
 func (g *Group) DownConsumer(consumer_name string) {
 	g.rmu.Lock()
@@ -114,7 +121,7 @@ func (g *Group) RecoverConsumer(consumer_name string) {
 	g.rmu.Lock()
 	defer g.rmu.Unlock()
 	_, ok := g.consumers[consumer_name]
-	//先看这个消费这存在这不
+	//
 	if ok {
 		if g.consumers[consumer_name] {
 			errors.New("consumer is alive")

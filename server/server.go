@@ -93,6 +93,18 @@ func (s *Server) PushHandle(push Push) error {
 	topic.AddMessage(s, push)
 	return nil
 }
+func (s *Server) AddMessage(topic *Topic, req Push) {
+	part, ok := topic.Parts[req.key]
+	if ok {
+		part.rmu.Lock()
+		part.queue = append(part.queue, req.message)
+		part.rmu.Unlock()
+	} else {
+		part = NewPartition(req)
+		go part.Release(s)
+		topic.Parts[req.key] = part
+	}
+}
 
 type PullRequest struct {
 	consumerId int64

@@ -14,6 +14,8 @@ const (
 	TOPIC_NIL_PTP = 1
 	TOPIC_NIL_PSB = 2
 	TOPIC_KEY_PSB = 3
+	VIARUAL_10    = 10
+	VIRTUAL_20    = 20
 )
 
 type Topic struct {
