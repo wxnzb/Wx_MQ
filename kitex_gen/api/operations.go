@@ -8,7 +8,7 @@ import (
 )
 
 type PushRequest struct {
-	ProducerId int64  `thrift:"producerId,1" frugal:"1,default,i64" json:"producerId"`
+	ProducerId string `thrift:"producerId,1" frugal:"1,default,string" json:"producerId"`
 	Topic      string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
 	Key        string `thrift:"key,3" frugal:"3,default,string" json:"key"`
 	Message    string `thrift:"message,4" frugal:"4,default,string" json:"message"`
@@ -21,7 +21,7 @@ func NewPushRequest() *PushRequest {
 func (p *PushRequest) InitDefault() {
 }
 
-func (p *PushRequest) GetProducerId() (v int64) {
+func (p *PushRequest) GetProducerId() (v string) {
 	return p.ProducerId
 }
 
@@ -36,7 +36,7 @@ func (p *PushRequest) GetKey() (v string) {
 func (p *PushRequest) GetMessage() (v string) {
 	return p.Message
 }
-func (p *PushRequest) SetProducerId(val int64) {
+func (p *PushRequest) SetProducerId(val string) {
 	p.ProducerId = val
 }
 func (p *PushRequest) SetTopic(val string) {
@@ -93,7 +93,7 @@ var fieldIDToName_PushResponse = map[int16]string{
 }
 
 type PullRequest struct {
-	ConsumerId int64  `thrift:"consumerId,1" frugal:"1,default,i64" json:"consumerId"`
+	ConsumerId string `thrift:"consumerId,1" frugal:"1,default,string" json:"consumerId"`
 	Topic      string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
 	Key        string `thrift:"key,3" frugal:"3,default,string" json:"key"`
 }
@@ -105,7 +105,7 @@ func NewPullRequest() *PullRequest {
 func (p *PullRequest) InitDefault() {
 }
 
-func (p *PullRequest) GetConsumerId() (v int64) {
+func (p *PullRequest) GetConsumerId() (v string) {
 	return p.ConsumerId
 }
 
@@ -116,7 +116,7 @@ func (p *PullRequest) GetTopic() (v string) {
 func (p *PullRequest) GetKey() (v string) {
 	return p.Key
 }
-func (p *PullRequest) SetConsumerId(val int64) {
+func (p *PullRequest) SetConsumerId(val string) {
 	p.ConsumerId = val
 }
 func (p *PullRequest) SetTopic(val string) {
@@ -226,6 +226,100 @@ var fieldIDToName_InfoResponse = map[int16]string{
 	1: "ret",
 }
 
+type InfoGetRequest struct {
+	Cli_Name       string `thrift:"cli_Name,1" frugal:"1,default,string" json:"cli_Name"`
+	Topic_Name     string `thrift:"topic_Name,2" frugal:"2,default,string" json:"topic_Name"`
+	Partition_Name string `thrift:"partition_Name,3" frugal:"3,default,string" json:"partition_Name"`
+	Offset         int64  `thrift:"offset,4" frugal:"4,default,i64" json:"offset"`
+	Option         int8   `thrift:"option,5" frugal:"5,default,i8" json:"option"`
+}
+
+func NewInfoGetRequest() *InfoGetRequest {
+	return &InfoGetRequest{}
+}
+
+func (p *InfoGetRequest) InitDefault() {
+}
+
+func (p *InfoGetRequest) GetCli_Name() (v string) {
+	return p.Cli_Name
+}
+
+func (p *InfoGetRequest) GetTopic_Name() (v string) {
+	return p.Topic_Name
+}
+
+func (p *InfoGetRequest) GetPartition_Name() (v string) {
+	return p.Partition_Name
+}
+
+func (p *InfoGetRequest) GetOffset() (v int64) {
+	return p.Offset
+}
+
+func (p *InfoGetRequest) GetOption() (v int8) {
+	return p.Option
+}
+func (p *InfoGetRequest) SetCli_Name(val string) {
+	p.Cli_Name = val
+}
+func (p *InfoGetRequest) SetTopic_Name(val string) {
+	p.Topic_Name = val
+}
+func (p *InfoGetRequest) SetPartition_Name(val string) {
+	p.Partition_Name = val
+}
+func (p *InfoGetRequest) SetOffset(val int64) {
+	p.Offset = val
+}
+func (p *InfoGetRequest) SetOption(val int8) {
+	p.Option = val
+}
+
+func (p *InfoGetRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("InfoGetRequest(%+v)", *p)
+}
+
+var fieldIDToName_InfoGetRequest = map[int16]string{
+	1: "cli_Name",
+	2: "topic_Name",
+	3: "partition_Name",
+	4: "offset",
+	5: "option",
+}
+
+type InfoGetResponse struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewInfoGetResponse() *InfoGetResponse {
+	return &InfoGetResponse{}
+}
+
+func (p *InfoGetResponse) InitDefault() {
+}
+
+func (p *InfoGetResponse) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *InfoGetResponse) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *InfoGetResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("InfoGetResponse(%+v)", *p)
+}
+
+var fieldIDToName_InfoGetResponse = map[int16]string{
+	1: "ret",
+}
+
 type SubRequest struct {
 	Consumer string `thrift:"consumer,1" frugal:"1,default,string" json:"consumer"`
 	Topic    string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
@@ -312,7 +406,11 @@ var fieldIDToName_SubResponse = map[int16]string{
 }
 
 type PubRequest struct {
-	Msg string `thrift:"msg,1" frugal:"1,default,string" json:"msg"`
+	TopicName    string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
+	PartitonName string `thrift:"partiton_name,2" frugal:"2,default,string" json:"partiton_name"`
+	StartIndex   int64  `thrift:"start_index,3" frugal:"3,default,i64" json:"start_index"`
+	EndIndex     int64  `thrift:"end_index,4" frugal:"4,default,i64" json:"end_index"`
+	Msg          []byte `thrift:"msg,5" frugal:"5,default,binary" json:"msg"`
 }
 
 func NewPubRequest() *PubRequest {
@@ -322,10 +420,38 @@ func NewPubRequest() *PubRequest {
 func (p *PubRequest) InitDefault() {
 }
 
-func (p *PubRequest) GetMsg() (v string) {
+func (p *PubRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *PubRequest) GetPartitonName() (v string) {
+	return p.PartitonName
+}
+
+func (p *PubRequest) GetStartIndex() (v int64) {
+	return p.StartIndex
+}
+
+func (p *PubRequest) GetEndIndex() (v int64) {
+	return p.EndIndex
+}
+
+func (p *PubRequest) GetMsg() (v []byte) {
 	return p.Msg
 }
-func (p *PubRequest) SetMsg(val string) {
+func (p *PubRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *PubRequest) SetPartitonName(val string) {
+	p.PartitonName = val
+}
+func (p *PubRequest) SetStartIndex(val int64) {
+	p.StartIndex = val
+}
+func (p *PubRequest) SetEndIndex(val int64) {
+	p.EndIndex = val
+}
+func (p *PubRequest) SetMsg(val []byte) {
 	p.Msg = val
 }
 
@@ -337,7 +463,11 @@ func (p *PubRequest) String() string {
 }
 
 var fieldIDToName_PubRequest = map[int16]string{
-	1: "msg",
+	1: "topic_name",
+	2: "partiton_name",
+	3: "start_index",
+	4: "end_index",
+	5: "msg",
 }
 
 type PubResponse struct {
@@ -435,6 +565,8 @@ type Server_Operations interface {
 	Info(ctx context.Context, req *InfoRequest) (r *InfoResponse, err error)
 
 	Sub(ctx context.Context, req *SubRequest) (r *SubResponse, err error)
+
+	StarttoGet(ctx context.Context, req *InfoGetRequest) (r *InfoGetResponse, err error)
 }
 
 type Server_OperationsPushArgs struct {
@@ -738,6 +870,82 @@ func (p *Server_OperationsSubResult) String() string {
 }
 
 var fieldIDToName_Server_OperationsSubResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsStarttoGetArgs struct {
+	Req *InfoGetRequest `thrift:"req,1" frugal:"1,default,InfoGetRequest" json:"req"`
+}
+
+func NewServer_OperationsStarttoGetArgs() *Server_OperationsStarttoGetArgs {
+	return &Server_OperationsStarttoGetArgs{}
+}
+
+func (p *Server_OperationsStarttoGetArgs) InitDefault() {
+}
+
+var Server_OperationsStarttoGetArgs_Req_DEFAULT *InfoGetRequest
+
+func (p *Server_OperationsStarttoGetArgs) GetReq() (v *InfoGetRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsStarttoGetArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsStarttoGetArgs) SetReq(val *InfoGetRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsStarttoGetArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsStarttoGetArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsStarttoGetArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsStarttoGetArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsStarttoGetResult struct {
+	Success *InfoGetResponse `thrift:"success,0,optional" frugal:"0,optional,InfoGetResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsStarttoGetResult() *Server_OperationsStarttoGetResult {
+	return &Server_OperationsStarttoGetResult{}
+}
+
+func (p *Server_OperationsStarttoGetResult) InitDefault() {
+}
+
+var Server_OperationsStarttoGetResult_Success_DEFAULT *InfoGetResponse
+
+func (p *Server_OperationsStarttoGetResult) GetSuccess() (v *InfoGetResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsStarttoGetResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsStarttoGetResult) SetSuccess(x interface{}) {
+	p.Success = x.(*InfoGetResponse)
+}
+
+func (p *Server_OperationsStarttoGetResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsStarttoGetResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsStarttoGetResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsStarttoGetResult = map[int16]string{
 	0: "success",
 }
 

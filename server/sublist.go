@@ -62,7 +62,7 @@ func (topic *Topic) AddMessage(s *Server, push Push) error {
 	return nil
 }
 
-// 增加一个新的订阅
+// 消费者要订阅topic里面的一个分区
 func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
 	ret := t.getStringFromSub(req)
 	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
@@ -142,7 +142,7 @@ func NewPartition(req Push) *Partition {
 	return part
 }
 
-// 发布消息给所有分区的消费者
+// 在新创建了一个分区之后，要做的是，发布消息给所有分区的消费者，但是现在还没有消费者呀，好奇怪？？？？
 func (p *Partition) Release(s *Server) {
 	for consumer_name := range p.consumer_offset {
 		s.rmu.Lock()
@@ -155,10 +155,10 @@ func (p *Partition) Release(s *Server) {
 
 // 发布消息给特定的消费者，根据消费者的状态决定是否继续发送消息
 func (p *Partition) Pub(con *Consumer) {
-	//要是客户端活着，先得到消息
+	//要是客户端活着，会议只给他从offset这开始发送消息，但是要是到最后一个消息了呢？？
 	for {
 		con.rmu.RLock()
-		//cl.state=="alive写成这样可以吗
+		//cl.state=="alive写成这样可以吗，当然可以
 		if con.state == ALIVE {
 			name := con.name
 			con.rmu.RUnlock()
@@ -198,7 +198,7 @@ type SubScription struct {
 	name               string //topicname+option类型
 	rmu                sync.RWMutex
 	topic_name         string
-	consumer_partition map[string]string //一个消费者可以属于多个消费者组
+	consumer_partition map[string]string //一个消费者对应的分区
 	groups             []*Group
 	option             int8
 	consistent         *Consistent
@@ -229,13 +229,13 @@ func NewSubScription(sub Sub, ret string) *SubScription {
 // 将消费者加入到这个订阅队列里面
 func (sub *SubScription) AddConsumer(req Sub) {
 	switch req.option {
-	//点对点订阅
+	//点对点订阅，全部放在一个消费者组里面
 	case TOPIC_NIL_PTP:
 		{
 			//sub.groups[0].consumers[req.consumer]=true
 			sub.groups[0].AddConsumer(req.consumer)
 		}
-	//按key发布的订阅
+	//按key发布的订阅，创建新的消费者组
 	case TOPIC_KEY_PSB:
 		{
 			group := NewGroup(req.topic, req.consumer)
@@ -249,12 +249,14 @@ func (sub *SubScription) AddConsumer(req Sub) {
 func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	sub.rmu.Lock()
 	switch sub.option {
+	//点对点就只有一个消费者组group[0],因此无需遍历直接删除就好，用下面那个我感觉也是没有问题的
 	case TOPIC_NIL_PTP:
 		{
 			sub.groups[0].DownConsumer(consumer_name)
-			sub.consistent.Reduce(consumer_name)
+			sub.consistent.Reduce(consumer_name) //为啥这个需要下面哪个不需要？？？？？
 
 		}
+		//因为广播的话有很多消费者组，你需要在这里面先找到消费者，然后将他标记为不活跃
 	case TOPIC_KEY_PSB:
 		{
 			for _, group := range sub.groups {

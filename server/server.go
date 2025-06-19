@@ -11,9 +11,8 @@ import (
 )
 
 type Server struct {
-	topics map[string]*Topic
-	//groups map[string]Group
-	consumers map[string]*Consumer
+	topics    map[string]*Topic
+	consumers map[string]*Consumer //这里的string是消费者的ip_port
 	rmu       sync.RWMutex
 }
 
@@ -30,7 +29,10 @@ func (s *Server) StartRelease() {
 		go topic.StartRelease(s) //先时获得所有的topic，然后获得所有topic里面的partition,然后获得所有partition里面的所有消费者，通过这个消费者获得*Client
 	}
 }
+
+// 将消费者客户端连接到服务器
 func (s *Server) InfoHandle(ip_port string) error {
+	//消费者客户端
 	client, err := client_operations.NewClient("client", cl.WithHostPorts(ip_port))
 	if err == nil {
 		//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
@@ -48,13 +50,15 @@ func (s *Server) InfoHandle(ip_port string) error {
 	}
 	return err
 }
+
+// 循环遍历这个消费者是否还在先，要是没在先，就要将他所有的订阅都删除调并重新进行平衡
 func (s *Server) CheckConsumer(consumer *Consumer) {
 	shutDown := consumer.CheckConsumer()
 	if shutDown {
 		consumer.rmu.Lock()
 		for _, subscription := range consumer.subList {
 			topic_name := subscription.shutDownConsumer(consumer.name)
-			//我现在感觉s.topics[subscription.topic_name].Rebalance()这样写不是更简单吗,还不用给shutDownConsumer这个函数加返回值
+			//我现在感觉s.topics[subscription.topic_name].Rebalance()这样写不是更简单吗,还不用给shutDownConsumer这个函数加返回值，恩呢，感觉确实可以
 			s.topics[topic_name].Rebalance()
 		}
 		consumer.rmu.Unlock()
@@ -65,7 +69,6 @@ func (s *Server) CheckConsumer(consumer *Consumer) {
 func (s *Server) RecoverConsumer(consumer *Consumer) {
 	s.rmu.Lock()
 	consumer.rmu.Lock()
-	//这里为什么又要将他变成活着的状态
 	consumer.state = ALIVE
 	for sub_name, sub := range consumer.subList {
 		go s.topics[sub.topic_name].RecoverConsumer(sub_name, consumer)
@@ -75,12 +78,13 @@ func (s *Server) RecoverConsumer(consumer *Consumer) {
 }
 
 type Push struct {
-	producerId int64
+	producerId string
 	topic      string
 	key        string
 	message    string
 }
 
+// 服务器将消息存在topic里面
 func (s *Server) PushHandle(push Push) error {
 	topic, ok := s.topics[push.topic]
 	if !ok {
@@ -107,7 +111,7 @@ func (s *Server) AddMessage(topic *Topic, req Push) {
 }
 
 type PullRequest struct {
-	consumerId int64
+	consumerId string
 	topic      string
 	key        string
 }
@@ -126,6 +130,8 @@ type Sub struct {
 	option   int8
 }
 
+// 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
+// 通过Sub结构体来订阅消息
 func (s *Server) SubHandle(req Sub) error {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
@@ -150,6 +156,7 @@ func (s *Server) UnSubHandle(req Sub) error {
 	if !ok {
 		return errors.New("topic not exist")
 	}
+	//这里消费者要删除这个订阅就把这个订阅全部删除了吗？感觉好奇怪
 	sub_name, err := topic.ReduceScription(req)
 	if err != nil {
 		return err

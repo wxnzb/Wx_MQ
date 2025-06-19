@@ -2,7 +2,7 @@ namespace go api
 // 推送消息
 //下面的key是分区
 struct PushRequest{
-    1:i64 producerId
+    1:string producerId
     2:string topic
     3:string key
     4:string message
@@ -13,7 +13,7 @@ struct PushResponse{
 }
 //拉取消息所需的信息
 struct PullRequest{
-    1:i64 consumerId
+    1:string consumerId
     2:string topic
     3:string key
 }
@@ -26,6 +26,17 @@ struct infoRequest{
     1:string ip_port
 }
 struct infoResponse{
+    1:bool ret
+}
+//现在还不太明白这个InfoGetRequest是干啥的
+struct InfoGetRequest{
+			1:string  cli_Name  
+			2:string  topic_Name 
+			3:string  partition_Name 
+			4:i64     offset 
+            5:i8     option
+		}
+struct InfoGetResponse{
     1:bool ret
 }
 //消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
@@ -43,17 +54,22 @@ struct SubResponse{
 // push	处理生产者发来的推送消息
 // pull	处理消费者拉取消息请求
 // info	处理客户端状态报告、连接信息等
-
 service Server_Operations{
     PushResponse push(1:PushRequest req)
     PullResponse pull(1:PullRequest req)
     infoResponse info(1:infoRequest req)
     SubResponse sub(1:SubRequest req)
+    InfoGetResponse StarttoGet(1:InfoGetRequest req)
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。
-//PubRequest 是服务端→客户端，用于回调、下发、通知、甚至测试心跳机制。
+//PubRequest 是服务端→消费者客户端批量发送消息
+//之前是i64 offset,现在变成了两个，有什么好处吗？？？
 struct PubRequest{
-    1:string msg
+    1:string topic_name
+    2:string partiton_name
+    3:i64 start_index
+    4:i64 end_index
+    5:binary msg
 }
 struct PubResponse{
     1:bool ret

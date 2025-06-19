@@ -101,3 +101,6 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 		Ret: false,
 	}, err
 }
+func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetRequest, err error) {
+
+}
