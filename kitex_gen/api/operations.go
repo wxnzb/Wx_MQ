@@ -406,11 +406,11 @@ var fieldIDToName_SubResponse = map[int16]string{
 }
 
 type PubRequest struct {
-	TopicName    string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
-	PartitonName string `thrift:"partiton_name,2" frugal:"2,default,string" json:"partiton_name"`
-	StartIndex   int64  `thrift:"start_index,3" frugal:"3,default,i64" json:"start_index"`
-	EndIndex     int64  `thrift:"end_index,4" frugal:"4,default,i64" json:"end_index"`
-	Msg          []byte `thrift:"msg,5" frugal:"5,default,binary" json:"msg"`
+	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
+	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
+	StartIndex    int64  `thrift:"start_index,3" frugal:"3,default,i64" json:"start_index"`
+	EndIndex      int64  `thrift:"end_index,4" frugal:"4,default,i64" json:"end_index"`
+	Msg           []byte `thrift:"msg,5" frugal:"5,default,binary" json:"msg"`
 }
 
 func NewPubRequest() *PubRequest {
@@ -424,8 +424,8 @@ func (p *PubRequest) GetTopicName() (v string) {
 	return p.TopicName
 }
 
-func (p *PubRequest) GetPartitonName() (v string) {
-	return p.PartitonName
+func (p *PubRequest) GetPartitionName() (v string) {
+	return p.PartitionName
 }
 
 func (p *PubRequest) GetStartIndex() (v int64) {
@@ -442,8 +442,8 @@ func (p *PubRequest) GetMsg() (v []byte) {
 func (p *PubRequest) SetTopicName(val string) {
 	p.TopicName = val
 }
-func (p *PubRequest) SetPartitonName(val string) {
-	p.PartitonName = val
+func (p *PubRequest) SetPartitionName(val string) {
+	p.PartitionName = val
 }
 func (p *PubRequest) SetStartIndex(val int64) {
 	p.StartIndex = val
@@ -464,7 +464,7 @@ func (p *PubRequest) String() string {
 
 var fieldIDToName_PubRequest = map[int16]string{
 	1: "topic_name",
-	2: "partiton_name",
+	2: "partition_name",
 	3: "start_index",
 	4: "end_index",
 	5: "msg",

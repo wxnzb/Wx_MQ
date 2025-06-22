@@ -12,13 +12,13 @@ import (
 
 type Server struct {
 	topics    map[string]*Topic
-	consumers map[string]*Consumer //这里的string是消费者的ip_port
+	consumers map[string]*ToConsumer //这里的string是消费者的ip_port
 	rmu       sync.RWMutex
 }
 
 func (s *Server) make() {
 	s.topics = make(map[string]*Topic)
-	s.consumers = make(map[string]*Consumer)
+	s.consumers = make(map[string]*ToConsumer)
 	s.rmu = sync.RWMutex{}
 	s.StartRelease()
 }
@@ -40,7 +40,7 @@ func (s *Server) InfoHandle(ip_port string) error {
 		s.rmu.Lock()
 		consumer, ok := s.consumers[ip_port]
 		if !ok {
-			consumer = NewConsumer(ip_port, client)
+			consumer = NewToConsumer(ip_port, client)
 			s.consumers[ip_port] = consumer
 		}
 		go s.CheckConsumer(consumer)
@@ -52,7 +52,7 @@ func (s *Server) InfoHandle(ip_port string) error {
 }
 
 // 循环遍历这个消费者是否还在先，要是没在先，就要将他所有的订阅都删除调并重新进行平衡
-func (s *Server) CheckConsumer(consumer *Consumer) {
+func (s *Server) CheckConsumer(consumer *ToConsumer) {
 	shutDown := consumer.CheckConsumer()
 	if shutDown {
 		consumer.rmu.Lock()
@@ -66,7 +66,7 @@ func (s *Server) CheckConsumer(consumer *Consumer) {
 }
 
 // 上面的要是失败了死了就取消，现在又要将他变成活得
-func (s *Server) RecoverConsumer(consumer *Consumer) {
+func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 	s.rmu.Lock()
 	consumer.rmu.Lock()
 	consumer.state = ALIVE
@@ -163,4 +163,33 @@ func (s *Server) UnSubHandle(req Sub) error {
 	}
 	s.consumers[req.consumer].ReduceScription(sub_name)
 	return nil
+}
+
+type PartitionInitInfo struct {
+	topic           string
+	partition       string
+	consumer_ipname string
+	option          int8
+	index           int64
+}
+
+// 这个还没有实现
+func (s *Server) StartGet(req PartitionInitInfo) error {
+	return nil
+}
+
+const (
+	NODE_SIZE = 42
+)
+
+type NodeData struct {
+	Start_index int64 `json:"start_index"` //这几批消息的第一批消息的index
+	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
+	Size        int   `json:"size"`        //这几批消息的总大小
+}
+type Message struct {
+	Topic_name     string `json:topic_name`
+	Partition_name string `json:partition_name`
+	Index          int64  `json:"index"`
+	Msgs           []byte `json:msgs`
 }

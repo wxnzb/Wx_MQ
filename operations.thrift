@@ -28,7 +28,7 @@ struct infoRequest{
 struct infoResponse{
     1:bool ret
 }
-//现在还不太明白这个InfoGetRequest是干啥的
+//cli_Name来从broker中拿topic_oartition下面从index的数据以opyion的方式
 struct InfoGetRequest{
 			1:string  cli_Name  
 			2:string  topic_Name 
@@ -66,7 +66,7 @@ service Server_Operations{
 //之前是i64 offset,现在变成了两个，有什么好处吗？？？
 struct PubRequest{
     1:string topic_name
-    2:string partiton_name
+    2:string partition_name
     3:i64 start_index
     4:i64 end_index
     5:binary msg
