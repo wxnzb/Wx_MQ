@@ -70,16 +70,17 @@ func NewToConsumer(ip_port string, consumer client_operations.Client) *ToConsume
 	}
 }
 
-// 服务器作为消费者客户端向消费者推送消息
-func (con *ToConsumer) Pub(msg string) bool {
-	resp, err := con.consumer.Pub(context.Background(), &api.PubRequest{
-		Msg: msg,
-	})
-	if err != nil || resp.Ret == false {
-		return false
-	}
-	return true
-}
+//这个也没了？？？
+// // 服务器作为消费者客户端向消费者推送消息
+// func (con *ToConsumer) Pub(msg string) bool {
+// 	resp, err := con.consumer.Pub(context.Background(), &api.PubRequest{
+// 		Msg: msg,
+// 	})
+// 	if err != nil || resp.Ret == false {
+// 		return false
+// 	}
+// 	return true
+// }
 
 // 服务器作为消费者客户端一直给消费者发送Pong看是否在线，直到他下线
 func (con *ToConsumer) CheckConsumer() bool {
@@ -105,9 +106,20 @@ func (con *ToConsumer) AddScription(sub *SubScription) {
 	con.subList[con.name] = sub //这句暂时还不理解，因为key的原因，与reduceScription的key是一样的
 }
 
+// 新加函数：查看这个消费者是否订阅了这个sub
+func (con *ToConsumer) CheckSubscription(sub_name string) bool {
+	con.rmu.RLock()
+	defer con.rmu.RUnlock()
+	_, ok := con.subList[sub_name]
+	return ok
+}
+
 // ----------------------新加的感觉暂时没用上================
 // 得到这个消费者的操作接口
-func (con *ToConsumer) GetClient() client_operations.Client {
+func (con *ToConsumer) GetToConsumer() *client_operations.Client {
+	con.rmu.RLock()
+	defer con.rmu.Unlock()
+	return &con.consumer
 }
 
 // 移除订阅，这个函数还没懂
@@ -162,7 +174,7 @@ type Part struct {
 	rmu            sync.RWMutex
 	topic_name     string
 	partition_name string
-	to_consumers   map[string]client_operations.Client //这里的string应该是consumer的ip_port
+	to_consumers   map[string]*client_operations.Client //这里的string应该是consumer的ip_port
 	option         int8
 	state          string
 	//文件
@@ -179,7 +191,7 @@ type Part struct {
 	block_status map[int64]string
 }
 
-func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]client_operations.Client, file *File) *Part {
+func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) *Part {
 	return &Part{
 		rmu:            sync.RWMutex{},
 		topic_name:     partitionInitInfo.topic,
@@ -194,12 +206,24 @@ func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]client_
 		block_status:   make(map[int64]string),
 	}
 }
+func (con *ToConsumer) StartPart(req PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) {
+	con.rmu.Lock()
+	defer con.rmu.Unlock()
+	part, ok := con.parts[req.topic]
+	if !ok {
+		//func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) *Part
+		//要是没有就要新建一个
+		part = NewPart(req, toConsumers, file)
+		con.parts[req.topic] = part
+	}
+	part.Start()
+}
 
 // 这个函数主要做的事情有：
 // 1：读取文件的消息存到part结构体的buffer_node和buffer_mags中
 // 2：开启一个携程接收消费者发送过来的ack
 // 3:开启携程向消费者发送消息
-func (p *Part) PartStart() {
+func (p *Part) Start() {
 	//打开一个文件
 	p.fd = *p.file.OpenFile()
 	//根据index找到偏移
@@ -238,6 +262,7 @@ const (
 	//这个是part里的block_status
 	HADDO      = "haddo"
 	NOTDO      = "notdo"
+	DOING      = "doing"
 	FALL_TIMES = 3
 )
 
@@ -248,9 +273,10 @@ type ConsumerAck struct {
 	//使得part删除这个消费者的时候可以找到
 	name string
 	//这个我还不知道有什么用
-	to_consumer client_operations.Client
+	to_consumer *client_operations.Client
 }
 
+// 走的是负载均衡，每个块只能被一个消费者消费
 // |node-1...50|node-51...120|node-121...200|这就是三个块，这里的1.50等都是这批消息的索引
 func (p *Part) GetDone() {
 	for {
@@ -291,6 +317,7 @@ func (p *Part) GetDone() {
 	}
 }
 
+// 这里我有个问题，他这个offset在PartStart()出现赋值，但是他个块不是已经读过了吗？？？
 // 讲文件里的block存到内存里面
 func (p *Part) AddBlock() error {
 	//打开文件，思考从哪里开始读取
@@ -310,54 +337,60 @@ func (p *Part) AddBlock() error {
 	return nil
 }
 
-func (p *Part) SendOneBlock(name string, toConsumer client_operations.Client, startIndex int64) {
+func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client, startIndex int64) {
 	//为了防止他开始让发的已经发过了，因此要在外面在加一层for循环
-	for{
-	if p.block_status[startIndex] == NOTDO {
-		node := p.buffer_node[startIndex]
-		msgs := p.buffer_msgs[startIndex]
-		//因为Pub环是是byte刘，这里要进行转化
-		msgs_data := make([]byte, node.Size)
-		var err error
-		msgs_data, err = json.Marshal(msgs)
-		num := 0
-		//循环发送
-		for {
-			err = p.Pub(toConsumer, node, msgs_data)
-			if err != nil {
-				num++
-				if num >= FALL_TIMES {
-					p.block_status[startIndex] = NOTDO
+	for {
+		if p.block_status[startIndex] == NOTDO {
+			node := p.buffer_node[startIndex]
+			msgs := p.buffer_msgs[startIndex]
+			//因为Pub是byte刘，这里要进行转化
+			msgs_data := make([]byte, node.Size)
+			var err error
+			msgs_data, err = json.Marshal(msgs)
+			num := 0
+			p.rmu.Lock()
+			p.block_status[startIndex] = DOING
+			p.rmu.Unlock()
+			//循环发送
+			for {
+				err = p.Pub(toConsumer, node, msgs_data)
+				if err != nil {
+					num++
+					if num >= FALL_TIMES {
+						p.rmu.Lock()
+						p.block_status[startIndex] = NOTDO
+						p.rmu.Unlock()
+						p.consumer_ack <- ConsumerAck{
+							start_index: startIndex,
+							err:         TIMEOUT,
+							name:        name,
+							to_consumer: toConsumer,
+						}
+						break
+					}
+				} else {
+					//要是发送成功了，不需要在这里确认，他分成两步，有先将占说明这个消息正在发送，那么不会再发给其他的消费者，然后要是发送成功并且消费者返回ack,GetDone会将他有doing修改成haddo
+					//p.block_status[startIndex] = HADDO
 					p.consumer_ack <- ConsumerAck{
 						start_index: startIndex,
-						err:         p.block_status[startIndex],
+						err:         OK,
 						name:        name,
 						to_consumer: toConsumer,
 					}
 					break
 				}
-			} else {
-				//要是发送成功了
-				p.block_status[startIndex] = HADDO
-				p.consumer_ack <- ConsumerAck{
-					start_index: startIndex,
-					err:         p.block_status[startIndex],
-					name:        name,
-					to_consumer: toConsumer,
-				}
-				break
+
 			}
-
+			break
+		} else {
+			startIndex += p.buffer_node[startIndex].End_index + 1
 		}
-
-	}else{
-		startIndex+=p.buffer_node[startIndex].End_index+1
 	}
 }
 
 // func (p *kClient) Pub(ctx context.Context, req *api.PubRequest) (r *api.PubResponse, err error)
-func (p *Part) Pub(toConsumer client_operations.Client, node NodeData, msgs_data []byte) error {
-	resp, err := toConsumer.Pub(context.Background(),
+func (p *Part) Pub(toConsumer *client_operations.Client, node NodeData, msgs_data []byte) error {
+	resp, err := (*toConsumer).Pub(context.Background(),
 		&api.PubRequest{
 			TopicName:     p.topic_name,
 			PartitionName: p.partition_name,
@@ -372,4 +405,11 @@ func (p *Part) Pub(toConsumer client_operations.Client, node NodeData, msgs_data
 
 	}
 	return nil
+}
+
+// 这个还没用上
+func (p *Part) ClosePart() {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	p.state = DOWN
 }

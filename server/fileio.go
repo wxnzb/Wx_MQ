@@ -119,3 +119,8 @@ func (f *File) ReadFile(fd *os.File, blockoffset int64) (NodeData, []Message, er
 	return node, msgs, nil
 
 }
+
+// 这个还没有实现
+func (f *File) GetIndex(file *os.File) int64 {
+	return 0
+}

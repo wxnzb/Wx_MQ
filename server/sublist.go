@@ -3,10 +3,11 @@ package server
 import (
 	"errors"
 	"hash/crc32"
+	"os"
 	"sort"
 	"strconv"
 	"sync"
-	"time"
+	//"time"
 )
 
 const (
@@ -14,7 +15,7 @@ const (
 	TOPIC_NIL_PTP = 1
 	TOPIC_NIL_PSB = 2
 	TOPIC_KEY_PSB = 3
-	VIARUAL_10    = 10
+	VIRTUAL_10    = 10
 	VIRTUAL_20    = 20
 )
 
@@ -22,49 +23,53 @@ type Topic struct {
 	rmu     sync.RWMutex
 	Parts   map[string]*Partition    //分区列表
 	SubList map[string]*SubScription //订阅列表
+	Files   map[string]string
 }
 
 // 创建一个新的topic
 func NewTopic(push Push) *Topic {
-	topic := &Topic{
+	t := &Topic{
 		rmu:     sync.RWMutex{},
 		Parts:   make(map[string]*Partition),
 		SubList: make(map[string]*SubScription),
+		Files:   make(map[string]string),
 	}
-	topic.Parts[push.key] = NewPartition(push)
-	return topic
+	str, _ := os.Getwd()
+	str += "/" + ip_name + "/" + push.topic
+	CreateDir(str)
+	part, file := NewPartition(push)
+	t.Parts[push.key] = part
+	t.Files[push.key] = file
+	return t
 }
 
-// 开始server.make()的时候调用
-func (t *Topic) StartRelease(s *Server) {
-	for _, part := range t.Parts {
-		part.Release(s)
-	}
-}
+// // 开始server.make()的时候调用
+// func (t *Topic) StartRelease(s *Server) {
+// 	for _, part := range t.Parts {
+// 		part.Release(s)
+// 	}
+// }
 
 // PushRequest
-func (topic *Topic) AddMessage(s *Server, push Push) error {
-	part, ok := topic.Parts[push.key]
+func (t *Topic) AddMessage(push Push) error {
+	part, ok := t.Parts[push.key]
 	if !ok {
 		//要是没有这个分区，就要创建一个新的分区
-		part := NewPartition(push)
-		//这句还需要在理解
-		//先在这是一个分区，要是有消费者订阅，通过这个携程可以及时推送给他
-		//这里真的需要用携程吗？
-		go part.Release(s)
-		topic.Parts[push.key] = part
-
-	} else {
-		part.rmu.Lock()
-		part.queue = append(part.queue, push.message)
-		part.rmu.Unlock()
+		part, file := NewPartition(push)
+		t.Files[push.key] = file
+		t.Parts[push.key] = part
 	}
+	part.rmu.Lock()
+	//part.queue = append(part.queue, push.message)
+	part.addMessage(push)
+	part.rmu.Unlock()
+
 	return nil
 }
 
 // 消费者要订阅topic里面的一个分区
-func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
-	ret := t.getStringFromSub(req)
+func (t *Topic) AddScription(req Sub, con *ToConsumer) (*SubScription, error) {
+	ret := GetStringFromSub(req.topic, req.key, req.option)
 	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
 	t.rmu.RLock()
 	subScription, ok := t.SubList[ret]
@@ -79,118 +84,152 @@ func (t *Topic) AddScription(req Sub, con *Consumer) (*SubScription, error) {
 		t.rmu.Unlock()
 	}
 	//t.Parts.AddConsumer(con)这个现在还不太清楚，先把他删了把
-	t.Rebalance()
+	//t.Rebalance()
 	return subScription, nil
 }
 
 // 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
 func (t *Topic) ReduceScription(req Sub) (string, error) {
-	ret := t.getStringFromSub(req)
-	t.rmu.RLock()
-	_, ok := t.SubList[ret]
-	t.rmu.RUnlock()
+	ret := GetStringFromSub(req.topic, req.key, req.option)
+	t.rmu.Lock()
+	subscription, ok := t.SubList[ret]
 	if ok {
-		delete(t.SubList, ret)
+		//delete(t.SubList, ret)
+		//这个是新加的
+		subscription.ReduceConsumer(req.consumer)
 	} else {
 		errors.New("订阅不存在")
 	}
+	delete(t.SubList, ret)
 	t.rmu.Unlock()
-	t.Rebalance()
+	//t.Rebalance()
 	return ret, nil
 }
 
 // topic + "nil" + "ptp" (point to point consumer比partition为 1 : n)
 // topic + key   + "psb" (pub and sub consumer比partition为 n : 1)
 // topic + "nil" + "psb" (pub and sub consumer比partition为 n : n)
-func (t *Topic) getStringFromSub(sub Sub) string {
-	ret := sub.topic
-	if sub.option == TOPIC_NIL_PTP {
+func GetStringFromSub(topic_name, partition_name string, option int8) string {
+	ret := topic_name
+	if option == TOPIC_NIL_PTP {
 		ret = ret + "nil" + "ptp"
-	} else if sub.option == TOPIC_NIL_PSB {
+	} else if option == TOPIC_NIL_PSB {
 		ret = ret + "nil" + "psb"
-	} else if sub.option == TOPIC_KEY_PSB {
-		ret = ret + sub.key + "psb"
+	} else if option == TOPIC_KEY_PSB {
+		ret = ret + partition_name + "psb"
 	}
 	return ret
 }
 func (t *Topic) Rebalance() {
 
 }
-func (t *Topic) RecoverConsumer(sub_name string, con *Consumer) {
+func (t *Topic) RecoverConsumer(sub_name string, con *ToConsumer) {
 
+}
+func (t *Topic) GetFile(partition string) *File {
+	t.rmu.RLock()
+	defer t.rmu.RUnlock()
+	return t.Parts[partition].GetFile()
 }
 
 // ---------------------------------------------------------------------------
 type Partition struct {
-	rmu             sync.RWMutex
-	key             string               //分区名字
-	queue           []string             //分区里面存的消息队列
-	consumer_offset map[string]int       //消费者偏移列表
-	consumer        map[string]*Consumer //消费者列表
+	rmu   sync.RWMutex
+	key   string   //分区名字
+	queue []string //分区里面存的消息队列
+	// consumer_offset map[string]int         //消费者偏移列表
+	// consumer        map[string]*ToConsumer //消费者列表
+	//新加的关于文件的,下面这些到底是干什么用的
+	file_name   string
+	file        *File
+	fd          *os.File
+	index       int64
+	start_index int64
 }
 
 // 创建一个新的分区
-func NewPartition(req Push) *Partition {
+func NewPartition(req Push) (*Partition, string) {
 	part := &Partition{
-		rmu:             sync.RWMutex{},
-		key:             req.key,
-		queue:           make([]string, 40),
-		consumer_offset: make(map[string]int),
-		//consumer:make(map[string]*Consumer),不用加这句吗
+		rmu:   sync.RWMutex{},
+		key:   req.key,
+		queue: make([]string, 40),
+		//consumer_offset: make(map[string]int),
+		//consumer:make(map[string]*ToConsumer),不用加这句吗
 	}
-	part.queue = append(part.queue, req.message)
-	return part
+	str, _ := os.Getwd()
+	str += "/" + ip_name + "/" + req.topic + "/" + req.key + ".txt"
+	part.file_name = str
+	part.file = NewFile(str)
+	file, err := CreateFile(str)
+	if err != nil {
+
+	}
+	part.fd = file
+	part.index = part.file.GetIndex(part.fd)
+	part.start_index = part.index + 1
+	return part, str
 }
 
 // 在新创建了一个分区之后，要做的是，发布消息给所有分区的消费者，但是现在还没有消费者呀，好奇怪？？？？
-func (p *Partition) Release(s *Server) {
-	for consumer_name := range p.consumer_offset {
-		s.rmu.Lock()
-		con := s.consumers[consumer_name]
-		s.rmu.Unlock()
-		//开启新的携程服务端主动向消费者推送消息
-		go p.Pub(con)
-	}
-}
+// func (p *Partition) Release(s *Server) {
+// 	for consumer_name := range p.consumer_offset {
+// 		s.rmu.Lock()
+// 		con := s.consumers[consumer_name]
+// 		s.rmu.Unlock()
+// 		//开启新的携程服务端主动向消费者推送消息
+// 		go p.Pub(con)
+// 	}
+// }
 
 // 发布消息给特定的消费者，根据消费者的状态决定是否继续发送消息
-func (p *Partition) Pub(con *Consumer) {
-	//要是客户端活着，会议只给他从offset这开始发送消息，但是要是到最后一个消息了呢？？
-	for {
-		con.rmu.RLock()
-		//cl.state=="alive写成这样可以吗，当然可以
-		if con.state == ALIVE {
-			name := con.name
-			con.rmu.RUnlock()
-			p.rmu.RLock()
-			offset := p.consumer_offset[name]
-			msg := p.queue[offset]
-			p.rmu.Unlock()
-			ret := con.Pub(msg)
-			if ret {
-				p.rmu.Lock()
-				p.consumer_offset[name] = offset + 1
-				p.rmu.Unlock()
-			}
-		} else {
-			con.rmu.RUnlock()
-			time.Sleep(5 * time.Second)
-		}
-	}
-}
+// func (p *Partition) Pub(con *ToConsumer) {
+// 	//要是消费者客户端活着，他会从offset那里之后接收消息，但是要是到最后一个消息了呢？？
+// 	for {
+// 		con.rmu.RLock()
+// 		//cl.state=="alive写成这样可以吗，当然可以
+// 		if con.state == ALIVE {
+// 			name := con.name
+// 			con.rmu.RUnlock()
+// 			p.rmu.RLock()
+// 			offset := p.consumer_offset[name]
+// 			msg := p.queue[offset]
+// 			p.rmu.RUnlock()
+// 			//这一句很关键，应该是服务器将从队列取出的消息传递给消费者！！！！
+// 			ret := con.Pub(msg)
+// 			if ret {
+// 				p.rmu.Lock()
+// 				p.consumer_offset[name] = offset + 1
+// 				p.rmu.Unlock()
+// 			}
+// 		} else {
+// 			con.rmu.RUnlock()
+// 			time.Sleep(5 * time.Second)
+// 		}
+// 	}
+// }
 
 // 将消费者添加到这个分区
-func (p *Partition) AddConsumer(con *Consumer) {
-	p.rmu.Lock()
+//
+//	func (p *Partition) AddConsumer(con *ToConsumer) {
+//		p.rmu.Lock()
+//		defer p.rmu.Unlock()
+//		p.consumer[con.name] = con
+//		p.consumer_offset[con.name] = OFFSET
+//	}
+//
+//	func (p *Partition) DeleteConsumer(con *ToConsumer) {
+//		p.rmu.Lock()
+//		defer p.rmu.Unlock()
+//		delete(p.consumer, con.name)
+//		delete(p.consumer_offset, con.name)
+//	}
+func (p *Partition) GetFile() *File {
+	p.rmu.RLock()
 	defer p.rmu.Unlock()
-	p.consumer[con.name] = con
-	p.consumer_offset[con.name] = OFFSET
+	return p.file
 }
-func (p *Partition) DeleteConsumer(con *Consumer) {
-	p.rmu.Lock()
-	defer p.rmu.Unlock()
-	delete(p.consumer, con.name)
-	delete(p.consumer_offset, con.name)
+func (p *Partition) addMessage(req Push) {
+
 }
 
 // -----------------------------------------------------------
@@ -201,7 +240,7 @@ type SubScription struct {
 	consumer_partition map[string]string //一个消费者对应的分区
 	groups             []*Group
 	option             int8
-	consistent         *Consistent
+	//consistent         *Consistent
 }
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
@@ -217,11 +256,11 @@ func NewSubScription(sub Sub, ret string) *SubScription {
 	subScription.groups = append(subScription.groups, group)
 	subScription.consumer_partition[sub.consumer] = sub.key
 	//直接在这里加上点对点还是先有点问题
-	if sub.option == TOPIC_NIL_PTP {
-		//初始化哈希，然后将这个消费者加进去
-		subScription.consistent = NewConsistent()
-		subScription.consistent.Add(sub.consumer)
-	}
+	// if sub.option == TOPIC_NIL_PTP {
+	// 	//初始化哈希，然后将这个消费者加进去
+	// 	subScription.consistent = NewConsistent()
+	// 	subScription.consistent.Add(sub.consumer)
+	// }
 	return subScription
 }
 
@@ -253,7 +292,7 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	case TOPIC_NIL_PTP:
 		{
 			sub.groups[0].DownConsumer(consumer_name)
-			sub.consistent.Reduce(consumer_name) //为啥这个需要下面哪个不需要？？？？？
+			//sub.consistent.Reduce(consumer_name) //为啥这个需要下面哪个不需要？？？？？
 
 		}
 		//因为广播的话有很多消费者组，你需要在这里面先找到消费者，然后将他标记为不活跃
@@ -274,7 +313,7 @@ func (sub *SubScription) ReduceConsumer(consumer_name string) {
 	case TOPIC_NIL_PTP:
 		{
 			sub.groups[0].DeleteConsumer(consumer_name)
-			sub.consistent.Reduce(consumer_name)
+			//sub.consistent.Reduce(consumer_name)
 
 		}
 	case TOPIC_KEY_PSB:
@@ -294,7 +333,7 @@ func (sub *SubScription) RecoverConsumer(req Sub) {
 	case TOPIC_NIL_PTP:
 		{
 			sub.groups[0].RecoverConsumer(req.consumer)
-			sub.consistent.Add(req.consumer)
+			//sub.consistent.Add(req.consumer)
 		}
 	case TOPIC_KEY_PSB:
 		{
@@ -323,7 +362,7 @@ func NewConsistent() *Consistent {
 		rmu:              sync.RWMutex{},
 		hashSortNodes:    make([]uint32, 0),
 		circleNodes:      make(map[uint32]string),
-		virtualNodeCount: 10,
+		virtualNodeCount: VIRTUAL_10,
 		nodes:            make(map[string]bool),
 	}
 }

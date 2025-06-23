@@ -101,6 +101,18 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 		Ret: false,
 	}, err
 }
-func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetRequest, err error) {
+
+// 这个还不太清楚作用
+func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
+
+	err = s.server.StartGet(PartitionInitInfo{
+		topic:     req.Topic_Name,
+		partition: req.Partition_Name,
+		index:     req.Offset,
+	})
+	if err != nil {
+		return &api.InfoGetResponse{Ret: false}, err
+	}
+	return &api.InfoGetResponse{Ret: true}, nil
 
 }

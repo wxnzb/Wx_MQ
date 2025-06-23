@@ -2,6 +2,7 @@ package server
 
 import (
 	"Wx_MQ/kitex_gen/api/client_operations"
+	"os"
 
 	"sync"
 
@@ -16,19 +17,23 @@ type Server struct {
 	rmu       sync.RWMutex
 }
 
+var ip_name string //加了这个
 func (s *Server) make() {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
 	s.rmu = sync.RWMutex{}
-	s.StartRelease()
+	//s.StartRelease()删除这个
+	ip_name = GetIpPort()
 }
-func (s *Server) StartRelease() {
-	s.rmu.Lock()
-	defer s.rmu.Unlock()
-	for _, topic := range s.topics {
-		go topic.StartRelease(s) //先时获得所有的topic，然后获得所有topic里面的partition,然后获得所有partition里面的所有消费者，通过这个消费者获得*Client
-	}
-}
+
+//这个怎么也没了？？？
+// func (s *Server) StartRelease() {
+// 	s.rmu.Lock()
+// 	defer s.rmu.Unlock()
+// 	for _, topic := range s.topics {
+// 		go topic.StartRelease(s) //先时获得所有的topic，然后获得所有topic里面的partition,然后获得所有partition里面的所有消费者，通过这个消费者获得*Client
+// 	}
+// }
 
 // 将消费者客户端连接到服务器
 func (s *Server) InfoHandle(ip_port string) error {
@@ -44,7 +49,7 @@ func (s *Server) InfoHandle(ip_port string) error {
 			s.consumers[ip_port] = consumer
 		}
 		go s.CheckConsumer(consumer)
-		go s.RecoverConsumer(consumer)
+		//go s.RecoverConsumer(consumer)
 		s.rmu.Unlock()
 		return nil
 	}
@@ -52,16 +57,17 @@ func (s *Server) InfoHandle(ip_port string) error {
 }
 
 // 循环遍历这个消费者是否还在先，要是没在先，就要将他所有的订阅都删除调并重新进行平衡
-func (s *Server) CheckConsumer(consumer *ToConsumer) {
-	shutDown := consumer.CheckConsumer()
+func (s *Server) CheckConsumer(toconsumer *ToConsumer) {
+	shutDown := toconsumer.CheckConsumer()
 	if shutDown {
-		consumer.rmu.Lock()
-		for _, subscription := range consumer.subList {
-			topic_name := subscription.shutDownConsumer(consumer.name)
+		toconsumer.rmu.Lock()
+		for _, subscription := range toconsumer.subList {
+			subscription.shutDownConsumer(toconsumer.name)
 			//我现在感觉s.topics[subscription.topic_name].Rebalance()这样写不是更简单吗,还不用给shutDownConsumer这个函数加返回值，恩呢，感觉确实可以
-			s.topics[topic_name].Rebalance()
+			//s.topics[topic_name].Rebalance()
+			//这里还要将consumer中的part关掉
 		}
-		consumer.rmu.Unlock()
+		toconsumer.rmu.Unlock()
 	}
 }
 
@@ -82,6 +88,7 @@ type Push struct {
 	topic      string
 	key        string
 	message    string
+	option     int8
 }
 
 // 服务器将消息存在topic里面
@@ -94,21 +101,23 @@ func (s *Server) PushHandle(push Push) error {
 		s.topics[push.topic] = topic
 		s.rmu.Unlock()
 	}
-	topic.AddMessage(s, push)
+	topic.AddMessage(push)
 	return nil
 }
-func (s *Server) AddMessage(topic *Topic, req Push) {
-	part, ok := topic.Parts[req.key]
-	if ok {
-		part.rmu.Lock()
-		part.queue = append(part.queue, req.message)
-		part.rmu.Unlock()
-	} else {
-		part = NewPartition(req)
-		go part.Release(s)
-		topic.Parts[req.key] = part
-	}
-}
+
+//这个怎么没了
+// func (s *Server) AddMessage(topic *Topic, req Push) {
+// 	part, ok := topic.Parts[req.key]
+// 	if ok {
+// 		part.rmu.Lock()
+// 		part.queue = append(part.queue, req.message)
+// 		part.rmu.Unlock()
+// 	} else {
+// 		part = NewPartition(req)
+// 		go part.Release(s)
+// 		topic.Parts[req.key] = part
+// 	}
+// }
 
 type PullRequest struct {
 	consumerId string
@@ -175,6 +184,29 @@ type PartitionInitInfo struct {
 
 // 这个还没有实现
 func (s *Server) StartGet(req PartitionInitInfo) error {
+
+	//先看
+	switch req.option {
+	//负载均衡
+	case TOPIC_NIL_PTP:
+		//广播
+	case TOPIC_KEY_PSB:
+		{
+			//先看这个是否订阅
+			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
+			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
+			if ret == true {
+				//下面这三行是为了没有这个分区的时候新建一个
+				toConsumers := make(map[string]*client_operations.Client)
+				toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
+				file := s.topics[req.topic].GetFile(req.partition)
+				go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
+			} else {
+
+			}
+		}
+
+	}
 	return nil
 }
 
@@ -192,4 +224,22 @@ type Message struct {
 	Partition_name string `json:partition_name`
 	Index          int64  `json:"index"`
 	Msgs           []byte `json:msgs`
+}
+type Msgs struct {
+	producer string
+	topic    string
+	key      string
+	msgs     []byte
+}
+
+// 因为他要进行存储到文件
+func (s *Server) CheckList() {
+	// 获得当前目录路径
+	str, _ := os.Getwd()
+	str += ip_name
+	err := FileOrListExist(str)
+	if err == false {
+		//进行创建为什么要给他创建一个目录？？？
+		CreateDir(str)
+	}
 }
