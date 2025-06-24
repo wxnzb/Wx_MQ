@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"os"
 )
@@ -19,7 +20,8 @@ func CreateFile(filePath string) (*os.File, error) {
 func GetIpPort() string {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return "error"
+		//return "error"
+		panic("Poor soul,here is what you got:" + err.Error())
 	}
 	ipport := ""
 	for _, i := range interfaces {
@@ -43,5 +45,9 @@ func FileOrListExist(filePath string) bool {
 
 // 创建目录
 func CreateDir(dirPath string) error {
-
+	err := os.Mkdir(dirPath, 0666)
+	if err != nil {
+		fmt.Println("mkdir", dirPath, "error")
+	}
+	return err
 }

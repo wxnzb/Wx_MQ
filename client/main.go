@@ -27,9 +27,7 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	info := &api.InfoRequest{
-		IpPort: ipport,
-	}
+	//这里可以进行选择是生产者还是消费者
 	option := os.Args[1]
 	port := ""
 	if len(os.Args) == 3 {
@@ -42,13 +40,22 @@ func main() {
 	case "p":
 		pro := cl2.Producer{}
 		pro.Cli = client
-		//这个还没有呢
+		//这个还没有实现呢
 		pro.Name = cl2.GetIpPort() + port
 		ipport = pro.Name
+	case "c":
+		con := cl2.Consumer{}
+		con.Cli = client
+		con.Name = cl2.GetIpPort() + port
+		ipport = con.Name
+		//这里为什么要加:??开启这个消费者客户端的rpc服务器
+		go con.Start_server(":" + port)
 	}
-	consumer := cl2.Consumer{}
-	consumer.Cli = client
+	info := &api.InfoRequest{
+		IpPort: ipport,
+	}
 	//这个是为了反向代理，当broker有消息要发给这个中转站的时候就能找到了
+	//这里一般是c的时候能用上，要让broker知道这个消费者的ip和端口
 	resp, err := client.Info(context.Background(), info)
 	if err != nil {
 		fmt.Println(err)
@@ -57,6 +64,7 @@ func main() {
 	}
 	for {
 		req := &api.PushRequest{
+			//这里也是，现在他是string,应该是int64
 			ProducerId: ipport,
 			Topic:      "name",
 			Key:        "wuxi",

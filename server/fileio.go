@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"sync"
 )
@@ -38,11 +40,12 @@ func (f *File) FindOffset(fd *os.File, index int64) (int64, error) {
 		//ReadAt 直接按 offset 读取 NODE_SIZE 字节到 node_data
 		size, err := fd.ReadAt(node_data, offset)
 		//这里为什么size会不等于NODE_SIZE呢
+
 		if size != NODE_SIZE {
-
+			return int64(-1), errors.New("read node size is not NODE_SIZE")
 		}
-		if err != nil {
-
+		if err == io.EOF {
+			return index, errors.New("blockoffset is out of range")
 		}
 		json.Unmarshal(node_data, &node)
 		//说明现在index还在后面
@@ -69,12 +72,12 @@ func (f *File) GetSize() int64 {
 func (f *File) WriteFile(file *os.File, node NodeData, msgs []Message) bool {
 	msgs_json, err := json.Marshal(msgs)
 	if err != nil {
-
+		DEBUG(dERROR, "%v turn json fail\n", msgs)
 	}
 	node.Size = len(msgs_json)
 	node_json, err := json.Marshal(node)
 	if err != nil {
-
+		DEBUG(dERROR, "%v turn json fail\n", node)
 	}
 	if f.node_size == 0 {
 		f.node_size = len(node_json)
@@ -96,25 +99,35 @@ func (f *File) ReadFile(fd *os.File, blockoffset int64) (NodeData, []Message, er
 	defer f.rmu.RUnlock()
 	node_data := make([]byte, NODE_SIZE)
 	size, err := fd.ReadAt(node_data, blockoffset)
-	if err != nil {
-
-	}
-	if size != NODE_SIZE {
-
-	}
 	var node NodeData
+	var msgs []Message
+	//这个好像不需要
+	// if err != nil {
+	// 	return node,msgs, err
+	// }
+	if size != NODE_SIZE {
+		return node, msgs, errors.New("read node size is not NODE_SIZE")
+	}
+	if err == io.EOF {
+		return node, msgs, errors.New("blockoffset is out of range")
+	}
+	//var node NodeData
 	json.Unmarshal(node_data, &node)
 
 	offset := blockoffset + int64(NODE_SIZE)
 	msgs_data := make([]byte, node.Size)
 	size, err = fd.ReadAt(msgs_data, offset)
-	if err != nil {
+	//这个好像也不需要
+	// if err != nil {
 
-	}
+	// }
 	if size != node.Size {
-
+		return node, msgs, errors.New("read node size is not NODE_SIZE")
 	}
-	var msgs []Message
+	if err == io.EOF {
+		return node, msgs, errors.New("blockoffset is out of range")
+	}
+	// var msgs []Message
 	json.Unmarshal(msgs_data, &msgs)
 	return node, msgs, nil
 

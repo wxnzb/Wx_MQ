@@ -15,22 +15,29 @@ type Producer struct {
 	Topic_Partition map[string]bool //这个topic的Partition是否是这个生产者负责
 }
 type Message struct {
-	Topic     string
-	Partition string
-	Msg       string
+	Topic_Name     string
+	Partition_Name string
+	Msg            string
 }
 
 func (pro *Producer) Push(msg Message) error {
 	pro.rmu.RLock()
-	index := msg.Topic + "_" + msg.Partition
-	if _, ok := pro.Topic_Partition[index]; ok {
-		pro.rmu.RUnlock()
+	index := msg.Topic_Name + "_" + msg.Partition_Name
+	ok := pro.Topic_Partition[index]
+	pro.rmu.RUnlock()
+	if ok {
 		resp, err := pro.Cli.Push(context.Background(), &api.PushRequest{
-			ProducerId: pro.name,
-			Topic:      msg.Topic,
-			Key:        msg.Partition,
+			//这里报错的原因是ProducerId是int64不是string
+			ProducerId: pro.Name,
+			Topic:      msg.Topic_Name,
+			Key:        msg.Partition_Name,
 			Message:    msg.Msg,
 		})
+		if err == nil && resp.Ret {
+			return nil
+		} else {
+			return errors.New("err!=nil or resp.Ret==false\n")
+		}
 
 	} else {
 		return errors.New("this topic_partition is not has this producer")

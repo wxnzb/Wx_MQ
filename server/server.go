@@ -7,8 +7,7 @@ import (
 	"sync"
 
 	"errors"
-
-	cl "github.com/cloudwego/kitex/client"
+	//cl "github.com/cloudwego/kitex/client"
 )
 
 type Server struct {
@@ -36,24 +35,42 @@ func (s *Server) make() {
 // }
 
 // 将消费者客户端连接到服务器
-func (s *Server) InfoHandle(ip_port string) error {
-	//消费者客户端
-	client, err := client_operations.NewClient("client", cl.WithHostPorts(ip_port))
-	if err == nil {
-		//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
-		//s.groups["default"].consumers[ip_port] = &client
-		s.rmu.Lock()
-		consumer, ok := s.consumers[ip_port]
-		if !ok {
-			consumer = NewToConsumer(ip_port, client)
-			s.consumers[ip_port] = consumer
+//
+//	func (s *Server) InfoHandle(ip_port string) error {
+//		//消费者客户端
+//		client, err := client_operations.NewClient("client", cl.WithHostPorts(ip_port))
+//		if err == nil {
+//			//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
+//			//s.groups["default"].consumers[ip_port] = &client
+//			s.rmu.Lock()
+//			consumer, ok := s.consumers[ip_port]
+//			if !ok {
+//				consumer = NewToConsumer(ip_port, client)
+//				s.consumers[ip_port] = consumer
+//			}
+//			go s.CheckConsumer(consumer)
+//			//go s.RecoverConsumer(consumer)
+//			s.rmu.Unlock()
+//			return nil
+//		}
+//		return err
+//	}
+//
+// 换个版本可能更好理解
+func (s *Server) InfoHandle(ip_port string) (err error) {
+	s.rmu.Lock()
+	consumer, ok := s.consumers[ip_port]
+	if !ok {
+		consumer, err = NewToConsumer(ip_port)
+		if err != nil {
+			return err
 		}
-		go s.CheckConsumer(consumer)
-		//go s.RecoverConsumer(consumer)
-		s.rmu.Unlock()
-		return nil
+		s.consumers[ip_port] = consumer
 	}
-	return err
+	go s.CheckConsumer(consumer)
+	//go s.RecoverConsumer(consumer)
+	s.rmu.Unlock()
+	return nil
 }
 
 // 循环遍历这个消费者是否还在先，要是没在先，就要将他所有的订阅都删除调并重新进行平衡
@@ -77,6 +94,7 @@ func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 	consumer.rmu.Lock()
 	consumer.state = ALIVE
 	for sub_name, sub := range consumer.subList {
+		//这里topic的RecoverConsumer还没有实现
 		go s.topics[sub.topic_name].RecoverConsumer(sub_name, consumer)
 	}
 	consumer.rmu.Unlock()
@@ -129,7 +147,7 @@ type PullResponse struct {
 }
 
 func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
-	return PullResponse{message: "haha"}, nil
+	return PullResponse{message: ""}, nil
 }
 
 type Sub struct {
@@ -183,8 +201,7 @@ type PartitionInitInfo struct {
 }
 
 // 这个还没有实现
-func (s *Server) StartGet(req PartitionInitInfo) error {
-
+func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 	//先看
 	switch req.option {
 	//负载均衡
@@ -192,6 +209,8 @@ func (s *Server) StartGet(req PartitionInitInfo) error {
 		//广播
 	case TOPIC_KEY_PSB:
 		{
+			s.rmu.Lock()
+			defer s.rmu.Unlock()
 			//先看这个是否订阅
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
 			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
@@ -202,12 +221,14 @@ func (s *Server) StartGet(req PartitionInitInfo) error {
 				file := s.topics[req.topic].GetFile(req.partition)
 				go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
 			} else {
-
+				err = errors.New("not subscribe")
 			}
 		}
+	default:
+		err = errors.New("option error")
 
 	}
-	return nil
+	return err
 }
 
 const (
@@ -219,11 +240,13 @@ type NodeData struct {
 	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
 	Size        int   `json:"size"`        //这几批消息的总大小
 }
+
+// 下面这两个有什么区别吗？？
 type Message struct {
 	Topic_name     string `json:topic_name`
 	Partition_name string `json:partition_name`
 	Index          int64  `json:"index"`
-	Msgs           []byte `json:msgs`
+	Msg            []byte `json:msg`
 }
 type Msgs struct {
 	producer string
@@ -232,7 +255,7 @@ type Msgs struct {
 	msgs     []byte
 }
 
-// 因为他要进行存储到文件
+// 因为他要进行存储到文件，这里不用加"/"吗？？？
 func (s *Server) CheckList() {
 	// 获得当前目录路径
 	str, _ := os.Getwd()

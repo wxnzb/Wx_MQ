@@ -3,7 +3,7 @@ package server
 import (
 	"Wx_MQ/kitex_gen/api/server_operations"
 
-	"sync"
+	//"sync"
 
 	"context"
 	"fmt"
@@ -14,26 +14,24 @@ import (
 )
 
 type RPCServer struct {
-	logging struct {
-		logger      Logger
-		debug       int32 //是否开启调试日志
-		trace       int32 //是否开启trace日志
-		traceSysAcc int32 //trace system account是否开启系统用户的trace日志
-		sync.RWMutex
-	}
 	server Server
+}
+
+func NewRpcServer() RPCServer {
+	LOGinit()
+	return RPCServer{}
 }
 
 // 我终于知道为什么8889连接8888这个broker的时候总是连接不上了，因为虽然他start想通过携程启动但是mian函数已经结束了，所以就没启动,去掉go携程就好
 func (s *RPCServer) Start(opts []server.Option) error {
 	srv := server_operations.NewServer(s, opts...) //要使用这个函数，需要实现这个函数第一个参数，他是一个接口，那么*RPCServer就要是先这个接口下面的所有函数
 	s.server.make()
-	// go func() {
-	err := srv.Run()
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	// }()
+	go func() {
+		err := srv.Run()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
 	return nil
 }
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
@@ -106,9 +104,10 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
 
 	err = s.server.StartGet(PartitionInitInfo{
-		topic:     req.Topic_Name,
-		partition: req.Partition_Name,
-		index:     req.Offset,
+		topic:           req.Topic_Name,
+		partition:       req.Partition_Name,
+		consumer_ipname: req.Cli_Name,
+		index:           req.Offset,
 	})
 	if err != nil {
 		return &api.InfoGetResponse{Ret: false}, err

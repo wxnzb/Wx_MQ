@@ -18,6 +18,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	client2 "github.com/cloudwego/kitex/client"
 )
 
 // 这是消费组，一个消费组可以消费多个topic
@@ -59,15 +61,32 @@ type ToConsumer struct {
 	parts    map[string]*Part         //消费者消费的分区
 }
 
-func NewToConsumer(ip_port string, consumer client_operations.Client) *ToConsumer {
+// 那么这个也换一个版本
+//
+//	func NewToConsumer(ip_port string, consumer client_operations.Client) *ToConsumer {
+//		return &ToConsumer{
+//			rmu:      sync.RWMutex{},
+//			name:     ip_port,
+//			state:    ALIVE,
+//			subList:  make(map[string]*SubScription),
+//			consumer: consumer,
+//			parts:    make(map[string]*Part),
+//		}
+//	}
+func NewToConsumer(ip_port string) (*ToConsumer, error) {
+	client, err := client_operations.NewClient("clients", client2.WithHostPorts(ip_port))
+	if err != nil {
+		DEBUG(dERROR, "NewClient err:%v", err)
+		return nil, err
+	}
 	return &ToConsumer{
 		rmu:      sync.RWMutex{},
 		name:     ip_port,
 		state:    ALIVE,
 		subList:  make(map[string]*SubScription),
-		consumer: consumer,
+		consumer: client,
 		parts:    make(map[string]*Part),
-	}
+	}, nil
 }
 
 //这个也没了？？？
@@ -122,7 +141,7 @@ func (con *ToConsumer) GetToConsumer() *client_operations.Client {
 	return &con.consumer
 }
 
-// 移除订阅，这个函数还没懂
+// 移除订阅
 func (con *ToConsumer) ReduceScription(sub_name string) {
 	con.rmu.Lock()
 	defer con.rmu.Unlock()

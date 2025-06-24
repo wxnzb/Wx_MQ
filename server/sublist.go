@@ -1,7 +1,9 @@
 package server
 
 import (
+	"Wx_MQ/kitex_gen/api/client_operations"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"os"
 	"sort"
@@ -98,7 +100,7 @@ func (t *Topic) ReduceScription(req Sub) (string, error) {
 		//这个是新加的
 		subscription.ReduceConsumer(req.consumer)
 	} else {
-		errors.New("订阅不存在")
+		return ret, errors.New("订阅不存在")
 	}
 	delete(t.SubList, ret)
 	t.rmu.Unlock()
@@ -135,15 +137,13 @@ func (t *Topic) GetFile(partition string) *File {
 // ---------------------------------------------------------------------------
 type Partition struct {
 	rmu   sync.RWMutex
-	key   string   //分区名字
-	queue []string //分区里面存的消息队列
-	// consumer_offset map[string]int         //消费者偏移列表
-	// consumer        map[string]*ToConsumer //消费者列表
+	key   string    //分区名字
+	queue []Message //分区里面存的消息队列
 	//新加的关于文件的,下面这些到底是干什么用的
 	file_name   string
 	file        *File
 	fd          *os.File
-	index       int64
+	index       int64 //文件指向的位置
 	start_index int64
 }
 
@@ -152,9 +152,7 @@ func NewPartition(req Push) (*Partition, string) {
 	part := &Partition{
 		rmu:   sync.RWMutex{},
 		key:   req.key,
-		queue: make([]string, 40),
-		//consumer_offset: make(map[string]int),
-		//consumer:make(map[string]*ToConsumer),不用加这句吗
+		queue: make([]Message, 40),
 	}
 	str, _ := os.Getwd()
 	str += "/" + ip_name + "/" + req.topic + "/" + req.key + ".txt"
@@ -162,7 +160,7 @@ func NewPartition(req Push) (*Partition, string) {
 	part.file = NewFile(str)
 	file, err := CreateFile(str)
 	if err != nil {
-
+		fmt.Println("create", str, "fail")
 	}
 	part.fd = file
 	part.index = part.file.GetIndex(part.fd)
@@ -228,8 +226,35 @@ func (p *Partition) GetFile() *File {
 	defer p.rmu.Unlock()
 	return p.file
 }
-func (p *Partition) addMessage(req Push) {
 
+// 内存队列中累积消息，并在队列达到一定长度后批量写入文件
+func (p *Partition) addMessage(req Push) {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	p.index++
+	msg := Message{
+		Topic_name:     req.topic,
+		Partition_name: req.key,
+		Index:          p.index,
+		Msg:            []byte(req.message),
+	}
+	p.queue = append(p.queue, msg)
+	if p.index-p.start_index >= 10 {
+		var msgs []Message
+		for i := 0; i < VIRTUAL_10; i++ {
+			msgs = append(msgs, p.queue[i])
+		}
+		node := NodeData{
+			Start_index: p.start_index,
+			End_index:   p.start_index + VIRTUAL_10,
+		}
+		//这里用for是重试机制，只要 WriteFile() 写失败（返回 false），就不断重试，并打印错误日志，直到写成功为止
+		for !p.file.WriteFile(p.fd, node, msgs) {
+			DEBUG(dERROR, "write to %v fail\n", p.file_name)
+		}
+		p.start_index = p.start_index + VIRTUAL_10 + 1
+		p.queue = p.queue[VIRTUAL_10:]
+	}
 }
 
 // -----------------------------------------------------------
@@ -240,7 +265,7 @@ type SubScription struct {
 	consumer_partition map[string]string //一个消费者对应的分区
 	groups             []*Group
 	option             int8
-	//consistent         *Consistent
+	config             *Config
 }
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
@@ -267,6 +292,8 @@ func NewSubScription(sub Sub, ret string) *SubScription {
 // ---这个也不要了吗
 // 将消费者加入到这个订阅队列里面
 func (sub *SubScription) AddConsumer(req Sub) {
+	sub.rmu.Lock()
+	defer sub.rmu.Unlock()
 	switch req.option {
 	//点对点订阅，全部放在一个消费者组里面
 	case TOPIC_NIL_PTP:
@@ -346,6 +373,48 @@ func (sub *SubScription) RecoverConsumer(req Sub) {
 }
 func (sub *SubScription) Rebalance() {
 
+}
+
+// 这里实现不太一样
+func (sub *SubScription) GetConfig() *Config {
+	sub.rmu.RLock()
+	defer sub.rmu.RUnlock()
+	return sub.config
+}
+
+// -------------------------------------------------------------
+type Config struct {
+	rmu              sync.RWMutex
+	consistent       *Consistent
+	part_toconsumers map[string][]string                  //part对应的消费者
+	toconsumers      map[string]*client_operations.Client //消费者对应的消费者客户端接口
+}
+
+func NewConfig() *Config {
+	return &Config{
+		rmu: sync.RWMutex{},
+		//consistent:NewConsistent()这个暂时没有？
+		part_toconsumers: make(map[string][]string),
+		toconsumers:      make(map[string]*client_operations.Client),
+	}
+}
+func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_operations.Client) {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
+	c.toconsumers[consumer] = toconsumer
+}
+func (c *Config) DeleteToconsumer(part, consumer string) {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	delete(c.toconsumers, consumer)
+	for i, name := range c.part_toconsumers[part] {
+		if name == consumer {
+			//后面那三个点是什么
+			c.part_toconsumers[part] = append(c.part_toconsumers[part][:i], c.part_toconsumers[part][i+1:]...)
+			break
+		}
+	}
 }
 
 // -------------------------------------------------------------
