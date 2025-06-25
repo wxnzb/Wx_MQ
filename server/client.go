@@ -58,7 +58,8 @@ type ToConsumer struct {
 	state    string
 	subList  map[string]*SubScription //这里的string应该是SubScription的名字，topic_name+option类型
 	consumer client_operations.Client //这个就是消费者进行消费的接口
-	parts    map[string]*Part         //消费者消费的分区
+	//现在把这个取了
+	//parts    map[string]*Part         //消费者消费的分区
 }
 
 // 那么这个也换一个版本
@@ -85,7 +86,7 @@ func NewToConsumer(ip_port string) (*ToConsumer, error) {
 		state:    ALIVE,
 		subList:  make(map[string]*SubScription),
 		consumer: client,
-		parts:    make(map[string]*Part),
+		//parts:    make(map[string]*Part),
 	}, nil
 }
 
@@ -118,14 +119,7 @@ func (con *ToConsumer) CheckConsumer() bool {
 	return true
 }
 
-// 消费者订阅消息，这个函数还没懂
-func (con *ToConsumer) AddScription(sub *SubScription) {
-	con.rmu.Lock()
-	defer con.rmu.Unlock()
-	con.subList[con.name] = sub //这句暂时还不理解，因为key的原因，与reduceScription的key是一样的
-}
-
-// 新加函数：查看这个消费者是否订阅了这个sub
+// 查看这个消费者是否订阅了这个sub
 func (con *ToConsumer) CheckSubscription(sub_name string) bool {
 	con.rmu.RLock()
 	defer con.rmu.RUnlock()
@@ -133,12 +127,11 @@ func (con *ToConsumer) CheckSubscription(sub_name string) bool {
 	return ok
 }
 
-// ----------------------新加的感觉暂时没用上================
-// 得到这个消费者的操作接口
-func (con *ToConsumer) GetToConsumer() *client_operations.Client {
-	con.rmu.RLock()
+// 消费者订阅消息，这个函数还没懂
+func (con *ToConsumer) AddScription(sub *SubScription) {
+	con.rmu.Lock()
 	defer con.rmu.Unlock()
-	return &con.consumer
+	con.subList[con.name] = sub //这句暂时还不理解，因为key的原因，与reduceScription的key是一样的
 }
 
 // 移除订阅
@@ -146,6 +139,27 @@ func (con *ToConsumer) ReduceScription(sub_name string) {
 	con.rmu.Lock()
 	defer con.rmu.Unlock()
 	delete(con.subList, sub_name)
+}
+
+// 得到这个消费者的操作接口
+func (con *ToConsumer) GetToConsumer() *client_operations.Client {
+	con.rmu.RLock()
+	defer con.rmu.Unlock()
+	return &con.consumer
+}
+
+// 获取消费者状态
+func (con *ToConsumer) GetState() string {
+	con.rmu.RLock()
+	defer con.rmu.Unlock()
+	return con.state
+}
+
+// 获取消费者订阅的Sub
+func (con *ToConsumer) GetSubList(sub_name string) *SubScription {
+	con.rmu.RLock()
+	defer con.rmu.RUnlock()
+	return con.subList[sub_name]
 }
 
 // 将消费者标记为不活跃，现在是broker的消费者客户端不能接收到消费者ping的消息时，就找到的他所有的订阅，然后将他的所有订阅的组里都标记为不活跃，为什么不直接删除？？
@@ -210,33 +224,36 @@ type Part struct {
 	block_status map[int64]string
 }
 
-func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) *Part {
+func NewPart(topic_name, part_name string, file *File) *Part {
 	return &Part{
 		rmu:            sync.RWMutex{},
-		topic_name:     partitionInitInfo.topic,
-		partition_name: partitionInitInfo.partition,
-		option:         partitionInitInfo.option,
-		state:          ALIVE,
+		topic_name:     topic_name,
+		partition_name: part_name,
+		option:         TOPIC_NIL_PTP,
+		state:          DOWN,
 		file:           file,
-		to_consumers:   toConsumers,
+		to_consumers:   make(map[string]*client_operations.Client),
 		buffer_node:    make(map[int64]NodeData),
 		buffer_msgs:    make(map[int64][]Message),
 		consumer_ack:   make(chan ConsumerAck),
 		block_status:   make(map[int64]string),
+		lastIndex:      0,
 	}
+
 }
-func (con *ToConsumer) StartPart(req PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) {
-	con.rmu.Lock()
-	defer con.rmu.Unlock()
-	part, ok := con.parts[req.topic]
-	if !ok {
-		//func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) *Part
-		//要是没有就要新建一个
-		part = NewPart(req, toConsumers, file)
-		con.parts[req.topic] = part
-	}
-	part.Start()
-}
+
+// func (con *ToConsumer) StartPart(req PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) {
+// 	con.rmu.Lock()
+// 	defer con.rmu.Unlock()
+// 	part, ok := con.parts[req.topic]
+// 	if !ok {
+// 		//func NewPart(partitionInitInfo PartitionInitInfo, toConsumers map[string]*client_operations.Client, file *File) *Part
+// 		//要是没有就要新建一个
+// 		part = NewPart(req, toConsumers, file)
+// 		con.parts[req.topic] = part
+// 	}
+// 	part.Start()
+// }
 
 // 这个函数主要做的事情有：
 // 1：读取文件的消息存到part结构体的buffer_node和buffer_mags中
@@ -251,27 +268,31 @@ func (p *Part) Start() {
 	//这里得到的是这一块消息的偏移，他无法得到这一批消息的偏移，但是先在感觉这句根本就没有用上阿，为什么要放在这里？？
 	p.blockOffset, err = p.file.FindOffset(&p.fd, p.lastIndex)
 	if err != nil {
-
+		DEBUG(dERROR, err.Error())
 	}
 	//开始从磁盘读取5个快放在buffer中
-	for i := 0; i < 5; i++ {
+	for i := 0; i < BUFF_NUM; i++ {
 		err = p.AddBlock()
+		if err != nil {
+			DEBUG(dERROR, err.Error())
+		}
 	}
 	//开启一个携程接收消费者发送过来的ack
 	go p.GetDone()
 	//现在循环发送消息给消费者
-	for {
-		p.rmu.RLock()
-		if p.state == DOWN {
-			break
-		}
-		p.rmu.RUnlock()
-		p.rmu.RLock()
-		for name, toConsumer := range p.to_consumers {
-			go p.SendOneBlock(name, toConsumer, p.startIndex)
-		}
+	p.rmu.Lock()
+
+	if p.state == DOWN {
+		p.state = ALIVE
+	} else {
+		p.rmu.Unlock()
+		DEBUG(dERROR, "the part start already is alive\n")
+		return
 	}
-	p.rmu.RUnlock()
+	for name, toConsumer := range p.to_consumers {
+		go p.SendOneBlock(name, toConsumer)
+	}
+	p.rmu.Unlock()
 }
 
 const (
@@ -283,6 +304,7 @@ const (
 	NOTDO      = "notdo"
 	DOING      = "doing"
 	FALL_TIMES = 3
+	BUFF_NUM   = 5
 )
 
 // 消费者在收到消息后返回的ack信息
@@ -356,9 +378,16 @@ func (p *Part) AddBlock() error {
 	return nil
 }
 
-func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client, startIndex int64) {
+func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client) {
 	//为了防止他开始让发的已经发过了，因此要在外面在加一层for循环
+	var startIndex int64
+	startIndex = 0
 	for {
+		if startIndex == 0 {
+			startIndex = p.startIndex
+		}
+		if _, ok := p.to_consumers[name]; !ok {
+		}
 		if p.block_status[startIndex] == NOTDO {
 			node := p.buffer_node[startIndex]
 			msgs := p.buffer_msgs[startIndex]

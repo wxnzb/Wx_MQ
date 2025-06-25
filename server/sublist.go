@@ -375,7 +375,7 @@ func (sub *SubScription) Rebalance() {
 
 }
 
-// 这里实现不太一样
+// 从SubScription中获得*Config
 func (sub *SubScription) GetConfig() *Config {
 	sub.rmu.RLock()
 	defer sub.rmu.RUnlock()
@@ -383,26 +383,80 @@ func (sub *SubScription) GetConfig() *Config {
 }
 
 // -------------------------------------------------------------
+// 提供一个线程安全的管理机制，管理消息传递系统中的分区和消费者的关系
 type Config struct {
 	rmu              sync.RWMutex
-	consistent       *Consistent
-	part_toconsumers map[string][]string                  //part对应的消费者
+	part_toconsumers map[string][]string //part对应的消费者
+	con_nums         int
+	part_nums        int
 	toconsumers      map[string]*client_operations.Client //消费者对应的消费者客户端接口
+	partitions       map[string]*Partition
+	parts            map[string]*Part
+	//文件
+	files map[string]*File
+	//下面这还不理解干啥的
+	con_part   bool //是一消费者为节点还是以分区为节点
+	consistent *Consistent
 }
 
-func NewConfig() *Config {
-	return &Config{
-		rmu: sync.RWMutex{},
-		//consistent:NewConsistent()这个暂时没有？
+func NewConfig(topic_name string, partitions map[string]*Partition, part_nums int, files map[string]*File) *Config {
+	con := &Config{
+		rmu:              sync.RWMutex{},
 		part_toconsumers: make(map[string][]string),
+		con_nums:         0,
+		part_nums:        part_nums,
 		toconsumers:      make(map[string]*client_operations.Client),
+		partitions:       partitions,
+		files:            files,
+		//true 表示消费者是 node，false 表示分区是 node
+		con_part:   true,
+		consistent: NewConsistent(),
 	}
+	for partition_name, _ := range partitions {
+		con.parts[partition_name] = NewPart(topic_name, partition_name, files[partition_name])
+	}
+	return con
 }
 func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_operations.Client) {
 	c.rmu.Lock()
 	defer c.rmu.Unlock()
 	c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
 	c.toconsumers[consumer] = toconsumer
+	c.con_nums++
+	//这里要是消费者数量多且现在是消费者做节点，就将节点转换为分区座节点，多个消费者key映射到一个节点
+	if c.con_nums > c.part_nums && c.con_part {
+		c.con_part = false
+		c.consistent = TurnConsistent(GetPartitionArry(c.partitions))
+	}
+	if c.con_part == true {
+		err := c.consistent.Add(consumer)
+		if err != nil {
+			DEBUG(dERROR, err.Error())
+		}
+	}
+	c.RebalancePtoC() //更新配置
+	c.UpdateParts()   //应用配置
+}
+func GetPartitionArry(partitions map[string]*Partition) []string {
+	var arry []string
+	for name, _ := range partitions {
+		arry = append(arry, name)
+	}
+	return arry
+}
+func TurnConsistent(arry []string) *Consistent {
+	consistent := NewConsistent()
+	//这里还挺奇怪的，不就是string数组吗，为啥这里要多加一个_???
+	for _, name := range arry {
+		consistent.Add(name)
+	}
+	return consistent
+}
+func (c *Config) RebalancePtoC() {
+
+}
+func (c *Config) UpdateParts() {
+
 }
 func (c *Config) DeleteToconsumer(part, consumer string) {
 	c.rmu.Lock()
@@ -415,6 +469,7 @@ func (c *Config) DeleteToconsumer(part, consumer string) {
 			break
 		}
 	}
+
 }
 
 // -------------------------------------------------------------
