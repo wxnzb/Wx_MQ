@@ -1,6 +1,7 @@
 package server
 
 import (
+	"Wx_MQ/kitex_gen/api/client_operations"
 	"fmt"
 	"net"
 	"os"
@@ -50,4 +51,35 @@ func CreateDir(dirPath string) error {
 		fmt.Println("mkdir", dirPath, "error")
 	}
 	return err
+}
+
+// CheckChangeCon(p.to_consumers, confPartToCons),前面是这个part里面的consumers,后面是config中的这个part里面的consumers，因为+-消费者都是先操作的config,现在就要找出他们量的差异
+//
+//eg:1 2 3 4 5； 1 2 5 6 7=======reduce:3 4;add : 6 7
+func CheckChangeCon(old map[string]*client_operations.Client, new []string) (reduce, add []string) {
+	for o, _ := range old {
+		ra := false
+		for _, n := range new {
+			if o == n {
+				ra = true //说明都有
+				break
+			}
+		}
+		if ra == false {
+			reduce = append(reduce, o)
+		}
+	}
+	for _, n := range new {
+		ra := false
+		for o, _ := range old {
+			if n == o {
+				ra = true
+				break
+			}
+		}
+		if ra == false {
+			add = append(add, n)
+		}
+	}
+	return
 }

@@ -461,3 +461,16 @@ func (p *Part) ClosePart() {
 	defer p.rmu.Unlock()
 	p.state = DOWN
 }
+
+func (p *Part) UpdateCons(confPartToCons []string, confCons map[string]*client_operations.Client) {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	reduce, add := CheckChangeCon(p.to_consumers, confPartToCons)
+	for _, r := range reduce {
+		delete(p.to_consumers, r)
+	}
+	for _, a := range add {
+		p.to_consumers[a] = confCons[a]
+		p.SendOneBlock(a, confCons[a])
+	}
+}

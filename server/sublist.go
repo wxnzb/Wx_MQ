@@ -383,96 +383,6 @@ func (sub *SubScription) GetConfig() *Config {
 }
 
 // -------------------------------------------------------------
-// 提供一个线程安全的管理机制，管理消息传递系统中的分区和消费者的关系
-type Config struct {
-	rmu              sync.RWMutex
-	part_toconsumers map[string][]string //part对应的消费者
-	con_nums         int
-	part_nums        int
-	toconsumers      map[string]*client_operations.Client //消费者对应的消费者客户端接口
-	partitions       map[string]*Partition
-	parts            map[string]*Part
-	//文件
-	files map[string]*File
-	//下面这还不理解干啥的
-	con_part   bool //是一消费者为节点还是以分区为节点
-	consistent *Consistent
-}
-
-func NewConfig(topic_name string, partitions map[string]*Partition, part_nums int, files map[string]*File) *Config {
-	con := &Config{
-		rmu:              sync.RWMutex{},
-		part_toconsumers: make(map[string][]string),
-		con_nums:         0,
-		part_nums:        part_nums,
-		toconsumers:      make(map[string]*client_operations.Client),
-		partitions:       partitions,
-		files:            files,
-		//true 表示消费者是 node，false 表示分区是 node
-		con_part:   true,
-		consistent: NewConsistent(),
-	}
-	for partition_name, _ := range partitions {
-		con.parts[partition_name] = NewPart(topic_name, partition_name, files[partition_name])
-	}
-	return con
-}
-func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_operations.Client) {
-	c.rmu.Lock()
-	defer c.rmu.Unlock()
-	c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
-	c.toconsumers[consumer] = toconsumer
-	c.con_nums++
-	//这里要是消费者数量多且现在是消费者做节点，就将节点转换为分区座节点，多个消费者key映射到一个节点
-	if c.con_nums > c.part_nums && c.con_part {
-		c.con_part = false
-		c.consistent = TurnConsistent(GetPartitionArry(c.partitions))
-	}
-	if c.con_part == true {
-		err := c.consistent.Add(consumer)
-		if err != nil {
-			DEBUG(dERROR, err.Error())
-		}
-	}
-	c.RebalancePtoC() //更新配置
-	c.UpdateParts()   //应用配置
-}
-func GetPartitionArry(partitions map[string]*Partition) []string {
-	var arry []string
-	for name, _ := range partitions {
-		arry = append(arry, name)
-	}
-	return arry
-}
-func TurnConsistent(arry []string) *Consistent {
-	consistent := NewConsistent()
-	//这里还挺奇怪的，不就是string数组吗，为啥这里要多加一个_???
-	for _, name := range arry {
-		consistent.Add(name)
-	}
-	return consistent
-}
-func (c *Config) RebalancePtoC() {
-
-}
-func (c *Config) UpdateParts() {
-
-}
-func (c *Config) DeleteToconsumer(part, consumer string) {
-	c.rmu.Lock()
-	defer c.rmu.Unlock()
-	delete(c.toconsumers, consumer)
-	for i, name := range c.part_toconsumers[part] {
-		if name == consumer {
-			//后面那三个点是什么
-			c.part_toconsumers[part] = append(c.part_toconsumers[part][:i], c.part_toconsumers[part][i+1:]...)
-			break
-		}
-	}
-
-}
-
-// -------------------------------------------------------------
 type Consistent struct {
 	rmu              sync.RWMutex
 	hashSortNodes    []uint32          //排序的虚拟节点
@@ -559,3 +469,227 @@ func (c *Consistent) getposition(hashKey uint32) int {
 	}
 	return i
 }
+
+// -------------------------------------------------------------
+// 提供一个线程安全的管理机制，管理消息传递系统中的分区和消费者的关系
+type Config struct {
+	rmu         sync.RWMutex
+	PartToCon   map[string][]string //part对应的消费者
+	con_nums    int
+	part_nums   int
+	toconsumers map[string]*client_operations.Client //消费者对应的消费者客户端接口
+	partitions  map[string]*Partition
+	parts       map[string]*Part
+	//文件
+	files map[string]*File
+	//下面这还不理解干啥的
+	con_part   bool //是一消费者为节点还是以分区为节点
+	consistent *Consistent
+}
+
+func NewConfig(topic_name string, partitions map[string]*Partition, part_nums int, files map[string]*File) *Config {
+	con := &Config{
+		rmu:         sync.RWMutex{},
+		PartToCon:   make(map[string][]string),
+		con_nums:    0,
+		part_nums:   part_nums,
+		toconsumers: make(map[string]*client_operations.Client),
+		partitions:  partitions,
+		parts:       make(map[string]*Part),
+		files:       files,
+		//true 表示消费者是 node，false 表示分区是 node
+		con_part:   true,
+		consistent: NewConsistent(),
+	}
+	for partition_name, _ := range partitions {
+		con.parts[partition_name] = NewPart(topic_name, partition_name, files[partition_name])
+	}
+	return con
+}
+
+// 这里+-知识操作了config,最后要移到part里面去
+func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_operations.Client) {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	//c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
+	c.toconsumers[consumer] = toconsumer
+	c.con_nums++
+	//这里要是消费者数量多且现在是消费者做节点，就将节点转换为分区座节点，多个消费者key映射到一个节点
+	if c.con_nums > c.part_nums && c.con_part {
+		c.con_part = false
+		c.consistent = TurnConsistent(GetPartitionArry(c.partitions))
+	}
+	if c.con_part == true {
+		err := c.consistent.Add(consumer)
+		if err != nil {
+			DEBUG(dERROR, err.Error())
+		}
+	}
+	c.RebalancePtoC() //更新配置
+	c.UpdateParts()   //应用配置
+}
+func GetPartitionArry(partitions map[string]*Partition) []string {
+	var arry []string
+	for name, _ := range partitions {
+		arry = append(arry, name)
+	}
+	return arry
+}
+func GetConsArry(toconsumers map[string]*client_operations.Client) []string {
+	var arry []string
+	for name, _ := range toconsumers {
+		arry = append(arry, name)
+	}
+	return arry
+}
+func TurnConsistent(arry []string) *Consistent {
+	consistent := NewConsistent()
+	//这里还挺奇怪的，不就是string数组吗，为啥这里要多加一个_???
+	for _, name := range arry {
+		consistent.Add(name)
+	}
+	return consistent
+}
+
+// 主要是c的part_consumsres
+func (c *Config) RebalancePtoC() {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	var newMap = make(map[string][]string)
+	//无论这两个总的哪一个，都是part对应con
+	if c.con_part {
+		//con是node,partition是key,多个key对应一个node
+		for key, _ := range c.partitions {
+			node := c.consistent.GetNode(key)
+			newMap[key] = append(newMap[key], node)
+		}
+	} else {
+		//patt是node,con是key,多个key对应一个node
+		for key, _ := range c.toconsumers {
+			node := c.consistent.GetNode(key)
+			newMap[node] = append(newMap[node], key)
+		}
+	}
+	c.PartToCon = newMap
+	return
+}
+func (c *Config) UpdateParts() {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	for part_name, part := range c.parts {
+		part.UpdateCons(c.PartToCon[part_name], c.toconsumers)
+	}
+}
+func (c *Config) DeleteToconsumer(part, consumer string) {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	delete(c.toconsumers, consumer)
+	for i, name := range c.PartToCon[part] {
+		if name == consumer {
+			//后面那三个点是什么
+			c.PartToCon[part] = append(c.PartToCon[part][:i], c.PartToCon[part][i+1:]...)
+			break
+		}
+	}
+	c.con_nums--
+	if c.con_nums < c.part_nums && !c.con_part {
+		c.con_part = true
+		c.consistent = TurnConsistent(GetConsArry(c.toconsumers))
+	}
+	if c.con_part == true {
+		err := c.consistent.Reduce(consumer)
+		if err != nil {
+			DEBUG(dERROR, err.Error())
+		}
+	}
+	c.RebalancePtoC() //更新配置
+	c.UpdateParts()   //应用配置
+}
+
+// // -------------------------------------------------------------
+// type Consistent struct {
+// 	rmu              sync.RWMutex
+// 	hashSortNodes    []uint32          //排序的虚拟节点
+// 	circleNodes      map[uint32]string //虚拟节点对应的世纪节点
+// 	virtualNodeCount int               //虚拟节点数量
+// 	nodes            map[string]bool   //已绑定的世纪节点为true，这个还不太了解
+// }
+
+// func NewConsistent() *Consistent {
+// 	return &Consistent{
+// 		rmu:              sync.RWMutex{},
+// 		hashSortNodes:    make([]uint32, 0),
+// 		circleNodes:      make(map[uint32]string),
+// 		virtualNodeCount: VIRTUAL_10,
+// 		nodes:            make(map[string]bool),
+// 	}
+// }
+// func (c *Consistent) hashKey(key string) uint32 {
+// 	return crc32.ChecksumIEEE([]byte(key))
+// }
+// func (c *Consistent) Add(node string) error {
+// 	if node == "" {
+// 		return nil
+// 	}
+// 	c.rmu.Lock()
+// 	defer c.rmu.Unlock()
+// 	ok := c.nodes[node]
+// 	if ok {
+// 		return errors.New("node already exist")
+// 	}
+// 	c.nodes[node] = true
+// 	for i := 0; i < c.virtualNodeCount; i++ {
+// 		virtualnode := c.hashKey(node + strconv.Itoa(i))
+// 		c.circleNodes[virtualnode] = node
+// 		c.hashSortNodes = append(c.hashSortNodes, virtualnode)
+// 	}
+// 	sort.Slice(c.hashSortNodes, func(i, j int) bool {
+// 		return c.hashSortNodes[i] < c.hashSortNodes[j]
+// 	})
+// 	return nil
+// }
+// func (c *Consistent) Reduce(node string) error {
+// 	if node == "" {
+// 		return nil
+// 	}
+// 	c.rmu.Lock()
+// 	defer c.rmu.Unlock()
+// 	ok := c.nodes[node]
+// 	if !ok {
+// 		return errors.New("node not exist")
+// 	}
+// 	c.nodes[node] = false
+// 	for i := 0; i < c.virtualNodeCount; i++ {
+// 		virtualnode := c.hashKey(node + strconv.Itoa(i))
+// 		delete(c.circleNodes, virtualnode)
+// 		for j := 0; j < len(c.hashSortNodes); j++ {
+// 			if c.hashSortNodes[j] == virtualnode && j != len(c.hashSortNodes)-1 {
+// 				c.hashSortNodes = append(c.hashSortNodes[:j], c.hashSortNodes[j+1:]...)
+// 			} else if c.hashSortNodes[j] == virtualnode && j == len(c.hashSortNodes)-1 {
+// 				c.hashSortNodes = c.hashSortNodes[:j]
+// 			}
+// 		}
+// 	}
+// 	sort.Slice(c.hashSortNodes, func(i, j int) bool {
+// 		return c.hashSortNodes[i] < c.hashSortNodes[j]
+// 	})
+// 	return nil
+// }
+
+// // 一致性哈希环的顺时针查找最近节点
+// func (c *Consistent) GetNode(key string) string {
+// 	c.rmu.Lock()
+// 	defer c.rmu.Unlock()
+// 	hashKey := c.hashKey(key)
+// 	i := c.getposition(hashKey)
+// 	return c.circleNodes[c.hashSortNodes[i]]
+// }
+// func (c *Consistent) getposition(hashKey uint32) int {
+// 	i := sort.Search(len(c.hashSortNodes), func(i int) bool {
+// 		return c.hashSortNodes[i] >= hashKey
+// 	})
+// 	if i == len(c.hashSortNodes) {
+// 		return 0
+// 	}
+// 	return i
+// }
