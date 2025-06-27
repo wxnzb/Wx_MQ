@@ -22,28 +22,6 @@ import (
 	client2 "github.com/cloudwego/kitex/client"
 )
 
-// 这是消费组，一个消费组可以消费多个topic
-// 下面这个是消费者，它对应的string一般是他的ip_port,一个消费组里面当然有多个消费者
-type Group struct {
-	rmu        sync.RWMutex
-	topic_name string
-	consumers  map[string]bool //这个是看属于这个消费者组里面的消费者还活着没
-}
-
-func NewGroup(topic, consumer string) *Group {
-	group := &Group{
-		rmu:        sync.RWMutex{},
-		topic_name: topic,
-	}
-	group.consumers[consumer] = true
-	return group
-}
-func (g *Group) AddConsumer(con_name string) {
-	g.rmu.Lock()
-	defer g.rmu.Unlock()
-	g.consumers[con_name] = true
-}
-
 // 这是消费者客户端的状态,state
 const (
 	ALIVE = "alive"
@@ -52,28 +30,15 @@ const (
 
 // 这是一个消费者实体的内存镜像，又是消费者的客户端
 // 他这个结构体既是含有这个消费者的信息，又有这个消费者的RPC客户端句柄
+// 现在这个消费者客户端有消费者：名字，状态，操作消费者的接口，订阅列表
 type ToConsumer struct {
 	rmu      sync.RWMutex
 	name     string //消费者的名字就是他的地址
 	state    string
 	subList  map[string]*SubScription //这里的string应该是SubScription的名字，topic_name+option类型
 	consumer client_operations.Client //这个就是消费者进行消费的接口
-	//现在把这个取了
-	//parts    map[string]*Part         //消费者消费的分区
 }
 
-// 那么这个也换一个版本
-//
-//	func NewToConsumer(ip_port string, consumer client_operations.Client) *ToConsumer {
-//		return &ToConsumer{
-//			rmu:      sync.RWMutex{},
-//			name:     ip_port,
-//			state:    ALIVE,
-//			subList:  make(map[string]*SubScription),
-//			consumer: consumer,
-//			parts:    make(map[string]*Part),
-//		}
-//	}
 func NewToConsumer(ip_port string) (*ToConsumer, error) {
 	client, err := client_operations.NewClient("clients", client2.WithHostPorts(ip_port))
 	if err != nil {
@@ -86,7 +51,6 @@ func NewToConsumer(ip_port string) (*ToConsumer, error) {
 		state:    ALIVE,
 		subList:  make(map[string]*SubScription),
 		consumer: client,
-		//parts:    make(map[string]*Part),
 	}, nil
 }
 
@@ -106,7 +70,7 @@ func NewToConsumer(ip_port string) (*ToConsumer, error) {
 func (con *ToConsumer) CheckConsumer() bool {
 	con.rmu = sync.RWMutex{}
 	for {
-		//Ping 请求是发送给 Broker 服务端的，用于检测消费者是否在线
+		//Ping 请求是发送给consumer服务端，用于检测消费者是否在线
 		resp, err := con.consumer.Pingpong(context.Background(), &api.PingpongRequest{Ping: true})
 		if resp.Pong == false || err != nil {
 			break
@@ -123,15 +87,15 @@ func (con *ToConsumer) CheckConsumer() bool {
 func (con *ToConsumer) CheckSubscription(sub_name string) bool {
 	con.rmu.RLock()
 	defer con.rmu.RUnlock()
-	_, ok := con.subList[sub_name]
+	_, ok := con.subList[sub_name] //由此可知：SubScription这个结构体中一定要有他自己的名字才能连接起来
 	return ok
 }
 
-// 消费者订阅消息，这个函数还没懂
+// 消费者订阅消息
 func (con *ToConsumer) AddScription(sub *SubScription) {
 	con.rmu.Lock()
 	defer con.rmu.Unlock()
-	con.subList[con.name] = sub //这句暂时还不理解，因为key的原因，与reduceScription的key是一样的
+	con.subList[sub.name] = sub
 }
 
 // 移除订阅
@@ -145,7 +109,7 @@ func (con *ToConsumer) ReduceScription(sub_name string) {
 func (con *ToConsumer) GetToConsumer() *client_operations.Client {
 	con.rmu.RLock()
 	defer con.rmu.Unlock()
-	return &con.consumer
+	return &con.consumer //这里为什么不直接将ToConsumer操作消费者的接口写成指针形式呢？？？
 }
 
 // 获取消费者状态
@@ -156,72 +120,113 @@ func (con *ToConsumer) GetState() string {
 }
 
 // 获取消费者订阅的Sub
-func (con *ToConsumer) GetSubList(sub_name string) *SubScription {
+func (con *ToConsumer) GetSub(sub_name string) *SubScription {
 	con.rmu.RLock()
 	defer con.rmu.RUnlock()
+	//先这样做吧，这里应该先判断一下她存在不？？
+	ok := con.CheckSubscription(sub_name)
+	if !ok {
+		DEBUG(dERROR, "no such sub:%s", sub_name)
+	}
 	return con.subList[sub_name]
 }
 
-// 将消费者标记为不活跃，现在是broker的消费者客户端不能接收到消费者ping的消息时，就找到的他所有的订阅，然后将他的所有订阅的组里都标记为不活跃，为什么不直接删除？？
-func (g *Group) DownConsumer(consumer_ipname string) {
-	g.rmu.Lock()
-	//这里为什么不直接写成g.consumers[consumer_name] = false，那要是你随便写一个消费者组里面就不存在的消费者的名字呢？对把
-	if _, ok := g.consumers[consumer_ipname]; ok {
-		g.consumers[consumer_ipname] = false
-	}
-	g.rmu.Unlock()
+// --------------------------------------------------------------------------------
+// 这是消费组，一个消费组可以消费多个topic
+// 消费者组需要有他所消费的topic_name,还需要有他里面的消费者以及存活情况
+type Group struct {
+	rmu        sync.RWMutex
+	topic_name string
+	consumers  map[string]bool //[ip_port]isornoAlive
 }
 
-// 感觉这个还没用上
-// 删除消费者
-func (g *Group) DeleteConsumer(consumer_name string) {
+// 创建一个消费者组那里面肯定需要至少有一个消费者，因此他需要参数topic_name和consumer_name
+func NewGroup(topic, consumer string) *Group {
+	group := &Group{
+		rmu:        sync.RWMutex{},
+		topic_name: topic,
+		consumers:  make(map[string]bool),
+	}
+	group.consumers[consumer] = true
+	return group
+}
+func (g *Group) AddConsumer(con_name string) error {
 	g.rmu.Lock()
+	defer g.rmu.Unlock()
+	if _, ok := g.consumers[con_name]; ok {
+		return errors.New("consumer already exist")
+	}
+	g.consumers[con_name] = true
+	return nil
+}
+
+// 删除消费者
+func (g *Group) DeleteConsumer(consumer_name string) error {
+	g.rmu.Lock()
+	defer g.rmu.Unlock()
 	//这里为什么不直接写成g.consumers[consumer_name] = false，不活跃和删除不是一个概念
 	if _, ok := g.consumers[consumer_name]; ok {
 		delete(g.consumers, consumer_name)
+	} else {
+		return errors.New("consumer not exist")
 	}
-	g.rmu.Unlock()
+	return nil
+}
+
+// 将消费者标记为不活跃，现在是broker的消费者客户端不能接收到消费者ping的消息时，就找到的他所有的订阅，然后将他的所有订阅的组里都标记为不活跃，为什么不直接删除？？
+func (g *Group) DownConsumer(consumer_name string) error {
+	g.rmu.Lock()
+	defer g.rmu.Unlock()
+	alive, ok := g.consumers[consumer_name]
+	if !ok {
+		return errors.New("no such consumer")
+	}
+	if !alive {
+		return errors.New("consumer 本来就是 down的")
+	}
+	g.consumers[consumer_name] = false
+	return nil
 }
 
 // 要是消费者重新向服务端发送消息证明他还活着，恢复消费者
-func (g *Group) RecoverConsumer(consumer_ipname string) {
+func (g *Group) RecoverConsumer(consumer_name string) error {
 	g.rmu.Lock()
 	defer g.rmu.Unlock()
-	_, ok := g.consumers[consumer_ipname]
-	//
-	if ok {
-		if g.consumers[consumer_ipname] {
-			errors.New("consumer is alive")
-		} else {
-			g.consumers[consumer_ipname] = true
-		}
-
-	} else {
-		errors.New("no such consumer")
+	alive, ok := g.consumers[consumer_name]
+	if !ok {
+		return errors.New("no such consumer")
 	}
+	if alive {
+		return errors.New("consumer 本来就是 alive的")
+	}
+	g.consumers[consumer_name] = true
+	return nil
 }
 
-// 一个block包含一个node和多个messages[多批消息，每批消息都有自己的index]
+// -------------------------------------------------------------------
+// 一个block包含一个node和多个messages多批消息，每批消息都有自己的index]
 // Part，这里的part应该是某个消费者/消费者组对应的分区状态
+// 想一下一个分区都需要什么：分区对应主题的名字，分区的名字，状态，哪些消费者订阅了该分区，分区从哪个文件拿数据，并存到自己的buffer里面，
+// 当把buffer里面的消息发送过给消费者的时候，将消费者返回的信息存到consumer_ack里面
 type Part struct {
 	rmu            sync.RWMutex
 	topic_name     string
 	partition_name string
 	to_consumers   map[string]*client_operations.Client //这里的string应该是consumer的ip_port
-	option         int8
+	option         int8                                 //------------------------------------------------------
 	state          string
 	//文件
 	file        *File
 	fd          os.File //感觉这个暂时不需要，可以由上面那个推出来
-	lastIndex   int64   //被所有订阅人他的消费者消费的消息的索引
-	blockOffset int64   //消费的这批消息的开始块位置
+	lastIndex   int64   //被所有订阅人他的消费者消费的消息的索引--------------------------------------
+	blockOffset int64   //消费的这批消息的开始块位置------------------------------------------------
 	//读取瓷盘中的消息存入的地方
 	buffer_node  map[int64]NodeData
 	buffer_msgs  map[int64][]Message
-	startIndex   int64
-	endIndex     int64
+	startIndex   int64 //-----------------------------------------------------------------------
+	endIndex     int64 //-----------------------------------------------------------------------
 	consumer_ack (chan ConsumerAck)
-	block_status map[int64]string
+	block_status map[int64]string //------------------------------------------------------------
 }
 
 func NewPart(topic_name, part_name string, file *File) *Part {

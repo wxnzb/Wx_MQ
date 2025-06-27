@@ -10,6 +10,25 @@ import (
 	//cl "github.com/cloudwego/kitex/client"
 )
 
+type NodeData struct {
+	Start_index int64 `json:"start_index"` //这几批消息的第一批消息的index
+	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
+	Size        int   `json:"size"`        //这几批消息的总大小
+}
+
+// 下面这两个有什么区别吗？？
+const (
+	NODE_SIZE = 42
+)
+
+type Message struct {
+	Topic_name     string `json:topic_name`
+	Partition_name string `json:partition_name`
+	Index          int64  `json:"index"`
+	Msg            []byte `json:msg`
+}
+
+// -------------------------------
 type Server struct {
 	topics    map[string]*Topic
 	consumers map[string]*ToConsumer //这里的string是消费者的ip_port
@@ -17,12 +36,26 @@ type Server struct {
 }
 
 var ip_name string //加了这个
+// 其实感觉挺奇怪的，这里为什么不直接把这个放到make里面呢？？？？
+func NewServer() *Server {
+	return &Server{
+		rmu: sync.RWMutex{},
+	}
+}
 func (s *Server) make() {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
-	s.rmu = sync.RWMutex{}
-	//s.StartRelease()删除这个
 	ip_name = GetIpPort()
+	s.CheckList()
+}
+func (s *Server) CheckList() {
+	str, _ := os.Getwd()
+	str += "/" + ip_name
+	ok := FileOrDirExist(str)
+	//要是不存在，就创建一个
+	if !ok {
+		CreateDir(str)
+	}
 }
 
 //这个怎么也没了？？？
@@ -150,32 +183,39 @@ func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
 	return PullResponse{message: ""}, nil
 }
 
-type Sub struct {
+type SubRequest struct {
 	consumer string
 	topic    string
 	key      string
 	option   int8
 }
+type SubResponse struct {
+	size  int
+	parts []PartName
+}
 
 // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
 // 通过Sub结构体来订阅消息
-func (s *Server) SubHandle(req Sub) error {
+func (s *Server) SubHandle(req SubRequest) (res SubResponse, err error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
+	DEBUG(dLOG, "get sub information")
 	//这里还得先判断一下这个topic有没有
 	topic, ok := s.topics[req.topic]
 	if !ok {
-		return errors.New("topic not exist")
+		return res, errors.New("topic not exist")
 	}
-	//sub, err := s.topics[req.topic].AddScription(req)
 	sub, err := topic.AddScription(req, s.consumers[req.consumer])
 	if err != nil {
-		return err
+		return res, err
 	}
 	s.consumers[req.consumer].AddScription(sub)
-	return nil
+	res.parts = GetPartNameArry(topic.GetParts())
+	res.size = len(res.parts)
+	return res, nil
 }
-func (s *Server) UnSubHandle(req Sub) error {
+
+func (s *Server) UnSubHandle(req SubRequest) error {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
 	//这里还得先判断一下这个topic有没有
@@ -206,6 +246,20 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 	switch req.option {
 	//负载均衡
 	case TOPIC_NIL_PTP:
+		{
+			s.rmu.Lock()
+			defer s.rmu.Unlock()
+			//先看这个是否订阅
+			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
+			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
+			sub := s.consumers[req.consumer_ipname].GetSub(sub_name)
+			if ret == true {
+				// sub.AddConsumerInConfig(req PartitionInitInfo,s.consumers[req.consumer_ipname].consumer)
+				// } else {
+
+				// }
+			}
+		}
 		//广播
 	case TOPIC_KEY_PSB:
 		{
@@ -231,38 +285,28 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 	return err
 }
 
-const (
-	NODE_SIZE = 42
-)
+//为啥放着他们就发现不了呢
+// const (
+// 	NODE_SIZE = 42
+// )
 
-type NodeData struct {
-	Start_index int64 `json:"start_index"` //这几批消息的第一批消息的index
-	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
-	Size        int   `json:"size"`        //这几批消息的总大小
-}
+// type NodeData struct {
+// 	Start_index int64 `json:"start_index"` //这几批消息的第一批消息的index
+// 	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
+// 	Size        int   `json:"size"`        //这几批消息的总大小
+// }
 
-// 下面这两个有什么区别吗？？
-type Message struct {
-	Topic_name     string `json:topic_name`
-	Partition_name string `json:partition_name`
-	Index          int64  `json:"index"`
-	Msg            []byte `json:msg`
-}
+// // 下面这两个有什么区别吗？？
+
+//	type Message struct {
+//		Topic_name     string `json:topic_name`
+//		Partition_name string `json:partition_name`
+//		Index          int64  `json:"index"`
+//		Msg            []byte `json:msg`
+//	}
 type Msgs struct {
 	producer string
 	topic    string
 	key      string
 	msgs     []byte
-}
-
-// 因为他要进行存储到文件，这里不用加"/"吗？？？
-func (s *Server) CheckList() {
-	// 获得当前目录路径
-	str, _ := os.Getwd()
-	str += ip_name
-	err := FileOrListExist(str)
-	if err == false {
-		//进行创建为什么要给他创建一个目录？？？
-		CreateDir(str)
-	}
 }

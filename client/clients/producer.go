@@ -21,25 +21,24 @@ type Message struct {
 }
 
 func (pro *Producer) Push(msg Message) error {
-	pro.rmu.RLock()
-	index := msg.Topic_Name + "_" + msg.Partition_Name
-	ok := pro.Topic_Partition[index]
-	pro.rmu.RUnlock()
-	if ok {
-		resp, err := pro.Cli.Push(context.Background(), &api.PushRequest{
-			//这里报错的原因是ProducerId是int64不是string
-			ProducerId: pro.Name,
-			Topic:      msg.Topic_Name,
-			Key:        msg.Partition_Name,
-			Message:    msg.Msg,
-		})
-		if err == nil && resp.Ret {
-			return nil
-		} else {
-			return errors.New("err!=nil or resp.Ret==false\n")
-		}
-
+	// pro.rmu.RLock()
+	// index := msg.Topic_Name + "_" + msg.Partition_Name
+	// ok := pro.Topic_Partition[index]
+	// pro.rmu.RUnlock()
+	// if ok {
+	resp, err := pro.Cli.Push(context.Background(), &api.PushRequest{
+		ProducerId: pro.Name,
+		Topic:      msg.Topic_Name,
+		Key:        msg.Partition_Name,
+		Message:    msg.Msg,
+	})
+	if err == nil && resp.Ret {
+		return nil
 	} else {
-		return errors.New("this topic_partition is not has this producer")
+		return errors.New("err!=nil or resp.Ret==false\n")
 	}
+
+	// } else {
+	// 	return errors.New("this topic_partition is not has this producer")
+	// }
 }

@@ -70,7 +70,7 @@ func (t *Topic) AddMessage(push Push) error {
 }
 
 // 消费者要订阅topic里面的一个分区
-func (t *Topic) AddScription(req Sub, con *ToConsumer) (*SubScription, error) {
+func (t *Topic) AddScription(req SubRequest, con *ToConsumer) (*SubScription, error) {
 	ret := GetStringFromSub(req.topic, req.key, req.option)
 	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
 	t.rmu.RLock()
@@ -91,7 +91,7 @@ func (t *Topic) AddScription(req Sub, con *ToConsumer) (*SubScription, error) {
 }
 
 // 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
-func (t *Topic) ReduceScription(req Sub) (string, error) {
+func (t *Topic) ReduceScription(req SubRequest) (string, error) {
 	ret := GetStringFromSub(req.topic, req.key, req.option)
 	t.rmu.Lock()
 	subscription, ok := t.SubList[ret]
@@ -132,6 +132,11 @@ func (t *Topic) GetFile(partition string) *File {
 	t.rmu.RLock()
 	defer t.rmu.RUnlock()
 	return t.Parts[partition].GetFile()
+}
+func (t *Topic) GetParts() map[string]*Partition {
+	t.rmu.RLock()
+	defer t.rmu.RUnlock()
+	return t.Parts
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +274,7 @@ type SubScription struct {
 }
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
-func NewSubScription(sub Sub, ret string) *SubScription {
+func NewSubScription(sub SubRequest, ret string) *SubScription {
 	subScription := &SubScription{
 		rmu:                sync.RWMutex{},
 		topic_name:         sub.topic,
@@ -291,7 +296,7 @@ func NewSubScription(sub Sub, ret string) *SubScription {
 
 // ---这个也不要了吗
 // 将消费者加入到这个订阅队列里面
-func (sub *SubScription) AddConsumer(req Sub) {
+func (sub *SubScription) AddConsumer(req SubRequest) {
 	sub.rmu.Lock()
 	defer sub.rmu.Unlock()
 	switch req.option {
@@ -354,7 +359,7 @@ func (sub *SubScription) ReduceConsumer(consumer_name string) {
 }
 
 // 恢复消费者
-func (sub *SubScription) RecoverConsumer(req Sub) {
+func (sub *SubScription) RecoverConsumer(req SubRequest) {
 	sub.rmu.Lock()
 	switch sub.option {
 	case TOPIC_NIL_PTP:
@@ -380,6 +385,21 @@ func (sub *SubScription) GetConfig() *Config {
 	sub.rmu.RLock()
 	defer sub.rmu.RUnlock()
 	return sub.config
+}
+func (sub *SubScription) AddConsumerInConfig(req PartitionInitInfo, tocon *client_operations.Client) {
+	sub.rmu.Lock()
+	defer sub.rmu.Unlock()
+	switch req.option {
+	case TOPIC_NIL_PTP:
+		{
+			sub.config.AddToconsumer(req.partition, req.consumer_ipname, tocon)
+		}
+	case TOPIC_KEY_PSB:
+		{
+			group := NewGroup(req.topic, req.consumer_ipname)
+			sub.groups = append(sub.groups, group)
+		}
+	}
 }
 
 // -------------------------------------------------------------

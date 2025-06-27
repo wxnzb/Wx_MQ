@@ -4,6 +4,10 @@ import (
 	"net"
 )
 
+type PartName struct {
+	name string `json:name`
+}
+
 // 本机所有网卡的mac地址进行拼接
 func GetIpPort() string {
 	interfaces, err := net.Interfaces()

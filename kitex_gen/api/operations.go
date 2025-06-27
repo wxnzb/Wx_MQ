@@ -377,7 +377,9 @@ var fieldIDToName_SubRequest = map[int16]string{
 }
 
 type SubResponse struct {
-	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Ret   bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Size  int64  `thrift:"size,2" frugal:"2,default,i64" json:"size"`
+	Parts []byte `thrift:"parts,3" frugal:"3,default,binary" json:"parts"`
 }
 
 func NewSubResponse() *SubResponse {
@@ -390,8 +392,22 @@ func (p *SubResponse) InitDefault() {
 func (p *SubResponse) GetRet() (v bool) {
 	return p.Ret
 }
+
+func (p *SubResponse) GetSize() (v int64) {
+	return p.Size
+}
+
+func (p *SubResponse) GetParts() (v []byte) {
+	return p.Parts
+}
 func (p *SubResponse) SetRet(val bool) {
 	p.Ret = val
+}
+func (p *SubResponse) SetSize(val int64) {
+	p.Size = val
+}
+func (p *SubResponse) SetParts(val []byte) {
+	p.Parts = val
 }
 
 func (p *SubResponse) String() string {
@@ -403,6 +419,8 @@ func (p *SubResponse) String() string {
 
 var fieldIDToName_SubResponse = map[int16]string{
 	1: "ret",
+	2: "size",
+	3: "parts",
 }
 
 type PubRequest struct {

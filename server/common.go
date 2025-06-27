@@ -7,6 +7,10 @@ import (
 	"os"
 )
 
+type PartName struct {
+	name string `json:name`
+}
+
 // 根据路径创建一个新的文件
 func CreateFile(filePath string) (*os.File, error) {
 	file, err := os.Create(filePath)
@@ -34,7 +38,7 @@ func GetIpPort() string {
 
 // 现在还没有用到
 // 判断一个文件是否存在
-func FileOrListExist(filePath string) bool {
+func FileOrDirExist(filePath string) bool {
 	_, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsExist(err) {
@@ -82,4 +86,11 @@ func CheckChangeCon(old map[string]*client_operations.Client, new []string) (red
 		}
 	}
 	return
+}
+func GetPartNameArry(parts map[string]*Partition) []PartName {
+	var varry []PartName
+	for p, _ := range parts {
+		varry = append(varry, PartName{name: p})
+	}
+	return varry
 }

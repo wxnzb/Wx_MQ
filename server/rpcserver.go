@@ -2,6 +2,7 @@ package server
 
 import (
 	"Wx_MQ/kitex_gen/api/server_operations"
+	"encoding/json"
 
 	//"sync"
 
@@ -14,28 +15,35 @@ import (
 )
 
 type RPCServer struct {
-	server Server
+	srv    server.Server
+	server *Server
 }
 
 func NewRpcServer() RPCServer {
 	LOGinit()
-	return RPCServer{}
+	return RPCServer{
+		server: NewServer(),
+	}
 }
 
-// 我终于知道为什么8889连接8888这个broker的时候总是连接不上了，因为虽然他start想通过携程启动但是mian函数已经结束了，所以就没启动,去掉go携程就好
 func (s *RPCServer) Start(opts []server.Option) error {
-	srv := server_operations.NewServer(s, opts...) //要使用这个函数，需要实现这个函数第一个参数，他是一个接口，那么*RPCServer就要是先这个接口下面的所有函数
+	s.srv = server_operations.NewServer(s, opts...) //要使用这个函数，需要实现这个函数第一个参数，他是一个接口，那么*RPCServer就要是先这个接口下面的所有函数
 	s.server.make()
-	go func() {
-		err := srv.Run()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}()
+	//go func() {
+	err := s.srv.Run()
+	DEBUG(dLOG, "broker start rpcserver")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	//}()
 	return nil
 }
+func (s *RPCServer) Stop() {
+	s.srv.Stop()
+}
+
+// 生产者	向 Broker 投递一条消息
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
-	//打印要推送的消息
 	fmt.Println(req)
 	err = s.server.PushHandle(Push{
 		producerId: req.ProducerId,
@@ -53,10 +61,8 @@ func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.Push
 	}, err
 }
 
+// 消费者	从 Broker 拉取消息（主动消费）
 func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.PullResponse, err error) {
-	//打印要拉取的topic和分区
-	fmt.Println(req)
-	//打印拉取到的消息
 	ret, err := s.server.PullHandle(PullRequest{
 		consumerId: req.ConsumerId,
 		topic:      req.Topic,
@@ -72,6 +78,7 @@ func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.Pull
 	}, err
 }
 
+// 消费者	向 Broker 注册自己的 IP:Port（上线注册）
 func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.InfoResponse, err error) {
 	err = s.server.InfoHandle(req.IpPort)
 	if err != nil {
@@ -83,16 +90,21 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 		Ret: true,
 	}, nil
 }
+
+// 消费者	订阅某个 topic 的数据
 func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubResponse, error) {
-	err := s.server.SubHandle(Sub{
+	res, err := s.server.SubHandle(SubRequest{
 		consumer: req.Consumer,
 		topic:    req.Topic,
 		key:      req.Key,
 		option:   req.Option,
 	})
+	partsName_data, _ := json.Marshal(res.parts)
 	if err == nil {
 		return &api.SubResponse{
-			Ret: true,
+			Ret:   true,
+			Size:  res.size,
+			Parts: partsName_data,
 		}, nil
 	}
 	return &api.SubResponse{
@@ -100,7 +112,7 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 	}, err
 }
 
-// 这个还不太清楚作用
+// 消费者	指示开始消费某个分区的消息，从某个 offset 开始
 func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
 
 	err = s.server.StartGet(PartitionInitInfo{

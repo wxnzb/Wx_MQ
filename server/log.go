@@ -121,6 +121,7 @@ func GetVerbosity() int {
 
 const (
 	dERROR string = "ERROR"
+	dLOG   string = "LOG"
 )
 
 func DEBUG(topic, format string, args ...interface{}) {

@@ -48,6 +48,8 @@ struct SubRequest{
 }
 struct SubResponse{
     1:bool ret
+    2:i64 size
+    3:binary parts 
 }
 //服务器接口
 //在thrift中service相当于给operation_server定义了一个接口

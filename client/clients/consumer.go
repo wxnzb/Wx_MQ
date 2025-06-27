@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	"Wx_MQ/kitex_gen/api/server_operations"
 
@@ -16,9 +17,23 @@ import (
 )
 
 type Consumer struct {
-	Cli              server_operations.Client //到broker的RPC客户端句柄
-	Name             string
-	Topic_Partitions map[string]Info //订阅的消费进度
+	rmu   sync.RWMutex
+	Cli   server_operations.Client //到broker的RPC客户端句柄
+	Name  string
+	state string
+	srv   server.Server
+}
+
+func NewConsumer() *Consumer {
+	return &Consumer{
+		rmu:   sync.RWMutex{},
+		state: "alive",
+	}
+}
+func (con *Consumer) GetState() string {
+	con.rmu.RLock()
+	defer con.rmu.RUnlock()
+	return con.state
 }
 
 // 这里是broker发送给消费者客户端是他们的反应
@@ -44,18 +59,22 @@ func (con *Consumer) Start_server(port string) {
 	var opts []server.Option
 	opts = append(opts, server.WithServiceAddr(addr))
 	//第一个参数要实现api.Client_Operations这个接口
-	srv := client_operations.NewServer(new(Consumer), opts...)
-	//他返回的是一个Server接口，长这样
-	// type Server interface {
-	// 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error
-	// 	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
-	// 	Run() error
-	// 	Stop() error
-	// }
-	err := srv.Run()
+	con.srv = client_operations.NewServer(new(Consumer), opts...)
+	err := con.srv.Run()
 	if err != nil {
 		println(err.Error())
 	}
+}
+func (con *Consumer) Stop() {
+	con.srv.Stop()
+}
+func (con *Consumer) Down() {
+	con.rmu.Lock()
+	defer con.rmu.Unlock()
+	con.state = "down"
+}
+func (c *Consumer) SubScription(sub api.SubRequest) (ret []PartName, err error) {
+	return
 }
 
 // 上面的只能被动接受broker发送给你的消息
@@ -65,22 +84,23 @@ type Info struct {
 	topic     string
 	partition string
 	offset    int64
-	buffer    []string //本地缓存的待处理的消息
+	//这两个干啥
+	option int8
+	bufs   map[int64]*api.PubRequest
 }
 
-func (con *Consumer) StartGet() (err error) {
+func (con *Consumer) StartGet(info Info) (err error) {
 	ret := ""
-	for name, info := range con.Topic_Partitions {
-		req := api.InfoGetRequest{
-			Cli_Name:       con.Name,
-			Topic_Name:     info.topic,
-			Partition_Name: info.partition,
-			Offset:         info.offset,
-		}
-		resp, err := con.Cli.StarttoGet(context.Background(), &req)
-		if err != nil || resp.Ret == false {
-			ret = name + ":err!=nil or resp.ret==false\n"
-		}
+	req := api.InfoGetRequest{
+		Cli_Name:       con.Name,
+		Topic_Name:     info.topic,
+		Partition_Name: info.partition,
+		Offset:         info.offset,
+		Option:         info.option,
+	}
+	resp, err := con.Cli.StarttoGet(context.Background(), &req)
+	if err != nil || resp.Ret == false {
+		ret = info.topic + info.partition + ":err!=nil or resp.ret==false\n"
 	}
 	if ret == "" {
 		return nil
