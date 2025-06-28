@@ -5,6 +5,7 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -18,8 +19,8 @@ import (
 
 type Consumer struct {
 	rmu   sync.RWMutex
-	Cli   server_operations.Client //到broker的RPC客户端句柄
-	Name  string
+	toCli server_operations.Client //到broker的RPC客户端句柄
+	name  string
 	state string
 	srv   server.Server
 }
@@ -74,7 +75,14 @@ func (con *Consumer) Down() {
 	con.state = "down"
 }
 func (c *Consumer) SubScription(sub api.SubRequest) (ret []PartName, err error) {
-	return
+	resp, err := c.toCli.Sub(context.Background(), &sub)
+	if err != nil || resp.Ret == false {
+		return ret, err
+	}
+	parts := make([]PartName, resp.Size)
+	json.Unmarshal(resp.Parts, &parts)
+
+	return parts, nil
 }
 
 // 上面的只能被动接受broker发送给你的消息
@@ -92,13 +100,13 @@ type Info struct {
 func (con *Consumer) StartGet(info Info) (err error) {
 	ret := ""
 	req := api.InfoGetRequest{
-		Cli_Name:       con.Name,
+		Cli_Name:       con.name,
 		Topic_Name:     info.topic,
 		Partition_Name: info.partition,
 		Offset:         info.offset,
 		Option:         info.option,
 	}
-	resp, err := con.Cli.StarttoGet(context.Background(), &req)
+	resp, err := con.toCli.StarttoGet(context.Background(), &req)
 	if err != nil || resp.Ret == false {
 		ret = info.topic + info.partition + ":err!=nil or resp.ret==false\n"
 	}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"Wx_MQ/kitex_gen/api/client_operations"
 	"os"
 
 	"sync"
@@ -254,10 +253,9 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
 			sub := s.consumers[req.consumer_ipname].GetSub(sub_name)
 			if ret == true {
-				// sub.AddConsumerInConfig(req PartitionInitInfo,s.consumers[req.consumer_ipname].consumer)
-				// } else {
-
-				// }
+				sub.AddConsumerInConfig(req, s.consumers[req.consumer_ipname].GetToConsumer())
+			} else {
+				err = errors.New("not subscribe")
 			}
 		}
 		//广播
@@ -270,10 +268,10 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
 			if ret == true {
 				//下面这三行是为了没有这个分区的时候新建一个
-				toConsumers := make(map[string]*client_operations.Client)
-				toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
-				file := s.topics[req.topic].GetFile(req.partition)
-				go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
+				// toConsumers := make(map[string]*client_operations.Client)
+				// toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
+				// file := s.topics[req.topic].GetFile(req.partition)
+				// go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
 			} else {
 				err = errors.New("not subscribe")
 			}
