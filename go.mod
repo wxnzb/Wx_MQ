@@ -7,6 +7,9 @@ replace github.com/apache/thrift => github.com/apache/thrift v0.13.0
 require (
 	github.com/cloudwego/gopkg v0.1.4
 	github.com/cloudwego/kitex v0.13.1
+	github.com/go-zookeeper/zk v1.0.4
+	github.com/kitex-contrib/registry-zookeeper v0.0.0-20240813065530-bfdecef3f6bd
+	google.golang.org/grpc v1.36.1
 )
 
 require (

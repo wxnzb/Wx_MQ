@@ -11,6 +11,7 @@ struct PushRequest{
 struct PushResponse{
     1:bool ret
 }
+/
 //拉取消息所需的信息
 struct PullRequest{
     1:string consumerId
@@ -21,7 +22,7 @@ struct PullRequest{
 struct PullResponse{
     1:string message
 }
-//这个先在还不太清楚干啥
+//像broker注册自己并创建这个消费者对应的客户端，就可以像消费者发送pingpong和pub了
 struct infoRequest{
     1:string ip_port
 }

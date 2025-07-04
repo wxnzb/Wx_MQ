@@ -18,9 +18,10 @@ import (
 )
 
 type Consumer struct {
-	rmu   sync.RWMutex
-	toCli server_operations.Client //到broker的RPC客户端句柄
-	name  string
+	rmu sync.RWMutex
+	//这里是大写是因为其他地方要用到
+	Cli   server_operations.Client //到broker的RPC客户端句柄
+	Name  string
 	state string
 	srv   server.Server
 }
@@ -36,7 +37,16 @@ func (con *Consumer) GetState() string {
 	defer con.rmu.RUnlock()
 	return con.state
 }
+func (con *Consumer) Stop() {
+	con.srv.Stop()
+}
+func (con *Consumer) Down() {
+	con.rmu.Lock()
+	defer con.rmu.Unlock()
+	con.state = "down"
+}
 
+// -----------------------------------------------
 // 这里是broker发送给消费者客户端是他们的反应
 // 下面这个是启动一个rpc服务器，broker服务器测试消息推送功能或探活功能就是通过和他交流的
 // 下面这两个会被执行的条件就是broker发送给消费者客户端的消息
@@ -54,6 +64,7 @@ func (con *Consumer) Pingpong(ctx context.Context, req *api.PingpongRequest) (r 
 	}, nil
 }
 
+// [server]----对应server/client.go中的NewToConsumer
 func (con *Consumer) Start_server(port string) {
 	//返回的是*TCPAddr,他实现了Network函数和String函数，也就是实现了net.Addr接口
 	addr, _ := net.ResolveTCPAddr("tcp", port)
@@ -66,16 +77,20 @@ func (con *Consumer) Start_server(port string) {
 		println(err.Error())
 	}
 }
-func (con *Consumer) Stop() {
-	con.srv.Stop()
-}
-func (con *Consumer) Down() {
-	con.rmu.Lock()
-	defer con.rmu.Unlock()
-	con.state = "down"
+
+// ------------------------------------------------
+// 像broker注册自己并创建这个消费者对应的客户端，就可以像消费者发送pingpong和pub了
+func (con *Consumer) RegisterSelf(port string) error {
+	resp, err := con.Cli.Info(context.Background(), &api.InfoRequest{
+		IpPort: port,
+	})
+	if err != nil {
+		fmt.Print(resp)
+	}
+	return err
 }
 func (c *Consumer) SubScription(sub api.SubRequest) (ret []PartName, err error) {
-	resp, err := c.toCli.Sub(context.Background(), &sub)
+	resp, err := c.Cli.Sub(context.Background(), &sub)
 	if err != nil || resp.Ret == false {
 		return ret, err
 	}
@@ -100,13 +115,13 @@ type Info struct {
 func (con *Consumer) StartGet(info Info) (err error) {
 	ret := ""
 	req := api.InfoGetRequest{
-		Cli_Name:       con.name,
+		Cli_Name:       con.Name,
 		Topic_Name:     info.topic,
 		Partition_Name: info.partition,
 		Offset:         info.offset,
 		Option:         info.option,
 	}
-	resp, err := con.toCli.StarttoGet(context.Background(), &req)
+	resp, err := con.Cli.StarttoGet(context.Background(), &req)
 	if err != nil || resp.Ret == false {
 		ret = info.topic + info.partition + ":err!=nil or resp.ret==false\n"
 	}

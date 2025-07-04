@@ -103,7 +103,7 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 	if err == nil {
 		return &api.SubResponse{
 			Ret:   true,
-			Size:  res.size,
+			Size:  int64(res.size),
 			Parts: partsName_data,
 		}, nil
 	}
