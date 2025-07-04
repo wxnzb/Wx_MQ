@@ -575,6 +575,252 @@ var fieldIDToName_PingpongResponse = map[int16]string{
 	1: "pong",
 }
 
+type BroInfoRequest struct {
+	BroName     string `thrift:"bro_name,1" frugal:"1,default,string" json:"bro_name"`
+	BroHostPort string `thrift:"bro_host_port,2" frugal:"2,default,string" json:"bro_host_port"`
+}
+
+func NewBroInfoRequest() *BroInfoRequest {
+	return &BroInfoRequest{}
+}
+
+func (p *BroInfoRequest) InitDefault() {
+}
+
+func (p *BroInfoRequest) GetBroName() (v string) {
+	return p.BroName
+}
+
+func (p *BroInfoRequest) GetBroHostPort() (v string) {
+	return p.BroHostPort
+}
+func (p *BroInfoRequest) SetBroName(val string) {
+	p.BroName = val
+}
+func (p *BroInfoRequest) SetBroHostPort(val string) {
+	p.BroHostPort = val
+}
+
+func (p *BroInfoRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BroInfoRequest(%+v)", *p)
+}
+
+var fieldIDToName_BroInfoRequest = map[int16]string{
+	1: "bro_name",
+	2: "bro_host_port",
+}
+
+type BroInfoResponse struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewBroInfoResponse() *BroInfoResponse {
+	return &BroInfoResponse{}
+}
+
+func (p *BroInfoResponse) InitDefault() {
+}
+
+func (p *BroInfoResponse) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *BroInfoResponse) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *BroInfoResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BroInfoResponse(%+v)", *p)
+}
+
+var fieldIDToName_BroInfoResponse = map[int16]string{
+	1: "ret",
+}
+
+type ProGetBroRequest struct {
+	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
+	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
+}
+
+func NewProGetBroRequest() *ProGetBroRequest {
+	return &ProGetBroRequest{}
+}
+
+func (p *ProGetBroRequest) InitDefault() {
+}
+
+func (p *ProGetBroRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *ProGetBroRequest) GetPartitionName() (v string) {
+	return p.PartitionName
+}
+func (p *ProGetBroRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *ProGetBroRequest) SetPartitionName(val string) {
+	p.PartitionName = val
+}
+
+func (p *ProGetBroRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProGetBroRequest(%+v)", *p)
+}
+
+var fieldIDToName_ProGetBroRequest = map[int16]string{
+	1: "topic_name",
+	2: "partition_name",
+}
+
+type ProGetBroResponse struct {
+	Ret         bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	BroHostPort string `thrift:"bro_host_port,2" frugal:"2,default,string" json:"bro_host_port"`
+}
+
+func NewProGetBroResponse() *ProGetBroResponse {
+	return &ProGetBroResponse{}
+}
+
+func (p *ProGetBroResponse) InitDefault() {
+}
+
+func (p *ProGetBroResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *ProGetBroResponse) GetBroHostPort() (v string) {
+	return p.BroHostPort
+}
+func (p *ProGetBroResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *ProGetBroResponse) SetBroHostPort(val string) {
+	p.BroHostPort = val
+}
+
+func (p *ProGetBroResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProGetBroResponse(%+v)", *p)
+}
+
+var fieldIDToName_ProGetBroResponse = map[int16]string{
+	1: "ret",
+	2: "bro_host_port",
+}
+
+type ConGetBroRequest struct {
+	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
+	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
+	Option        int8   `thrift:"option,3" frugal:"3,default,i8" json:"option"`
+}
+
+func NewConGetBroRequest() *ConGetBroRequest {
+	return &ConGetBroRequest{}
+}
+
+func (p *ConGetBroRequest) InitDefault() {
+}
+
+func (p *ConGetBroRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *ConGetBroRequest) GetPartitionName() (v string) {
+	return p.PartitionName
+}
+
+func (p *ConGetBroRequest) GetOption() (v int8) {
+	return p.Option
+}
+func (p *ConGetBroRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *ConGetBroRequest) SetPartitionName(val string) {
+	p.PartitionName = val
+}
+func (p *ConGetBroRequest) SetOption(val int8) {
+	p.Option = val
+}
+
+func (p *ConGetBroRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConGetBroRequest(%+v)", *p)
+}
+
+var fieldIDToName_ConGetBroRequest = map[int16]string{
+	1: "topic_name",
+	2: "partition_name",
+	3: "option",
+}
+
+type ConGetBroResponse struct {
+	Ret   bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Size  int64  `thrift:"size,2" frugal:"2,default,i64" json:"size"`
+	Bros  []byte `thrift:"bros,3" frugal:"3,default,binary" json:"bros"`
+	Parts []byte `thrift:"parts,4" frugal:"4,default,binary" json:"parts"`
+}
+
+func NewConGetBroResponse() *ConGetBroResponse {
+	return &ConGetBroResponse{}
+}
+
+func (p *ConGetBroResponse) InitDefault() {
+}
+
+func (p *ConGetBroResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *ConGetBroResponse) GetSize() (v int64) {
+	return p.Size
+}
+
+func (p *ConGetBroResponse) GetBros() (v []byte) {
+	return p.Bros
+}
+
+func (p *ConGetBroResponse) GetParts() (v []byte) {
+	return p.Parts
+}
+func (p *ConGetBroResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *ConGetBroResponse) SetSize(val int64) {
+	p.Size = val
+}
+func (p *ConGetBroResponse) SetBros(val []byte) {
+	p.Bros = val
+}
+func (p *ConGetBroResponse) SetParts(val []byte) {
+	p.Parts = val
+}
+
+func (p *ConGetBroResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConGetBroResponse(%+v)", *p)
+}
+
+var fieldIDToName_ConGetBroResponse = map[int16]string{
+	1: "ret",
+	2: "size",
+	3: "bros",
+	4: "parts",
+}
+
 type Server_Operations interface {
 	Push(ctx context.Context, req *PushRequest) (r *PushResponse, err error)
 
@@ -1122,5 +1368,241 @@ func (p *Client_OperationsPingpongResult) String() string {
 }
 
 var fieldIDToName_Client_OperationsPingpongResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_Operations interface {
+	BroInfo(ctx context.Context, req *BroInfoRequest) (r *BroInfoResponse, err error)
+
+	ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
+
+	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
+}
+
+type ZKServer_OperationsBroInfoArgs struct {
+	Req *BroInfoRequest `thrift:"req,1" frugal:"1,default,BroInfoRequest" json:"req"`
+}
+
+func NewZKServer_OperationsBroInfoArgs() *ZKServer_OperationsBroInfoArgs {
+	return &ZKServer_OperationsBroInfoArgs{}
+}
+
+func (p *ZKServer_OperationsBroInfoArgs) InitDefault() {
+}
+
+var ZKServer_OperationsBroInfoArgs_Req_DEFAULT *BroInfoRequest
+
+func (p *ZKServer_OperationsBroInfoArgs) GetReq() (v *BroInfoRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsBroInfoArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsBroInfoArgs) SetReq(val *BroInfoRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsBroInfoArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsBroInfoArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsBroInfoArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsBroInfoArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsBroInfoResult struct {
+	Success *BroInfoResponse `thrift:"success,0,optional" frugal:"0,optional,BroInfoResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsBroInfoResult() *ZKServer_OperationsBroInfoResult {
+	return &ZKServer_OperationsBroInfoResult{}
+}
+
+func (p *ZKServer_OperationsBroInfoResult) InitDefault() {
+}
+
+var ZKServer_OperationsBroInfoResult_Success_DEFAULT *BroInfoResponse
+
+func (p *ZKServer_OperationsBroInfoResult) GetSuccess() (v *BroInfoResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsBroInfoResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsBroInfoResult) SetSuccess(x interface{}) {
+	p.Success = x.(*BroInfoResponse)
+}
+
+func (p *ZKServer_OperationsBroInfoResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsBroInfoResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsBroInfoResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsBroInfoResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsProGetBroArgs struct {
+	Req *ProGetBroRequest `thrift:"req,1" frugal:"1,default,ProGetBroRequest" json:"req"`
+}
+
+func NewZKServer_OperationsProGetBroArgs() *ZKServer_OperationsProGetBroArgs {
+	return &ZKServer_OperationsProGetBroArgs{}
+}
+
+func (p *ZKServer_OperationsProGetBroArgs) InitDefault() {
+}
+
+var ZKServer_OperationsProGetBroArgs_Req_DEFAULT *ProGetBroRequest
+
+func (p *ZKServer_OperationsProGetBroArgs) GetReq() (v *ProGetBroRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsProGetBroArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsProGetBroArgs) SetReq(val *ProGetBroRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsProGetBroArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsProGetBroArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsProGetBroArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsProGetBroArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsProGetBroResult struct {
+	Success *ProGetBroResponse `thrift:"success,0,optional" frugal:"0,optional,ProGetBroResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsProGetBroResult() *ZKServer_OperationsProGetBroResult {
+	return &ZKServer_OperationsProGetBroResult{}
+}
+
+func (p *ZKServer_OperationsProGetBroResult) InitDefault() {
+}
+
+var ZKServer_OperationsProGetBroResult_Success_DEFAULT *ProGetBroResponse
+
+func (p *ZKServer_OperationsProGetBroResult) GetSuccess() (v *ProGetBroResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsProGetBroResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsProGetBroResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ProGetBroResponse)
+}
+
+func (p *ZKServer_OperationsProGetBroResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsProGetBroResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsProGetBroResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsProGetBroResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsConGetBroArgs struct {
+	Req *ConGetBroRequest `thrift:"req,1" frugal:"1,default,ConGetBroRequest" json:"req"`
+}
+
+func NewZKServer_OperationsConGetBroArgs() *ZKServer_OperationsConGetBroArgs {
+	return &ZKServer_OperationsConGetBroArgs{}
+}
+
+func (p *ZKServer_OperationsConGetBroArgs) InitDefault() {
+}
+
+var ZKServer_OperationsConGetBroArgs_Req_DEFAULT *ConGetBroRequest
+
+func (p *ZKServer_OperationsConGetBroArgs) GetReq() (v *ConGetBroRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsConGetBroArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsConGetBroArgs) SetReq(val *ConGetBroRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsConGetBroArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsConGetBroArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsConGetBroArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsConGetBroArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsConGetBroResult struct {
+	Success *ConGetBroResponse `thrift:"success,0,optional" frugal:"0,optional,ConGetBroResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsConGetBroResult() *ZKServer_OperationsConGetBroResult {
+	return &ZKServer_OperationsConGetBroResult{}
+}
+
+func (p *ZKServer_OperationsConGetBroResult) InitDefault() {
+}
+
+var ZKServer_OperationsConGetBroResult_Success_DEFAULT *ConGetBroResponse
+
+func (p *ZKServer_OperationsConGetBroResult) GetSuccess() (v *ConGetBroResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsConGetBroResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsConGetBroResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ConGetBroResponse)
+}
+
+func (p *ZKServer_OperationsConGetBroResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsConGetBroResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsConGetBroResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsConGetBroResult = map[int16]string{
 	0: "success",
 }

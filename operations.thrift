@@ -11,7 +11,6 @@ struct PushRequest{
 struct PushResponse{
     1:bool ret
 }
-/
 //拉取消息所需的信息
 struct PullRequest{
     1:string consumerId
@@ -87,4 +86,40 @@ service Client_Operations{
     PubResponse pub(1:PubRequest req)
     PingpongResponse pingpong(1:PingpongRequest req)
 }
+//bro注册自己
+struct BroInfoRequest{
+    1:string bro_name
+    2:string bro_host_port
+}
+struct BroInfoResponse{
+    1:bool ret
+}
+//为啥他们长的不一样，上面那个发送只能给一个broker,但是消费的话这个分区可能有多个副本
+//生产者获取broker的host和port
+struct ProGetBroRequest{
+    1:string topic_name
+    2:string partition_name
+}
+struct ProGetBroResponse{
+    1:bool ret
+    2:string bro_host_port
+}
+//消费者想消费某个 topic 的某个 partition，于是去询问哪个 broker 负责它。
+struct ConGetBroRequest{
+    1:string topic_name
+    2:string partition_name
+    3:i8 option
+}
+struct ConGetBroResponse{
+    1:bool ret
+    2:i64 size
+    3:binary bros
+    4:binary parts
+}
+service ZKServer_Operations{
+    BroInfoResponse  BroInfo(1:BroInfoRequest req)
+    ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
+    ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
+}
+
 
