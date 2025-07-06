@@ -21,3 +21,8 @@ func GetIpPort() string {
 	}
 	return ipport
 }
+
+type BrokerInfo struct {
+	Name      string `json:name`
+	Host_Port string `json:host_port`
+}

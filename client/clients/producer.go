@@ -3,17 +3,32 @@ package clients
 import (
 	"Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/server_operations"
+	"Wx_MQ/kitex_gen/api/zkserver_operations"
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/cloudwego/kitex/client"
 )
 
 type Producer struct {
-	Cli             server_operations.Client //生产者需要调用的接口
+	// Cli             server_operations.Client //生产者需要调用的接口
 	rmu             sync.RWMutex
 	Name            string
-	Topic_Partition map[string]bool //这个topic的Partition是否是这个生产者负责
+	Topic_Partition map[string]server_operations.Client //这个topic的Partition是否是这个生产者负责
+	zkBrokerCli     zkserver_operations.Client
 }
+
+func NewProducer(zkBrokerIpport, name string) *Producer {
+	pro := &Producer{
+		rmu:             sync.RWMutex{},
+		Name:            name,
+		Topic_Partition: make(map[string]server_operations.Client),
+	}
+	pro.zkBrokerCli, _ = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
+	return pro
+}
+
 type Message struct {
 	Topic_Name     string
 	Partition_Name string
@@ -21,12 +36,22 @@ type Message struct {
 }
 
 func (pro *Producer) Push(msg Message) error {
-	// pro.rmu.RLock()
-	// index := msg.Topic_Name + "_" + msg.Partition_Name
-	// ok := pro.Topic_Partition[index]
-	// pro.rmu.RUnlock()
-	// if ok {
-	resp, err := pro.Cli.Push(context.Background(), &api.PushRequest{
+	pro.rmu.RLock()
+	index := msg.Topic_Name + "_" + msg.Partition_Name
+	cli, ok := pro.Topic_Partition[index]
+	pro.rmu.RUnlock()
+	if !ok {
+		//要是找不到，就说明这个topic-partition的broker还没有连接到生产者，先要进行连接
+		resp, _ := pro.zkBrokerCli.ProGetBro(context.Background(), &api.ProGetBroRequest{
+			TopicName:     msg.Topic_Name,
+			PartitionName: msg.Partition_Name,
+		})
+		cli, _ := server_operations.NewClient(pro.Name, client.WithHostPorts(resp.BroHostPort))
+		pro.rmu.RLock()
+		pro.Topic_Partition[index] = cli
+		pro.rmu.RUnlock()
+	}
+	resp, err := cli.Push(context.Background(), &api.PushRequest{
 		ProducerId: pro.Name,
 		Topic:      msg.Topic_Name,
 		Key:        msg.Partition_Name,
@@ -37,8 +62,4 @@ func (pro *Producer) Push(msg Message) error {
 	} else {
 		return errors.New("err!=nil or resp.Ret==false\n")
 	}
-
-	// } else {
-	// 	return errors.New("this topic_partition is not has this producer")
-	// }
 }
