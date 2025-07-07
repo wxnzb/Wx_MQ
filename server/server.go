@@ -1,12 +1,20 @@
 package server
 
 import (
+	"encoding/json"
 	"os"
-
 	"sync"
 
 	"errors"
 	//cl "github.com/cloudwego/kitex/client"
+	api "Wx_MQ/kitex_gen/api"
+	"Wx_MQ/kitex_gen/api/zkserver_operations"
+	"Wx_MQ/zookeeper"
+
+	//"github.com/docker/docker/client"
+	"context"
+
+	"github.com/docker/docker/client"
 )
 
 type NodeData struct {
@@ -32,21 +40,93 @@ type Server struct {
 	topics    map[string]*Topic
 	consumers map[string]*ToConsumer //这里的string是消费者的ip_port
 	rmu       sync.RWMutex
+	zkclient  zkserver_operations.Client
+	zk        zookeeper.ZK
+	name      string
 }
 
 var ip_name string //加了这个
 // 其实感觉挺奇怪的，这里为什么不直接把这个放到make里面呢？？？？
-func NewServer() *Server {
+func NewServer(zkInfo zookeeper.ZKInfo) *Server {
 	return &Server{
 		rmu: sync.RWMutex{},
+		zk:  *zookeeper.NewZK(zkInfo),
 	}
 }
-func (s *Server) make() {
+
+// 这个broker先和zk建立联系，将这个broker像zk进行注册
+func (s *Server) make(opt Options) {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
 	ip_name = GetIpPort()
 	s.CheckList()
+	s.name = opt.Name
+	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, client.WithHost(opt.ZKServerHostPort))
+	// 	struct BroInfoRequest{
+	//     1:string bro_name
+	//     2:string bro_host_port
+	// }
+	resp, err := s.zkclient.BroInfo(context.Background(), &api.BroInfoRequest{
+		BroName:     opt.Name,
+		BroHostPort: opt.BrokerHostPort,
+	})
+	if resp.Ret == false || err != nil {
+		DEBUG(dERROR, "broker register failed")
+	}
+	s.InitBroker()
 }
+func (s *Server) InitBroker() {
+	s.rmu.Unlock()
+	broker_power := Broker_Power{
+		Name:  s.name,
+		Power: 1,
+	}
+	data, err := json.Marshal(broker_power)
+	if err != nil {
+
+	}
+	resp, err := s.zkclient.BroGetssign(context.Background(), &api.BroGetAssignRequest{
+		Brokerpower: data,
+	})
+	broker_assign := Broker_Assign{
+		Topics: make(map[string]Top_Info),
+	}
+	err = json.Unmarshal(resp.Assignment, &broker_assign)
+	s.HandleTopics(broker_assign.Topics)
+}
+
+//下面这些是根据broker的信息重新分配t-p
+
+func (s *Server) HandleTopics(topics map[string]Top_Info) {
+	for topic_name, top := range topics {
+		_, ok := s.topics[topic_name]
+		if !ok {
+			s.HandlePartitions(topic_name, top.Partitions)
+		} else {
+			DEBUG(dWARN, "This topic(%v) had in s.topics\n", topic_name)
+		}
+	}
+}
+func (s *Server) HandlePartitions(topic_name string, partitions map[string]Part_Info) {
+	for partition_name, part := range partitions {
+		_, ok := s.topics[topic_name].Parts[partition_name]
+		if !ok {
+			s.topics[topic_name] = NewTopic(Push{
+				topic: topic_name,
+				key:   partition_name,
+			})
+			s.HandleBlocks(topic_name, partition_name, part.Blocks)
+		} else {
+			DEBUG(dWARN, "This partition(%v) had in s.topics[%v].Parts\n", partition_name, topic_name)
+		}
+	}
+}
+
+// 这个还没有实现
+func (s *Server) HandleBlocks(topic_name, partition_name string, blocks_info map[string]Block_Info) {
+
+}
+
 func (s *Server) CheckList() {
 	str, _ := os.Getwd()
 	str += "/" + ip_name
@@ -56,15 +136,6 @@ func (s *Server) CheckList() {
 		CreateDir(str)
 	}
 }
-
-//这个怎么也没了？？？
-// func (s *Server) StartRelease() {
-// 	s.rmu.Lock()
-// 	defer s.rmu.Unlock()
-// 	for _, topic := range s.topics {
-// 		go topic.StartRelease(s) //先时获得所有的topic，然后获得所有topic里面的partition,然后获得所有partition里面的所有消费者，通过这个消费者获得*Client
-// 	}
-// }
 
 // 将消费者客户端连接到服务器
 //
@@ -154,20 +225,6 @@ func (s *Server) PushHandle(push Push) error {
 	topic.AddMessage(push)
 	return nil
 }
-
-//这个怎么没了
-// func (s *Server) AddMessage(topic *Topic, req Push) {
-// 	part, ok := topic.Parts[req.key]
-// 	if ok {
-// 		part.rmu.Lock()
-// 		part.queue = append(part.queue, req.message)
-// 		part.rmu.Unlock()
-// 	} else {
-// 		part = NewPartition(req)
-// 		go part.Release(s)
-// 		topic.Parts[req.key] = part
-// 	}
-// }
 
 type PullRequest struct {
 	consumerId string
@@ -294,14 +351,6 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 // 	Size        int   `json:"size"`        //这几批消息的总大小
 // }
 
-// // 下面这两个有什么区别吗？？
-
-//	type Message struct {
-//		Topic_name     string `json:topic_name`
-//		Partition_name string `json:partition_name`
-//		Index          int64  `json:"index"`
-//		Msg            []byte `json:msg`
-//	}
 type Msgs struct {
 	producer string
 	topic    string

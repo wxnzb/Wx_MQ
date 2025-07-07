@@ -94,3 +94,31 @@ func GetPartNameArry(parts map[string]*Partition) []PartName {
 	}
 	return varry
 }
+
+type Options struct {
+	Tag              string
+	Name             string
+	ZKServerHostPort string
+	BrokerHostPort   string
+}
+type Top_Info struct {
+	TopicName  string
+	Partitions map[string]Part_Info
+	//Pnums    int64
+}
+type Part_Info struct {
+	PartitionName string
+	Blocks        map[string]Block_Info
+}
+type Block_Info struct {
+	StartIndex int64
+	EndIndex   int64
+	FileName   string
+}
+type Broker_Power struct {
+	Name  string `json:"name"`
+	Power int64  `json:"power"`
+}
+type Broker_Assign struct {
+	Topics map[string]Top_Info
+}

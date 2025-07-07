@@ -28,7 +28,7 @@ type Topic struct {
 	Files   map[string]string
 }
 
-// 创建一个新的topic
+// 创建一个新的topic,这里push里面必须要有topic和key
 func NewTopic(push Push) *Topic {
 	t := &Topic{
 		rmu:     sync.RWMutex{},
@@ -39,31 +39,32 @@ func NewTopic(push Push) *Topic {
 	str, _ := os.Getwd()
 	str += "/" + ip_name + "/" + push.topic
 	CreateDir(str)
-	part, file := NewPartition(push)
-	t.Parts[push.key] = part
-	t.Files[push.key] = file
+	if push.key != "" {
+		part, file := NewPartition(push)
+		t.Parts[push.key] = part
+		t.Files[push.key] = file
+	}
 	return t
 }
-
-// // 开始server.make()的时候调用
-// func (t *Topic) StartRelease(s *Server) {
-// 	for _, part := range t.Parts {
-// 		part.Release(s)
-// 	}
-// }
+func (t *Topic) AddPartition(push Push) {
+	part, _ := NewPartition(push)
+	t.rmu.Lock()
+	t.Parts[push.key] = part
+	t.rmu.Unlock()
+}
 
 // PushRequest
 func (t *Topic) AddMessage(push Push) error {
 	part, ok := t.Parts[push.key]
 	if !ok {
+		DEBUG(dERROR, "no this partition")
 		//要是没有这个分区，就要创建一个新的分区
 		part, file := NewPartition(push)
 		t.Files[push.key] = file
 		t.Parts[push.key] = part
 	}
 	part.rmu.Lock()
-	//part.queue = append(part.queue, push.message)
-	part.addMessage(push)
+	//part.addMessage(push)
 	part.rmu.Unlock()
 
 	return nil

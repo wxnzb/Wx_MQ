@@ -377,9 +377,7 @@ var fieldIDToName_SubRequest = map[int16]string{
 }
 
 type SubResponse struct {
-	Ret   bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
-	Size  int64  `thrift:"size,2" frugal:"2,default,i64" json:"size"`
-	Parts []byte `thrift:"parts,3" frugal:"3,default,binary" json:"parts"`
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
 }
 
 func NewSubResponse() *SubResponse {
@@ -392,22 +390,8 @@ func (p *SubResponse) InitDefault() {
 func (p *SubResponse) GetRet() (v bool) {
 	return p.Ret
 }
-
-func (p *SubResponse) GetSize() (v int64) {
-	return p.Size
-}
-
-func (p *SubResponse) GetParts() (v []byte) {
-	return p.Parts
-}
 func (p *SubResponse) SetRet(val bool) {
 	p.Ret = val
-}
-func (p *SubResponse) SetSize(val int64) {
-	p.Size = val
-}
-func (p *SubResponse) SetParts(val []byte) {
-	p.Parts = val
 }
 
 func (p *SubResponse) String() string {
@@ -419,8 +403,6 @@ func (p *SubResponse) String() string {
 
 var fieldIDToName_SubResponse = map[int16]string{
 	1: "ret",
-	2: "size",
-	3: "parts",
 }
 
 type PubRequest struct {
@@ -819,6 +801,73 @@ var fieldIDToName_ConGetBroResponse = map[int16]string{
 	2: "size",
 	3: "bros",
 	4: "parts",
+}
+
+type BroGetAssignRequest struct {
+	Brokerpower []byte `thrift:"brokerpower,1" frugal:"1,default,binary" json:"brokerpower"`
+}
+
+func NewBroGetAssignRequest() *BroGetAssignRequest {
+	return &BroGetAssignRequest{}
+}
+
+func (p *BroGetAssignRequest) InitDefault() {
+}
+
+func (p *BroGetAssignRequest) GetBrokerpower() (v []byte) {
+	return p.Brokerpower
+}
+func (p *BroGetAssignRequest) SetBrokerpower(val []byte) {
+	p.Brokerpower = val
+}
+
+func (p *BroGetAssignRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BroGetAssignRequest(%+v)", *p)
+}
+
+var fieldIDToName_BroGetAssignRequest = map[int16]string{
+	1: "brokerpower",
+}
+
+type BroGetAssignResponse struct {
+	Ret        bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Assignment []byte `thrift:"assignment,2" frugal:"2,default,binary" json:"assignment"`
+}
+
+func NewBroGetAssignResponse() *BroGetAssignResponse {
+	return &BroGetAssignResponse{}
+}
+
+func (p *BroGetAssignResponse) InitDefault() {
+}
+
+func (p *BroGetAssignResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *BroGetAssignResponse) GetAssignment() (v []byte) {
+	return p.Assignment
+}
+func (p *BroGetAssignResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *BroGetAssignResponse) SetAssignment(val []byte) {
+	p.Assignment = val
+}
+
+func (p *BroGetAssignResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BroGetAssignResponse(%+v)", *p)
+}
+
+var fieldIDToName_BroGetAssignResponse = map[int16]string{
+	1: "ret",
+	2: "assignment",
 }
 
 type Server_Operations interface {
@@ -1377,6 +1426,8 @@ type ZKServer_Operations interface {
 	ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
 
 	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
+
+	BroGetssign(ctx context.Context, req *BroGetAssignRequest) (r *BroGetAssignResponse, err error)
 }
 
 type ZKServer_OperationsBroInfoArgs struct {
@@ -1604,5 +1655,81 @@ func (p *ZKServer_OperationsConGetBroResult) String() string {
 }
 
 var fieldIDToName_ZKServer_OperationsConGetBroResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsBroGetssignArgs struct {
+	Req *BroGetAssignRequest `thrift:"req,1" frugal:"1,default,BroGetAssignRequest" json:"req"`
+}
+
+func NewZKServer_OperationsBroGetssignArgs() *ZKServer_OperationsBroGetssignArgs {
+	return &ZKServer_OperationsBroGetssignArgs{}
+}
+
+func (p *ZKServer_OperationsBroGetssignArgs) InitDefault() {
+}
+
+var ZKServer_OperationsBroGetssignArgs_Req_DEFAULT *BroGetAssignRequest
+
+func (p *ZKServer_OperationsBroGetssignArgs) GetReq() (v *BroGetAssignRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsBroGetssignArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsBroGetssignArgs) SetReq(val *BroGetAssignRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsBroGetssignArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsBroGetssignArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsBroGetssignArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsBroGetssignArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsBroGetssignResult struct {
+	Success *BroGetAssignResponse `thrift:"success,0,optional" frugal:"0,optional,BroGetAssignResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsBroGetssignResult() *ZKServer_OperationsBroGetssignResult {
+	return &ZKServer_OperationsBroGetssignResult{}
+}
+
+func (p *ZKServer_OperationsBroGetssignResult) InitDefault() {
+}
+
+var ZKServer_OperationsBroGetssignResult_Success_DEFAULT *BroGetAssignResponse
+
+func (p *ZKServer_OperationsBroGetssignResult) GetSuccess() (v *BroGetAssignResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsBroGetssignResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsBroGetssignResult) SetSuccess(x interface{}) {
+	p.Success = x.(*BroGetAssignResponse)
+}
+
+func (p *ZKServer_OperationsBroGetssignResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsBroGetssignResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsBroGetssignResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsBroGetssignResult = map[int16]string{
 	0: "success",
 }

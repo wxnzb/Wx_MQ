@@ -34,6 +34,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"BroGetssign": kitex.NewMethodInfo(
+		broGetssignHandler,
+		newZKServer_OperationsBroGetssignArgs,
+		newZKServer_OperationsBroGetssignResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -154,6 +161,24 @@ func newZKServer_OperationsConGetBroResult() interface{} {
 	return api.NewZKServer_OperationsConGetBroResult()
 }
 
+func broGetssignHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsBroGetssignArgs)
+	realResult := result.(*api.ZKServer_OperationsBroGetssignResult)
+	success, err := handler.(api.ZKServer_Operations).BroGetssign(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsBroGetssignArgs() interface{} {
+	return api.NewZKServer_OperationsBroGetssignArgs()
+}
+
+func newZKServer_OperationsBroGetssignResult() interface{} {
+	return api.NewZKServer_OperationsBroGetssignResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -189,6 +214,16 @@ func (p *kClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *
 	_args.Req = req
 	var _result api.ZKServer_OperationsConGetBroResult
 	if err = p.c.Call(ctx, "ConGetBro", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest) (r *api.BroGetAssignResponse, err error) {
+	var _args api.ZKServer_OperationsBroGetssignArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsBroGetssignResult
+	if err = p.c.Call(ctx, "BroGetssign", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

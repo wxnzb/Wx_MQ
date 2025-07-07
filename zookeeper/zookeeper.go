@@ -92,13 +92,13 @@ func (z *ZK) RegisterNode(node interface{}) error {
 // 获取Topic的Broker信息
 func (z *ZK) GetBrokers(Topic string) ([]string, error) {
 	path := z.TopicRoot + "/" + Topic
-	exists, _ := z.Con.Exists(path)
+	exists, _, err := z.Con.Exists(path)
 	if !exists {
 		return nil, err
 	}
-	data, _ := z.Con.Get(path)
+	data, _, _ := z.Con.Get(path)
 	var tNode TopicNode
-	err := json.Unmarshal(data, &tNode)
+	err = json.Unmarshal(data, &tNode)
 	if err != nil {
 		return nil, err
 	}

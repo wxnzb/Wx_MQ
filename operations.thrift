@@ -48,8 +48,6 @@ struct SubRequest{
 }
 struct SubResponse{
     1:bool ret
-    2:i64 size
-    3:binary parts 
 }
 //服务器接口
 //在thrift中service相当于给operation_server定义了一个接口
@@ -116,10 +114,18 @@ struct ConGetBroResponse{
     3:binary bros
     4:binary parts
 }
+struct BroGetAssignRequest{
+    1:binary brokerpower
+}
+struct BroGetAssignResponse{
+    1:bool ret
+    2:binary assignment
+}
 service ZKServer_Operations{
     BroInfoResponse  BroInfo(1:BroInfoRequest req)
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
+    BroGetAssignResponse BroGetssign(1:BroGetAssignRequest req)
 }
 
 

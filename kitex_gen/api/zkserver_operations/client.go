@@ -14,6 +14,7 @@ type Client interface {
 	BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error)
 	ProGetBro(ctx context.Context, req *api.ProGetBroRequest, callOptions ...callopt.Option) (r *api.ProGetBroResponse, err error)
 	ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error)
+	BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -58,4 +59,9 @@ func (p *kZKServer_OperationsClient) ProGetBro(ctx context.Context, req *api.Pro
 func (p *kZKServer_OperationsClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ConGetBro(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.BroGetssign(ctx, req)
 }

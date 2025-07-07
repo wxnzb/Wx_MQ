@@ -1,7 +1,6 @@
 package server
 
 import (
-	"Wx_MQ/kitex_gen/api/server_operations"
 	"encoding/json"
 
 	//"sync"
@@ -10,36 +9,79 @@ import (
 	"fmt"
 
 	api "Wx_MQ/kitex_gen/api"
+	"Wx_MQ/kitex_gen/api/server_operations"
+
+	"Wx_MQ/zookeeper"
 
 	"github.com/cloudwego/kitex/server"
 )
 
 type RPCServer struct {
-	srv    server.Server
-	server *Server
+	srv_cli server.Server
+	srv_bro server.Server
+	////下面这两个分别对应上面那两个
+	server   *Server
+	zkServer *ZKServer
+	zkInfo   zookeeper.ZKInfo
 }
 
-func NewRpcServer() RPCServer {
+func NewRpcServer(zk_info zookeeper.ZKInfo) RPCServer {
 	LOGinit()
 	return RPCServer{
-		server: NewServer(),
+		zkInfo: zk_info,
 	}
 }
 
-func (s *RPCServer) Start(opts []server.Option) error {
-	s.srv = server_operations.NewServer(s, opts...) //要使用这个函数，需要实现这个函数第一个参数，他是一个接口，那么*RPCServer就要是先这个接口下面的所有函数
-	s.server.make()
-	//go func() {
-	err := s.srv.Run()
-	DEBUG(dLOG, "broker start rpcserver")
-	if err != nil {
-		fmt.Println(err.Error())
+const (
+	BROKER   = "broker"
+	ZKBROKER = "zkbroker"
+)
+
+func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error {
+	// s.srv = server_operations.NewServer(s, opts...) //要使用这个函数，需要实现这个函数第一个参数，他是一个接口，那么*RPCServer就要是先这个接口下面的所有函数
+	// s.server.make()
+	// //go func() {
+	// err := s.srv.Run()
+	// DEBUG(dLOG, "broker start rpcserver")
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+	// //}()
+	// return nil
+	//------------------------------
+	// addr, _ := net.ResolveTCPAddr("tcp", con.port)
+	// var opts []server.Option
+	// opts = append(opts, server.WithServiceAddr(addr))
+	// //第一个参数要实现api.Client_Operations这个接口
+	// con.srv = client_operations.NewServer(new(Consumer), opts...)
+	switch opt.Tag {
+	case BROKER:
+		s.server = NewServer(s.zkInfo)
+		s.server.make(opt)
+	case ZKBROKER:
+		s.zkServer = NewZKServer(s.zkInfo)
 	}
-	//}()
+	s.srv_bro = server_operations.NewServer(s, opts_bro...)
+	go func() {
+		err := s.srv_bro.Run()
+		DEBUG(dLOG, "broker start rpcserver")
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
+	s.srv_cli = server_operations.NewServer(s, opts_cli...)
+	go func() {
+		err := s.srv_cli.Run()
+		DEBUG(dLOG, "broker start rpcserver")
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
 	return nil
 }
 func (s *RPCServer) Stop() {
-	s.srv.Stop()
+	s.srv_bro.Stop()
+	s.srv_cli.Stop()
 }
 
 // 生产者	向 Broker 投递一条消息
@@ -99,12 +141,10 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 		key:      req.Key,
 		option:   req.Option,
 	})
-	partsName_data, _ := json.Marshal(res.parts)
+	json.Marshal(res.parts)
 	if err == nil {
 		return &api.SubResponse{
-			Ret:   true,
-			Size:  int64(res.size),
-			Parts: partsName_data,
+			Ret: true,
 		}, nil
 	}
 	return &api.SubResponse{
