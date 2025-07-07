@@ -24,6 +24,7 @@ func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
 		info_brokers:   make(map[string]zookeeper.BrokerNode),
 		info_topics:    make(map[string]zookeeper.TopicNode),
 		info_partition: make(map[string]zookeeper.PartitionNode),
+		brokers:        make(map[string]server_operations.Client),
 	}
 }
 func (zs *ZKServer) make(opt Options) {

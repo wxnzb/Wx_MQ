@@ -76,7 +76,7 @@ func (s *Server) make(opt Options) {
 	s.InitBroker()
 }
 func (s *Server) InitBroker() {
-	s.rmu.Unlock()
+	s.rmu.Lock()
 	broker_power := Broker_Power{
 		Name:  s.name,
 		Power: 1,
@@ -93,6 +93,7 @@ func (s *Server) InitBroker() {
 	}
 	err = json.Unmarshal(resp.Assignment, &broker_assign)
 	s.HandleTopics(broker_assign.Topics)
+	s.rmu.Unlock()
 }
 
 //下面这些是根据broker的信息重新分配t-p
@@ -252,23 +253,21 @@ type SubResponse struct {
 
 // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
 // 通过Sub结构体来订阅消息
-func (s *Server) SubHandle(req SubRequest) (res SubResponse, err error) {
+func (s *Server) SubHandle(req SubRequest) (err error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
 	DEBUG(dLOG, "get sub information")
 	//这里还得先判断一下这个topic有没有
 	topic, ok := s.topics[req.topic]
 	if !ok {
-		return res, errors.New("topic not exist")
+		return errors.New("topic not exist")
 	}
 	sub, err := topic.AddScription(req, s.consumers[req.consumer])
 	if err != nil {
-		return res, err
+		return err
 	}
 	s.consumers[req.consumer].AddScription(sub)
-	res.parts = GetPartNameArry(topic.GetParts())
-	res.size = len(res.parts)
-	return res, nil
+	return nil
 }
 
 func (s *Server) UnSubHandle(req SubRequest) error {

@@ -35,6 +35,13 @@ func main() {
 	case "c":
 		con := cl2.NewConsumer("0.0.0.0:5721", "consumer-wx", port)
 		go con.Start_server()
-		//con.SubScription("test_topic", "test_partition", 0)
+		clis, _ := con.SubScription("name", "wuxi", 0)
+		con.StartGet(cl2.InfoReq{
+			Topic:     "name",
+			Partition: "wuxi",
+			Offset:    5,
+			Option:    0,
+			Cli:       *clis[0],
+		})
 	}
 }

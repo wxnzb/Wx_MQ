@@ -137,3 +137,9 @@ func (f *File) ReadFile(fd *os.File, blockoffset int64) (NodeData, []Message, er
 func (f *File) GetIndex(file *os.File) int64 {
 	return 0
 }
+
+// 修改文件名
+func (f *File) UpFileName(newname string) {
+	f.rmu.Lock()
+	defer f.rmu.Unlock()
+}

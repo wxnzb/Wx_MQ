@@ -11,10 +11,13 @@ import (
 
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
-	BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error)
 	ProGetBro(ctx context.Context, req *api.ProGetBroRequest, callOptions ...callopt.Option) (r *api.ProGetBroResponse, err error)
 	ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error)
+	Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error)
+	BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error)
 	BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error)
+	CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error)
+	CreatePartition(ctx context.Context, req *api.CreatePartitionRequest, callOptions ...callopt.Option) (r *api.CreatePartitionResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -46,11 +49,6 @@ type kZKServer_OperationsClient struct {
 	*kClient
 }
 
-func (p *kZKServer_OperationsClient) BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error) {
-	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.BroInfo(ctx, req)
-}
-
 func (p *kZKServer_OperationsClient) ProGetBro(ctx context.Context, req *api.ProGetBroRequest, callOptions ...callopt.Option) (r *api.ProGetBroResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ProGetBro(ctx, req)
@@ -61,7 +59,27 @@ func (p *kZKServer_OperationsClient) ConGetBro(ctx context.Context, req *api.Con
 	return p.kClient.ConGetBro(ctx, req)
 }
 
+func (p *kZKServer_OperationsClient) Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Sub(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.BroInfo(ctx, req)
+}
+
 func (p *kZKServer_OperationsClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.BroGetssign(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreateTopic(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) CreatePartition(ctx context.Context, req *api.CreatePartitionRequest, callOptions ...callopt.Option) (r *api.CreatePartitionResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.CreatePartition(ctx, req)
 }

@@ -13,13 +13,6 @@ import (
 var errInvalidMessageType = errors.New("invalid message type for service method handler")
 
 var serviceMethods = map[string]kitex.MethodInfo{
-	"BroInfo": kitex.NewMethodInfo(
-		broInfoHandler,
-		newZKServer_OperationsBroInfoArgs,
-		newZKServer_OperationsBroInfoResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
 	"ProGetBro": kitex.NewMethodInfo(
 		proGetBroHandler,
 		newZKServer_OperationsProGetBroArgs,
@@ -34,10 +27,38 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"sub": kitex.NewMethodInfo(
+		subHandler,
+		newZKServer_OperationsSubArgs,
+		newZKServer_OperationsSubResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"BroInfo": kitex.NewMethodInfo(
+		broInfoHandler,
+		newZKServer_OperationsBroInfoArgs,
+		newZKServer_OperationsBroInfoResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"BroGetssign": kitex.NewMethodInfo(
 		broGetssignHandler,
 		newZKServer_OperationsBroGetssignArgs,
 		newZKServer_OperationsBroGetssignResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"CreateTopic": kitex.NewMethodInfo(
+		createTopicHandler,
+		newZKServer_OperationsCreateTopicArgs,
+		newZKServer_OperationsCreateTopicResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"CreatePartition": kitex.NewMethodInfo(
+		createPartitionHandler,
+		newZKServer_OperationsCreatePartitionArgs,
+		newZKServer_OperationsCreatePartitionResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -107,24 +128,6 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	return svcInfo
 }
 
-func broInfoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsBroInfoArgs)
-	realResult := result.(*api.ZKServer_OperationsBroInfoResult)
-	success, err := handler.(api.ZKServer_Operations).BroInfo(ctx, realArg.Req)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newZKServer_OperationsBroInfoArgs() interface{} {
-	return api.NewZKServer_OperationsBroInfoArgs()
-}
-
-func newZKServer_OperationsBroInfoResult() interface{} {
-	return api.NewZKServer_OperationsBroInfoResult()
-}
-
 func proGetBroHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.ZKServer_OperationsProGetBroArgs)
 	realResult := result.(*api.ZKServer_OperationsProGetBroResult)
@@ -161,6 +164,42 @@ func newZKServer_OperationsConGetBroResult() interface{} {
 	return api.NewZKServer_OperationsConGetBroResult()
 }
 
+func subHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsSubArgs)
+	realResult := result.(*api.ZKServer_OperationsSubResult)
+	success, err := handler.(api.ZKServer_Operations).Sub(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsSubArgs() interface{} {
+	return api.NewZKServer_OperationsSubArgs()
+}
+
+func newZKServer_OperationsSubResult() interface{} {
+	return api.NewZKServer_OperationsSubResult()
+}
+
+func broInfoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsBroInfoArgs)
+	realResult := result.(*api.ZKServer_OperationsBroInfoResult)
+	success, err := handler.(api.ZKServer_Operations).BroInfo(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsBroInfoArgs() interface{} {
+	return api.NewZKServer_OperationsBroInfoArgs()
+}
+
+func newZKServer_OperationsBroInfoResult() interface{} {
+	return api.NewZKServer_OperationsBroInfoResult()
+}
+
 func broGetssignHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.ZKServer_OperationsBroGetssignArgs)
 	realResult := result.(*api.ZKServer_OperationsBroGetssignResult)
@@ -179,6 +218,42 @@ func newZKServer_OperationsBroGetssignResult() interface{} {
 	return api.NewZKServer_OperationsBroGetssignResult()
 }
 
+func createTopicHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsCreateTopicArgs)
+	realResult := result.(*api.ZKServer_OperationsCreateTopicResult)
+	success, err := handler.(api.ZKServer_Operations).CreateTopic(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsCreateTopicArgs() interface{} {
+	return api.NewZKServer_OperationsCreateTopicArgs()
+}
+
+func newZKServer_OperationsCreateTopicResult() interface{} {
+	return api.NewZKServer_OperationsCreateTopicResult()
+}
+
+func createPartitionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsCreatePartitionArgs)
+	realResult := result.(*api.ZKServer_OperationsCreatePartitionResult)
+	success, err := handler.(api.ZKServer_Operations).CreatePartition(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsCreatePartitionArgs() interface{} {
+	return api.NewZKServer_OperationsCreatePartitionArgs()
+}
+
+func newZKServer_OperationsCreatePartitionResult() interface{} {
+	return api.NewZKServer_OperationsCreatePartitionResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -187,16 +262,6 @@ func newServiceClient(c client.Client) *kClient {
 	return &kClient{
 		c: c,
 	}
-}
-
-func (p *kClient) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
-	var _args api.ZKServer_OperationsBroInfoArgs
-	_args.Req = req
-	var _result api.ZKServer_OperationsBroInfoResult
-	if err = p.c.Call(ctx, "BroInfo", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
 }
 
 func (p *kClient) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r *api.ProGetBroResponse, err error) {
@@ -219,11 +284,51 @@ func (p *kClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *
 	return _result.GetSuccess(), nil
 }
 
+func (p *kClient) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubResponse, err error) {
+	var _args api.ZKServer_OperationsSubArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsSubResult
+	if err = p.c.Call(ctx, "sub", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
+	var _args api.ZKServer_OperationsBroInfoArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsBroInfoResult
+	if err = p.c.Call(ctx, "BroInfo", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
 func (p *kClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest) (r *api.BroGetAssignResponse, err error) {
 	var _args api.ZKServer_OperationsBroGetssignArgs
 	_args.Req = req
 	var _result api.ZKServer_OperationsBroGetssignResult
 	if err = p.c.Call(ctx, "BroGetssign", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CreateTopic(ctx context.Context, req *api.CreateTopicRequest) (r *api.CreateTopicResponse, err error) {
+	var _args api.ZKServer_OperationsCreateTopicArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsCreateTopicResult
+	if err = p.c.Call(ctx, "CreateTopic", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CreatePartition(ctx context.Context, req *api.CreatePartitionRequest) (r *api.CreatePartitionResponse, err error) {
+	var _args api.ZKServer_OperationsCreatePartitionArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsCreatePartitionResult
+	if err = p.c.Call(ctx, "CreatePartition", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

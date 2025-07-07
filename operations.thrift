@@ -10,6 +10,7 @@ struct PushRequest{
 //推送消息是否成功
 struct PushResponse{
     1:bool ret
+    2:string err
 }
 //拉取消息所需的信息
 struct PullRequest{
@@ -39,15 +40,28 @@ struct InfoGetRequest{
 struct InfoGetResponse{
     1:bool ret
 }
-//消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
-struct SubRequest{
-    1:string consumer
-    2:string topic
-    3:string key//这里为什么要用key，感觉用分区就行了
-    4:i8 option
+
+//-----------------------新加bro-bro，主broker先是让他准备好接收，然后告诉从节点具体接收文件的位置
+struct PrepareAcceptRequest{
+    1:string topic_Name
+    2:string partition_Name
+    3:string file_Name
 }
-struct SubResponse{
+struct PrepareAcceptResponse{
     1:bool ret
+    2:string err
+}
+
+struct PrepareSendRequest{
+    1:string topic_Name
+    2:string partition_Name
+    3:string file_Name
+    4:i64 offset
+    5:i8 option
+}
+struct PrepareSendResponse{
+    1:bool ret
+    2:string err
 }
 //服务器接口
 //在thrift中service相当于给operation_server定义了一个接口
@@ -55,11 +69,18 @@ struct SubResponse{
 // pull	处理消费者拉取消息请求
 // info	处理客户端状态报告、连接信息等
 service Server_Operations{
+    //producer
     PushResponse push(1:PushRequest req)
+    //consumer
     PullResponse pull(1:PullRequest req)
     infoResponse info(1:infoRequest req)
-    SubResponse sub(1:SubRequest req)
     InfoGetResponse StarttoGet(1:InfoGetRequest req)
+    //上面这些是消费者和客户端根broker交流，下面的是broker和broker之间的交流
+    //1:通知目标 Broker：准备接收某文件
+    PrepareAcceptResponse prepareAccept(1:PrepareAcceptRequest req)
+    //2:通知接收方“我要从 offset 开始，发送某个文件的某部分了”，请确认你准备好了，或者已经收到了这部分
+    PrepareSendResponse prepareSend(1:PrepareSendRequest req)    
+
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。
 //PubRequest 是服务端→消费者客户端批量发送消息
@@ -121,11 +142,44 @@ struct BroGetAssignResponse{
     1:bool ret
     2:binary assignment
 }
+//消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
+struct SubRequest{
+    1:string consumer
+    2:string topic
+    3:string key//这里为什么要用key，感觉用分区就行了
+    4:i8 option
+}
+struct SubResponse{
+    1:bool ret
+}
+struct CreateTopicRequest{
+    1:string topic_name
+}
+struct CreateTopicResponse{
+    1:bool ret
+    2:string err
+}
+struct CreatePartitionRequest{
+    1:string topic_name
+    2:string partition_name
+}
+struct CreatePartitionResponse{
+    1:bool ret
+    2:string err
+}
 service ZKServer_Operations{
-    BroInfoResponse  BroInfo(1:BroInfoRequest req)
+    //producer
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
+    //consumer
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
+    SubResponse sub(1:SubRequest req)
+     //broker
+    BroInfoResponse  BroInfo(1:BroInfoRequest req)
     BroGetAssignResponse BroGetssign(1:BroGetAssignRequest req)
+    //------------------
+    CreateTopicResponse CreateTopic(1:CreateTopicRequest req)
+    CreatePartitionResponse CreatePartition(1:CreatePartitionRequest req)
+
 }
 
 

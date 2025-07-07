@@ -263,6 +263,11 @@ func (p *Partition) addMessage(req Push) {
 	}
 }
 
+// 为partition添加一个文件存储他
+func (p *Partition) AddFile(path string) *File {
+
+}
+
 // -----------------------------------------------------------
 type SubScription struct {
 	name               string //topicname+option类型

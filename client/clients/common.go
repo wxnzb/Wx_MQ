@@ -4,8 +4,10 @@ import (
 	"net"
 )
 
-type PartName struct {
-	name string `json:name`
+type PartKey struct {
+	Name       string `json:name`
+	BrokerName string `json:brokername`
+	BrokerHP   string `json:brokerhp`
 }
 
 // 本机所有网卡的mac地址进行拼接

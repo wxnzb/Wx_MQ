@@ -5,7 +5,6 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -32,7 +31,7 @@ type Consumer struct {
 	//下面这些的作用是什么
 	port        string ///这个port是给broker注册的
 	zkBrokerCli zkserver_operations.Client
-	Brokers     map[string]*server_operations.Client
+	Brokers     map[string]server_operations.Client
 }
 
 func NewConsumer(zkBrokerIpport, name, port string) *Consumer {
@@ -41,7 +40,7 @@ func NewConsumer(zkBrokerIpport, name, port string) *Consumer {
 		state:   "alive",
 		Name:    name,
 		port:    port,
-		Brokers: make(map[string]*server_operations.Client),
+		Brokers: make(map[string]server_operations.Client),
 	}
 	c.zkBrokerCli, _ = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
 	return c
@@ -104,34 +103,17 @@ func (con *Consumer) RegisterSelf(port string, cli *server_operations.Client) er
 	return err
 }
 
-func (c *Consumer) SubScription(topic_name, partition_name string, option int8) (clis []*server_operations.Client, err error) {
-	resp, err := c.zkBrokerCli.ConGetBro(context.Background(), &api.ConGetBroRequest{
-		TopicName:     topic_name,
-		PartitionName: partition_name,
-		Option:        option,
+func (c *Consumer) SubScription(topic_name, partition_name string, option int8) (err error) {
+	resp, err := c.zkBrokerCli.Sub(context.Background(), &api.SubRequest{
+		Consumer: c.Name,
+		Topic:    topic_name,
+		Key:      partition_name,
+		Option:   option,
 	})
 	if err != nil || resp.Ret == false {
-		return
+		return err
 	}
-	//一个消费者订阅的topic_part可以属于多个brokers
-	//现在你还不明白为什么返回的[]byte这个resp.Bros为什么可以直接转化为BrokerInfo这个结构，然后就是返回的这个Size具体是什么？？？
-	brokers := make([]BrokerInfo, resp.Size)
-	json.Unmarshal(resp.Bros, &brokers)
-	for _, bro := range brokers {
-		cli, _ := server_operations.NewClient(c.Name, client.WithHostPorts(bro.Host_Port))
-		c.Brokers[bro.Host_Port] = &cli
-		clis = append(clis, &cli)
-		c.RegisterSelf(c.port, &cli) //完成反向注册，这样broker就可以主动发送pingpong和pub了
-		resp, _ := cli.Sub(context.Background(), &api.SubRequest{
-			Topic:  topic_name,
-			Key:    partition_name,
-			Option: option,
-		})
-		if resp.Ret == false {
-			return clis, err
-		}
-	}
-	return clis, nil
+	return nil
 }
 
 type InfoReq struct {
@@ -171,4 +153,31 @@ func (con *Consumer) StartGet(info InfoReq) (err error) {
 	} else {
 		return errors.New(ret)
 	}
+}
+func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
+	for _, part := range parts {
+		req := api.InfoGetRequest{
+			Cli_Name:       con.Name,
+			Topic_Name:     info.Topic,
+			Partition_Name: part.Name,
+			Offset:         info.Offset,
+			Option:         info.Option,
+		}
+		bro_cli, ok := con.Brokers[part.BrokerName]
+		//说明你想要开始拉取这个个分区所属与的broker你和他还没建立联系
+		if !ok {
+			bro_cli, err := server_operations.NewClient(con.Name, client.WithHostPorts(part.BrokerHP))
+			if err != nil {
+				return err
+			}
+			if info.Option == 1 {
+				bro_cli.StarttoGet(context.Background(), &req)
+				con.Brokers[part.BrokerName] = bro_cli
+			}
+		}
+		if info.Option == 3 {
+			bro_cli.StarttoGet(context.Background(), &req)
+		}
+	}
+	return nil
 }
