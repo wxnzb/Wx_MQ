@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 
 	//"sync"
 
@@ -135,13 +134,12 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 
 // 消费者	订阅某个 topic 的数据
 func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubResponse, error) {
-	res, err := s.server.SubHandle(SubRequest{
+	err := s.server.SubHandle(SubRequest{
 		consumer: req.Consumer,
 		topic:    req.Topic,
 		key:      req.Key,
 		option:   req.Option,
 	})
-	json.Marshal(res.parts)
 	if err == nil {
 		return &api.SubResponse{
 			Ret: true,
@@ -165,5 +163,16 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 		return &api.InfoGetResponse{Ret: false}, err
 	}
 	return &api.InfoGetResponse{Ret: true}, nil
+}
+
+type UnknowName struct {
+	TopicName     string
+	PartitionName string
+}
+
+func (s *RPCServer) CreateTopic(ctx context.Context, req *api.CreateTopicRequest) (r *api.CreateTopicResponse, err error) {
+	resp, err := s.zkServer.CreateTopic(UnknowName{
+		TopicName: req.TopicName,
+	})
 
 }

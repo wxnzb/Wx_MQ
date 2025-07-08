@@ -27,6 +27,47 @@ func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
 		brokers:        make(map[string]server_operations.Client),
 	}
 }
-func (zs *ZKServer) make(opt Options) {
+func (zks *ZKServer) make(opt Options) {
 
+}
+
+type UnknowName_in struct {
+	TopicName     string
+	PartitionName string
+}
+type UnknowName_out struct {
+	err error
+}
+
+func (zks *ZKServer) CreateTopic(topic UnknowName_in) UnknowName_out {
+	tNode := zookeeper.TopicNode{
+		Name: topic.TopicName,
+	}
+	err := zks.zk.RegisterNode(tNode)
+	return UnknowName_out{
+		err: err,
+	}
+}
+func (zks *ZKServer) CreatePartition(part UnknowName_in) UnknowName_out {
+	pNode := zookeeper.PartitionNode{
+		Name:     part.PartitionName,
+		Topic:    part.TopicName,
+		PTPIndex: int64(0),
+	}
+	err := zks.zk.RegisterNode(pNode)
+	err = zks.CreateNowBlock(part)
+	return UnknowName_out{
+		err: err,
+	}
+}
+func (zks *ZKServer) CreateNowBlock(block UnknowName_in) error {
+	bNode := zookeeper.BlockNode{
+		Name:        "nowBlock",
+		Topic:       block.TopicName,
+		Partition:   block.PartitionName,
+		StartOffset: int64(0),
+		FileName:    block.TopicName + "/" + block.PartitionName + "now.txt",
+	}
+	err := zks.zk.RegisterNode(bNode)
+	return err
 }

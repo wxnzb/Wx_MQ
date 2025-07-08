@@ -68,3 +68,22 @@ func (pro *Producer) Push(msg Message) error {
 		return errors.New("err!=nil or resp.Ret==false\n")
 	}
 }
+func (pro *Producer) CreateTopic(topic string) error {
+	resp, err := pro.zkBrokerCli.CreateTopic(context.Background(), &api.CreateTopicRequest{
+		TopicName: topic,
+	})
+	if !resp.Ret || err != nil {
+		return err
+	}
+	return nil
+}
+func (pro *Producer) CreateTopicPartition(topic, partition string) error {
+	resp, err := pro.zkBrokerCli.CreatePartition(context.Background(), &api.CreatePartitionRequest{
+		TopicName:     topic,
+		PartitionName: partition,
+	})
+	if !resp.Ret || err != nil {
+		return err
+	}
+	return nil
+}
