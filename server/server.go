@@ -23,7 +23,6 @@ type NodeData struct {
 	Size        int   `json:"size"`        //这几批消息的总大小
 }
 
-// 下面这两个有什么区别吗？？
 const (
 	NODE_SIZE = 42
 )
@@ -33,6 +32,12 @@ type Message struct {
 	Partition_name string `json:partition_name`
 	Index          int64  `json:"index"`
 	Msg            []byte `json:msg`
+}
+type Msgs struct {
+	producer string
+	topic    string
+	key      string
+	msgs     []byte
 }
 
 // -------------------------------
@@ -62,10 +67,6 @@ func (s *Server) make(opt Options) {
 	s.CheckList()
 	s.name = opt.Name
 	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, client.WithHost(opt.ZKServerHostPort))
-	// 	struct BroInfoRequest{
-	//     1:string bro_name
-	//     2:string bro_host_port
-	// }
 	resp, err := s.zkclient.BroInfo(context.Background(), &api.BroInfoRequest{
 		BroName:     opt.Name,
 		BroHostPort: opt.BrokerHostPort,
@@ -85,7 +86,7 @@ func (s *Server) InitBroker() {
 	if err != nil {
 
 	}
-	resp, err := s.zkclient.BroGetssign(context.Background(), &api.BroGetAssignRequest{
+	resp, err := s.zkclient.BroGetAssign(context.Background(), &api.BroGetAssignRequest{
 		Brokerpower: data,
 	})
 	broker_assign := Broker_Assign{
@@ -138,45 +139,6 @@ func (s *Server) CheckList() {
 	}
 }
 
-// 将消费者客户端连接到服务器
-//
-//	func (s *Server) InfoHandle(ip_port string) error {
-//		//消费者客户端
-//		client, err := client_operations.NewClient("client", cl.WithHostPorts(ip_port))
-//		if err == nil {
-//			//现在这样写，等于是全部的消费者都加入到了s的一个消费组里面
-//			//s.groups["default"].consumers[ip_port] = &client
-//			s.rmu.Lock()
-//			consumer, ok := s.consumers[ip_port]
-//			if !ok {
-//				consumer = NewToConsumer(ip_port, client)
-//				s.consumers[ip_port] = consumer
-//			}
-//			go s.CheckConsumer(consumer)
-//			//go s.RecoverConsumer(consumer)
-//			s.rmu.Unlock()
-//			return nil
-//		}
-//		return err
-//	}
-//
-// 换个版本可能更好理解
-func (s *Server) InfoHandle(ip_port string) (err error) {
-	s.rmu.Lock()
-	consumer, ok := s.consumers[ip_port]
-	if !ok {
-		consumer, err = NewToConsumer(ip_port)
-		if err != nil {
-			return err
-		}
-		s.consumers[ip_port] = consumer
-	}
-	go s.CheckConsumer(consumer)
-	//go s.RecoverConsumer(consumer)
-	s.rmu.Unlock()
-	return nil
-}
-
 // 循环遍历这个消费者是否还在先，要是没在先，就要将他所有的订阅都删除调并重新进行平衡
 func (s *Server) CheckConsumer(toconsumer *ToConsumer) {
 	shutDown := toconsumer.CheckConsumer()
@@ -205,6 +167,22 @@ func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 	s.rmu.Unlock()
 }
 
+//	service Server_Operations{
+//	    //producer
+//	    PushResponse push(1:PushRequest req)
+//	    //consumer
+//	    PullResponse pull(1:PullRequest req)
+//	    infoResponse info(1:infoRequest req)
+//	    InfoGetResponse StarttoGet(1:InfoGetRequest req)
+//	    //上面这些是消费者和客户端根broker交流，下面的是broker和broker之间的交流
+//	    //1:通知目标 Broker：准备接收某文件
+//	    PrepareAcceptResponse prepareAccept(1:PrepareAcceptRequest req)
+//	    //2:通知接收方“我要从 offset 开始，发送某个文件的某部分了”，请确认你准备好了，或者已经收到了这部分
+//	    PrepareSendResponse prepareSend(1:PrepareSendRequest req)
+//	}
+//
+// ------------------------------------------------
+// 1
 type Push struct {
 	producerId string
 	topic      string
@@ -227,6 +205,7 @@ func (s *Server) PushHandle(push Push) error {
 	return nil
 }
 
+// 2
 type PullRequest struct {
 	consumerId string
 	topic      string
@@ -240,63 +219,46 @@ func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
 	return PullResponse{message: ""}, nil
 }
 
-type SubRequest struct {
-	consumer string
-	topic    string
-	key      string
-	option   int8
-}
-type SubResponse struct {
-	size  int
-	parts []PartName
-}
-
-// 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
-// 通过Sub结构体来订阅消息
-func (s *Server) SubHandle(req SubRequest) (err error) {
+// 3
+func (s *Server) InfoHandle(ip_port string) (err error) {
 	s.rmu.Lock()
-	defer s.rmu.Unlock()
-	DEBUG(dLOG, "get sub information")
-	//这里还得先判断一下这个topic有没有
-	topic, ok := s.topics[req.topic]
+	consumer, ok := s.consumers[ip_port]
 	if !ok {
-		return errors.New("topic not exist")
+		consumer, err = NewToConsumer(ip_port)
+		if err != nil {
+			return err
+		}
+		s.consumers[ip_port] = consumer
 	}
-	sub, err := topic.AddScription(req, s.consumers[req.consumer])
-	if err != nil {
-		return err
-	}
-	s.consumers[req.consumer].AddScription(sub)
+	go s.CheckConsumer(consumer)
+	//go s.RecoverConsumer(consumer)
+	s.rmu.Unlock()
 	return nil
 }
 
-func (s *Server) UnSubHandle(req SubRequest) error {
-	s.rmu.Lock()
-	defer s.rmu.Unlock()
-	//这里还得先判断一下这个topic有没有
-	topic, ok := s.topics[req.topic]
-	if !ok {
-		return errors.New("topic not exist")
-	}
-	//这里消费者要删除这个订阅就把这个订阅全部删除了吗？感觉好奇怪
-	sub_name, err := topic.ReduceScription(req)
-	if err != nil {
-		return err
-	}
-	s.consumers[req.consumer].ReduceScription(sub_name)
-	return nil
-}
+// 4
+// name       string //broker name
+// 	topic_name string
+// 	part_name  string
+// 	file_name  string
+// 	option     int8
+// 	offset     int64
 
-type PartitionInitInfo struct {
+// producer string
+// consumer string
+type PartitionInfo struct {
+	name            string
 	topic           string
 	partition       string
 	consumer_ipname string
 	option          int8
-	index           int64
+	offset          int64
+	file_name       string
+	producer        string
+	consumer        string
 }
 
-// 这个还没有实现
-func (s *Server) StartGet(req PartitionInitInfo) (err error) {
+func (s *Server) StartGet(req PartitionInfo) (err error) {
 	//先看
 	switch req.option {
 	//负载均衡
@@ -339,20 +301,60 @@ func (s *Server) StartGet(req PartitionInitInfo) (err error) {
 	return err
 }
 
-//为啥放着他们就发现不了呢
-// const (
-// 	NODE_SIZE = 42
-// )
+// 5
+func (s *Server) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error) {
 
-// type NodeData struct {
-// 	Start_index int64 `json:"start_index"` //这几批消息的第一批消息的index
-// 	End_index   int64 `json:"end_index"`   //这几批消息的最后一批消息的index
-// 	Size        int   `json:"size"`        //这几批消息的总大小
-// }
+}
 
-type Msgs struct {
-	producer string
+// 6
+func (s *Server) PrepareSendHandle(pinfo PartitionInfo) (ret string, err error) {
+
+}
+
+// 感觉暂时不需要这个了,因为现在把他变到zkserver了
+type SubRequest struct {
+	consumer string
 	topic    string
 	key      string
-	msgs     []byte
+	option   int8
 }
+type SubResponse struct {
+	size  int
+	parts []PartName
+}
+
+// // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
+// // 通过Sub结构体来订阅消息
+// func (s *Server) SubHandle(req SubRequest) (err error) {
+// 	s.rmu.Lock()
+// 	defer s.rmu.Unlock()
+// 	DEBUG(dLOG, "get sub information")
+// 	//这里还得先判断一下这个topic有没有
+// 	topic, ok := s.topics[req.topic]
+// 	if !ok {
+// 		return errors.New("topic not exist")
+// 	}
+// 	sub, err := topic.AddScription(req, s.consumers[req.consumer])
+// 	if err != nil {
+// 		return err
+// 	}
+// 	s.consumers[req.consumer].AddScription(sub)
+// 	return nil
+// }
+
+// func (s *Server) UnSubHandle(req SubRequest) error {
+// 	s.rmu.Lock()
+// 	defer s.rmu.Unlock()
+// 	//这里还得先判断一下这个topic有没有
+// 	topic, ok := s.topics[req.topic]
+// 	if !ok {
+// 		return errors.New("topic not exist")
+// 	}
+// 	//这里消费者要删除这个订阅就把这个订阅全部删除了吗？感觉好奇怪
+// 	sub_name, err := topic.ReduceScription(req)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	s.consumers[req.consumer].ReduceScription(sub_name)
+// 	return nil
+// }

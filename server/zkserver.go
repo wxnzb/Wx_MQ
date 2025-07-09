@@ -31,24 +31,28 @@ func (zks *ZKServer) make(opt Options) {
 
 }
 
-type UnknowName_in struct {
+type Info_in struct {
 	TopicName     string
 	PartitionName string
+	Option        int8
+	CliName       string
+	Index         int64
 }
-type UnknowName_out struct {
-	err error
+type Info_out struct {
+	Err           error
+	bro_host_port string
 }
 
-func (zks *ZKServer) CreateTopic(topic UnknowName_in) UnknowName_out {
+func (zks *ZKServer) CreateTopic(topic Info_in) Info_out {
 	tNode := zookeeper.TopicNode{
 		Name: topic.TopicName,
 	}
 	err := zks.zk.RegisterNode(tNode)
-	return UnknowName_out{
-		err: err,
+	return Info_out{
+		Err: err,
 	}
 }
-func (zks *ZKServer) CreatePartition(part UnknowName_in) UnknowName_out {
+func (zks *ZKServer) CreatePartition(part Info_in) Info_out {
 	pNode := zookeeper.PartitionNode{
 		Name:     part.PartitionName,
 		Topic:    part.TopicName,
@@ -56,11 +60,11 @@ func (zks *ZKServer) CreatePartition(part UnknowName_in) UnknowName_out {
 	}
 	err := zks.zk.RegisterNode(pNode)
 	err = zks.CreateNowBlock(part)
-	return UnknowName_out{
-		err: err,
+	return Info_out{
+		Err: err,
 	}
 }
-func (zks *ZKServer) CreateNowBlock(block UnknowName_in) error {
+func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 	bNode := zookeeper.BlockNode{
 		Name:        "nowBlock",
 		Topic:       block.TopicName,
@@ -70,4 +74,16 @@ func (zks *ZKServer) CreateNowBlock(block UnknowName_in) error {
 	}
 	err := zks.zk.RegisterNode(bNode)
 	return err
+}
+func (zks *ZKServer) ProGetBroHandle(block Info_in) Info_out {
+
+}
+func (zks *ZKServer) ConGetBroHandle(block Info_in) Info_out {
+
+}
+func (zks *ZKServer) SubHandle(sub SubRequest) error {
+
+}
+func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
+
 }

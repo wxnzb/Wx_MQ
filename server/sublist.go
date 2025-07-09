@@ -265,7 +265,7 @@ func (p *Partition) addMessage(req Push) {
 
 // 为partition添加一个文件存储他
 func (p *Partition) AddFile(path string) *File {
-
+	return &File{}
 }
 
 // -----------------------------------------------------------
@@ -392,7 +392,7 @@ func (sub *SubScription) GetConfig() *Config {
 	defer sub.rmu.RUnlock()
 	return sub.config
 }
-func (sub *SubScription) AddConsumerInConfig(req PartitionInitInfo, tocon *client_operations.Client) {
+func (sub *SubScription) AddConsumerInConfig(req PartitionInfo, tocon *client_operations.Client) {
 	sub.rmu.Lock()
 	defer sub.rmu.Unlock()
 	switch req.option {

@@ -27,7 +27,7 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"sub": kitex.NewMethodInfo(
+	"Sub": kitex.NewMethodInfo(
 		subHandler,
 		newZKServer_OperationsSubArgs,
 		newZKServer_OperationsSubResult,
@@ -41,10 +41,10 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"BroGetssign": kitex.NewMethodInfo(
-		broGetssignHandler,
-		newZKServer_OperationsBroGetssignArgs,
-		newZKServer_OperationsBroGetssignResult,
+	"BroGetAssign": kitex.NewMethodInfo(
+		broGetAssignHandler,
+		newZKServer_OperationsBroGetAssignArgs,
+		newZKServer_OperationsBroGetAssignResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -200,22 +200,22 @@ func newZKServer_OperationsBroInfoResult() interface{} {
 	return api.NewZKServer_OperationsBroInfoResult()
 }
 
-func broGetssignHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsBroGetssignArgs)
-	realResult := result.(*api.ZKServer_OperationsBroGetssignResult)
-	success, err := handler.(api.ZKServer_Operations).BroGetssign(ctx, realArg.Req)
+func broGetAssignHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsBroGetAssignArgs)
+	realResult := result.(*api.ZKServer_OperationsBroGetAssignResult)
+	success, err := handler.(api.ZKServer_Operations).BroGetAssign(ctx, realArg.Req)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newZKServer_OperationsBroGetssignArgs() interface{} {
-	return api.NewZKServer_OperationsBroGetssignArgs()
+func newZKServer_OperationsBroGetAssignArgs() interface{} {
+	return api.NewZKServer_OperationsBroGetAssignArgs()
 }
 
-func newZKServer_OperationsBroGetssignResult() interface{} {
-	return api.NewZKServer_OperationsBroGetssignResult()
+func newZKServer_OperationsBroGetAssignResult() interface{} {
+	return api.NewZKServer_OperationsBroGetAssignResult()
 }
 
 func createTopicHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -288,7 +288,7 @@ func (p *kClient) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubRespo
 	var _args api.ZKServer_OperationsSubArgs
 	_args.Req = req
 	var _result api.ZKServer_OperationsSubResult
-	if err = p.c.Call(ctx, "sub", &_args, &_result); err != nil {
+	if err = p.c.Call(ctx, "Sub", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
@@ -304,11 +304,11 @@ func (p *kClient) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest) (r *api.BroGetAssignResponse, err error) {
-	var _args api.ZKServer_OperationsBroGetssignArgs
+func (p *kClient) BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest) (r *api.BroGetAssignResponse, err error) {
+	var _args api.ZKServer_OperationsBroGetAssignArgs
 	_args.Req = req
-	var _result api.ZKServer_OperationsBroGetssignResult
-	if err = p.c.Call(ctx, "BroGetssign", &_args, &_result); err != nil {
+	var _result api.ZKServer_OperationsBroGetAssignResult
+	if err = p.c.Call(ctx, "BroGetAssign", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

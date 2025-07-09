@@ -105,14 +105,6 @@ service Client_Operations{
     PubResponse pub(1:PubRequest req)
     PingpongResponse pingpong(1:PingpongRequest req)
 }
-//bro注册自己
-struct BroInfoRequest{
-    1:string bro_name
-    2:string bro_host_port
-}
-struct BroInfoResponse{
-    1:bool ret
-}
 //为啥他们长的不一样，上面那个发送只能给一个broker,但是消费的话这个分区可能有多个副本
 //生产者获取broker的host和port
 struct ProGetBroRequest{
@@ -128,13 +120,24 @@ struct ConGetBroRequest{
     1:string topic_name
     2:string partition_name
     3:i8 option
+    4:string  cli_name
+    5:i64    index
 }
 struct ConGetBroResponse{
     1:bool ret
     2:i64 size
-    3:binary bros
-    4:binary parts
+   // 3:binary bros
+    3:binary parts
 }
+//bro注册自己
+struct BroInfoRequest{
+    1:string bro_name
+    2:string bro_host_port
+}
+struct BroInfoResponse{
+    1:bool ret
+}
+
 struct BroGetAssignRequest{
     1:binary brokerpower
 }
@@ -172,10 +175,10 @@ service ZKServer_Operations{
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
     //consumer
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
-    SubResponse sub(1:SubRequest req)
+    SubResponse Sub(1:SubRequest req)
      //broker
     BroInfoResponse  BroInfo(1:BroInfoRequest req)
-    BroGetAssignResponse BroGetssign(1:BroGetAssignRequest req)
+    BroGetAssignResponse BroGetAssign(1:BroGetAssignRequest req)
     //------------------
     CreateTopicResponse CreateTopic(1:CreateTopicRequest req)
     CreatePartitionResponse CreatePartition(1:CreatePartitionRequest req)

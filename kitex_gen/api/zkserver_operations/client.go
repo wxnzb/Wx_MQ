@@ -15,7 +15,7 @@ type Client interface {
 	ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error)
 	Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error)
 	BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error)
-	BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error)
+	BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error)
 	CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error)
 	CreatePartition(ctx context.Context, req *api.CreatePartitionRequest, callOptions ...callopt.Option) (r *api.CreatePartitionResponse, err error)
 }
@@ -69,9 +69,9 @@ func (p *kZKServer_OperationsClient) BroInfo(ctx context.Context, req *api.BroIn
 	return p.kClient.BroInfo(ctx, req)
 }
 
-func (p *kZKServer_OperationsClient) BroGetssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error) {
+func (p *kZKServer_OperationsClient) BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.BroGetssign(ctx, req)
+	return p.kClient.BroGetAssign(ctx, req)
 }
 
 func (p *kZKServer_OperationsClient) CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error) {
