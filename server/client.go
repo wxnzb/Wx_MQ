@@ -24,8 +24,10 @@ import (
 
 // 这是消费者客户端的状态,state
 const (
-	ALIVE = "alive"
-	DOWN  = "down"
+	ALIVE     = "alive"
+	DOWN      = "down"
+	TIMEOUT   = 60 * 10
+	UPDATENUM = 10
 )
 
 // 这是一个消费者实体的内存镜像，又是消费者的客户端
@@ -229,11 +231,11 @@ type Part struct {
 	block_status map[int64]string //------------------------------------------------------------
 }
 
-func NewPart(topic_name, part_name string, file *File) *Part {
+func NewPart(partinfo Info_in, file *File) *Part {
 	return &Part{
 		rmu:            sync.RWMutex{},
-		topic_name:     topic_name,
-		partition_name: part_name,
+		topic_name:     partinfo.TopicName,
+		partition_name: partinfo.PartitionName,
 		option:         TOPIC_NIL_PTP,
 		state:          DOWN,
 		file:           file,
@@ -242,7 +244,7 @@ func NewPart(topic_name, part_name string, file *File) *Part {
 		buffer_msgs:    make(map[int64][]Message),
 		consumer_ack:   make(chan ConsumerAck),
 		block_status:   make(map[int64]string),
-		lastIndex:      0,
+		lastIndex:      partinfo.Index,
 	}
 
 }
@@ -264,7 +266,7 @@ func NewPart(topic_name, part_name string, file *File) *Part {
 // 1：读取文件的消息存到part结构体的buffer_node和buffer_mags中
 // 2：开启一个携程接收消费者发送过来的ack
 // 3:开启携程向消费者发送消息
-func (p *Part) Start() {
+func (p *Part) Start(close chan Part) {
 	//打开一个文件
 	p.fd = *p.file.OpenFile()
 	//根据index找到偏移
@@ -283,7 +285,7 @@ func (p *Part) Start() {
 		}
 	}
 	//开启一个携程接收消费者发送过来的ack
-	go p.GetDone()
+	go p.GetDone(close)
 	//现在循环发送消息给消费者
 	p.rmu.Lock()
 
@@ -302,8 +304,8 @@ func (p *Part) Start() {
 
 const (
 	//这个是ConsumerAck里的err
-	OK      = "ok"
-	TIMEOUT = "timeout"
+	OK       = "ok"
+	STIMEOUT = "timeout"
 	//这个是part里的block_status
 	HADDO      = "haddo"
 	NOTDO      = "notdo"
@@ -324,7 +326,8 @@ type ConsumerAck struct {
 
 // 走的是负载均衡，每个块只能被一个消费者消费
 // |node-1...50|node-51...120|node-121...200|这就是三个块，这里的1.50等都是这批消息的索引
-func (p *Part) GetDone() {
+//需要修改成可主动关闭模式
+func (p *Part) GetDone(close chan Part) {
 	for {
 		select {
 		case finish := <-p.consumer_ack:
@@ -353,7 +356,7 @@ func (p *Part) GetDone() {
 				}
 				p.rmu.Unlock()
 			}
-			if finish.err == TIMEOUT {
+			if finish.err == STIMEOUT {
 				//消费者可能掉线了，删了他，亨，不给他发了
 				p.rmu.Lock()
 				delete(p.to_consumers, finish.name)
@@ -415,7 +418,7 @@ func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client) {
 						p.rmu.Unlock()
 						p.consumer_ack <- ConsumerAck{
 							start_index: startIndex,
-							err:         TIMEOUT,
+							err:         STIMEOUT,
 							name:        name,
 							to_consumer: toConsumer,
 						}
@@ -460,12 +463,12 @@ func (p *Part) Pub(toConsumer *client_operations.Client, node NodeData, msgs_dat
 	return nil
 }
 
-// 这个还没用上
-func (p *Part) ClosePart() {
-	p.rmu.Lock()
-	defer p.rmu.Unlock()
-	p.state = DOWN
-}
+// // 这个还没用上
+// func (p *Part) ClosePart() {
+// 	p.rmu.Lock()
+// 	defer p.rmu.Unlock()
+// 	p.state = DOWN
+// }
 
 func (p *Part) UpdateCons(confPartToCons []string, confCons map[string]*client_operations.Client) {
 	p.rmu.Lock()

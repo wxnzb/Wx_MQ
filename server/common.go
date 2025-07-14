@@ -87,13 +87,14 @@ func CheckChangeCon(old map[string]*client_operations.Client, new []string) (red
 	}
 	return
 }
-func GetPartNameArry(parts map[string]*Partition) []PartName {
-	var varry []PartName
-	for p, _ := range parts {
-		varry = append(varry, PartName{name: p})
-	}
-	return varry
-}
+
+// func GetPartNameArry(parts map[string]*Partition) []PartName {
+// 	var varry []PartName
+// 	for p, _ := range parts {
+// 		varry = append(varry, PartName{name: p})
+// 	}
+// 	return varry
+// }
 
 type Options struct {
 	Tag              string

@@ -4,6 +4,9 @@ import (
 	"Wx_MQ/kitex_gen/api/server_operations"
 	"Wx_MQ/zookeeper"
 	"sync"
+
+	"github.com/cloudwego/kitex/client"
+	"github.com/docker/docker/client"
 )
 
 type ZKServer struct {
@@ -15,6 +18,7 @@ type ZKServer struct {
 	info_partition map[string]zookeeper.PartitionNode
 
 	brokers map[string]server_operations.Client
+	Name    string
 }
 
 func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
@@ -43,7 +47,25 @@ type Info_out struct {
 	bro_host_port string
 }
 
-func (zks *ZKServer) CreateTopic(topic Info_in) Info_out {
+func (zks *ZKServer) ProGetBroHandle(block Info_in) Info_out {
+
+}
+func (zks *ZKServer) ConGetBroHandle(block Info_in) Info_out {
+
+}
+func (zks *ZKServer) SubHandle(sub SubRequest) error {
+
+}
+
+// 创建一个新的broker
+func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
+	brocli, err := server_operations.NewClient(zks.Name, client.WithHost(brohostport))
+	zks.rmu.Lock()
+	zks.brokers[broname] = brocli
+	zks.rmu.Unlock()
+	return err
+}
+func (zks *ZKServer) CreateTopicHandle(topic Info_in) Info_out {
 	tNode := zookeeper.TopicNode{
 		Name: topic.TopicName,
 	}
@@ -52,7 +74,7 @@ func (zks *ZKServer) CreateTopic(topic Info_in) Info_out {
 		Err: err,
 	}
 }
-func (zks *ZKServer) CreatePartition(part Info_in) Info_out {
+func (zks *ZKServer) CreatePartitionHandle(part Info_in) Info_out {
 	pNode := zookeeper.PartitionNode{
 		Name:     part.PartitionName,
 		Topic:    part.TopicName,
@@ -64,6 +86,8 @@ func (zks *ZKServer) CreatePartition(part Info_in) Info_out {
 		Err: err,
 	}
 }
+
+// ------------------------------------------------------------------
 func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 	bNode := zookeeper.BlockNode{
 		Name:        "nowBlock",
@@ -74,16 +98,4 @@ func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 	}
 	err := zks.zk.RegisterNode(bNode)
 	return err
-}
-func (zks *ZKServer) ProGetBroHandle(block Info_in) Info_out {
-
-}
-func (zks *ZKServer) ConGetBroHandle(block Info_in) Info_out {
-
-}
-func (zks *ZKServer) SubHandle(sub SubRequest) error {
-
-}
-func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
-
 }
