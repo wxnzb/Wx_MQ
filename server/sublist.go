@@ -3,7 +3,6 @@ package server
 import (
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"os"
 	"sort"
@@ -26,45 +25,46 @@ type Topic struct {
 	Parts   map[string]*Partition    //分区列表
 	SubList map[string]*SubScription //订阅列表
 	Files   map[string]string
+	Name    string
 }
 
 // 创建一个新的topic,这里push里面必须要有topic和key
-func NewTopic(push Push) *Topic {
+func NewTopic(topicName string) *Topic {
 	t := &Topic{
 		rmu:     sync.RWMutex{},
 		Parts:   make(map[string]*Partition),
 		SubList: make(map[string]*SubScription),
 		Files:   make(map[string]string),
+		Name:    topicName,
 	}
 	str, _ := os.Getwd()
-	str += "/" + ip_name + "/" + push.topic
+	str += "/" + ip_name + "/" + topicName
 	CreateDir(str)
-	if push.key != "" {
-		part, file := NewPartition(push)
-		t.Parts[push.key] = part
-		t.Files[push.key] = file
-	}
+	//这个自会进行判断
+	// if push.key != "" {
+	// 	part, file := NewPartition(push)
+	// 	t.Parts[push.key] = part
+	// 	t.Files[push.key] = file
+	// }
 	return t
 }
-func (t *Topic) AddPartition(push Push) {
-	part, _ := NewPartition(push)
+func (t *Topic) AddPartition(partName string) {
+	part := NewPartition(t.Name, partName)
 	t.rmu.Lock()
-	t.Parts[push.key] = part
+	t.Parts[partName] = part
 	t.rmu.Unlock()
 }
 
 // PushRequest
-func (t *Topic) AddMessage(push Push) error {
-	part, ok := t.Parts[push.key]
+func (t *Topic) AddMessage(req Push) error {
+	part, ok := t.Parts[req.key]
+	part.rmu.Lock()
 	if !ok {
 		DEBUG(dERROR, "no this partition")
 		//要是没有这个分区，就要创建一个新的分区
-		part, file := NewPartition(push)
-		t.Files[push.key] = file
-		t.Parts[push.key] = part
+		part = NewPartition(req.topic, req.key)
+		t.Parts[req.key] = part
 	}
-	part.rmu.Lock()
-	//part.addMessage(push)
 	part.rmu.Unlock()
 
 	return nil
@@ -140,6 +140,18 @@ func (t *Topic) GetParts() map[string]*Partition {
 	return t.Parts
 }
 
+// 返回好奇怪
+func (t *Topic) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error) {
+	t.rmu.Lock()
+	defer t.rmu.Unlock()
+	part, ok := t.Parts[pinfo.partition]
+	if !ok {
+		part = NewPartition(pinfo.topic, pinfo.partition)
+		t.Parts[pinfo.partition] = part
+	}
+	return
+}
+
 // ---------------------------------------------------------------------------
 type Partition struct {
 	rmu   sync.RWMutex
@@ -154,24 +166,16 @@ type Partition struct {
 }
 
 // 创建一个新的分区
-func NewPartition(req Push) (*Partition, string) {
+func NewPartition(topic, partition string) *Partition {
 	part := &Partition{
 		rmu:   sync.RWMutex{},
-		key:   req.key,
+		key:   partition,
 		queue: make([]Message, 40),
 	}
 	str, _ := os.Getwd()
-	str += "/" + ip_name + "/" + req.topic + "/" + req.key + ".txt"
-	part.file_name = str
-	part.file = NewFile(str)
-	file, err := CreateFile(str)
-	if err != nil {
-		fmt.Println("create", str, "fail")
-	}
-	part.fd = file
-	part.index = part.file.GetIndex(part.fd)
-	part.start_index = part.index + 1
-	return part, str
+	str += "/" + ip_name + "/" + topic + "/" + partition
+
+	return part
 }
 
 // 在新创建了一个分区之后，要做的是，发布消息给所有分区的消费者，但是现在还没有消费者呀，好奇怪？？？？

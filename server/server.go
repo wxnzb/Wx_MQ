@@ -113,10 +113,7 @@ func (s *Server) HandlePartitions(topic_name string, partitions map[string]Part_
 	for partition_name, part := range partitions {
 		_, ok := s.topics[topic_name].Parts[partition_name]
 		if !ok {
-			s.topics[topic_name] = NewTopic(Push{
-				topic: topic_name,
-				key:   partition_name,
-			})
+			s.topics[topic_name] = NewTopic(topic_name)
 			s.HandleBlocks(topic_name, partition_name, part.Blocks)
 		} else {
 			DEBUG(dWARN, "This partition(%v) had in s.topics[%v].Parts\n", partition_name, topic_name)
@@ -301,9 +298,17 @@ func (s *Server) StartGet(req PartitionInfo) (err error) {
 	return err
 }
 
-// 5
+// 5所以他也把文件名传进来有什么用呢
 func (s *Server) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error) {
-
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+    topic,ok:=s.topics[pinfo.topic]
+	//创建一个新的topic
+	if !ok{
+        topic=NewTopic(pinfo.topic)
+		s.topics[pinfo.topic]=topic
+	}
+	topic.PrepareAcceptHandle(pinfo)
 }
 
 // 6

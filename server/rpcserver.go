@@ -148,28 +148,6 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 }
 
 // //-----------------------新加bro-bro，主broker先是让他准备好接收，然后告诉从节点具体接收文件的位置
-// struct PrepareAcceptRequest{
-//     1:string topic_Name
-//     2:string partition_Name
-//     3:string file_Name
-// }
-// struct PrepareAcceptResponse{
-//     1:bool ret
-//     2:string err
-// }
-
-//	struct PrepareSendRequest{
-//	    1:string topic_Name
-//	    2:string partition_Name
-//	    3:string file_Name
-//	    4:i64 offset
-//	    5:i8 option
-//	}
-//
-//	struct PrepareSendResponse{
-//	    1:bool ret
-//	    2:string err
-//	}
 // [Broker A]             [Broker B]
 //    |                        |
 //    |--- prepareAccept ----->|   （通知准备同步一段数据）
