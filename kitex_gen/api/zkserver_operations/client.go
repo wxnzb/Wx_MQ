@@ -12,8 +12,10 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	ProGetBro(ctx context.Context, req *api.ProGetBroRequest, callOptions ...callopt.Option) (r *api.ProGetBroResponse, err error)
+	ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error)
 	ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error)
 	Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error)
+	UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest, callOptions ...callopt.Option) (r *api.UpdatePTPOffsetResponse, err error)
 	BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error)
 	BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest, callOptions ...callopt.Option) (r *api.BroGetAssignResponse, err error)
 	CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error)
@@ -54,6 +56,11 @@ func (p *kZKServer_OperationsClient) ProGetBro(ctx context.Context, req *api.Pro
 	return p.kClient.ProGetBro(ctx, req)
 }
 
+func (p *kZKServer_OperationsClient) ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ProSetPart(ctx, req)
+}
+
 func (p *kZKServer_OperationsClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ConGetBro(ctx, req)
@@ -62,6 +69,11 @@ func (p *kZKServer_OperationsClient) ConGetBro(ctx context.Context, req *api.Con
 func (p *kZKServer_OperationsClient) Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.Sub(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest, callOptions ...callopt.Option) (r *api.UpdatePTPOffsetResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UpdatePTPOffset(ctx, req)
 }
 
 func (p *kZKServer_OperationsClient) BroInfo(ctx context.Context, req *api.BroInfoRequest, callOptions ...callopt.Option) (r *api.BroInfoResponse, err error) {

@@ -105,6 +105,9 @@ type PullRequest struct {
 	ConsumerId string `thrift:"consumerId,1" frugal:"1,default,string" json:"consumerId"`
 	Topic      string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
 	Key        string `thrift:"key,3" frugal:"3,default,string" json:"key"`
+	Offset     int64  `thrift:"offset,4" frugal:"4,default,i64" json:"offset"`
+	Option     int8   `thrift:"option,5" frugal:"5,default,i8" json:"option"`
+	Size       int8   `thrift:"size,6" frugal:"6,default,i8" json:"size"`
 }
 
 func NewPullRequest() *PullRequest {
@@ -125,6 +128,18 @@ func (p *PullRequest) GetTopic() (v string) {
 func (p *PullRequest) GetKey() (v string) {
 	return p.Key
 }
+
+func (p *PullRequest) GetOffset() (v int64) {
+	return p.Offset
+}
+
+func (p *PullRequest) GetOption() (v int8) {
+	return p.Option
+}
+
+func (p *PullRequest) GetSize() (v int8) {
+	return p.Size
+}
 func (p *PullRequest) SetConsumerId(val string) {
 	p.ConsumerId = val
 }
@@ -133,6 +148,15 @@ func (p *PullRequest) SetTopic(val string) {
 }
 func (p *PullRequest) SetKey(val string) {
 	p.Key = val
+}
+func (p *PullRequest) SetOffset(val int64) {
+	p.Offset = val
+}
+func (p *PullRequest) SetOption(val int8) {
+	p.Option = val
+}
+func (p *PullRequest) SetSize(val int8) {
+	p.Size = val
 }
 
 func (p *PullRequest) String() string {
@@ -146,10 +170,18 @@ var fieldIDToName_PullRequest = map[int16]string{
 	1: "consumerId",
 	2: "topic",
 	3: "key",
+	4: "offset",
+	5: "option",
+	6: "size",
 }
 
 type PullResponse struct {
-	Message string `thrift:"message,1" frugal:"1,default,string" json:"message"`
+	Msgs       []byte `thrift:"Msgs,1" frugal:"1,default,binary" json:"Msgs"`
+	Ret        bool   `thrift:"Ret,2" frugal:"2,default,bool" json:"Ret"`
+	StartIndex int64  `thrift:"Start_index,3" frugal:"3,default,i64" json:"Start_index"`
+	EndIndex   int64  `thrift:"End_index,4" frugal:"4,default,i64" json:"End_index"`
+	Size       int8   `thrift:"Size,5" frugal:"5,default,i8" json:"Size"`
+	Err        string `thrift:"Err,6" frugal:"6,default,string" json:"Err"`
 }
 
 func NewPullResponse() *PullResponse {
@@ -159,11 +191,46 @@ func NewPullResponse() *PullResponse {
 func (p *PullResponse) InitDefault() {
 }
 
-func (p *PullResponse) GetMessage() (v string) {
-	return p.Message
+func (p *PullResponse) GetMsgs() (v []byte) {
+	return p.Msgs
 }
-func (p *PullResponse) SetMessage(val string) {
-	p.Message = val
+
+func (p *PullResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *PullResponse) GetStartIndex() (v int64) {
+	return p.StartIndex
+}
+
+func (p *PullResponse) GetEndIndex() (v int64) {
+	return p.EndIndex
+}
+
+func (p *PullResponse) GetSize() (v int8) {
+	return p.Size
+}
+
+func (p *PullResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *PullResponse) SetMsgs(val []byte) {
+	p.Msgs = val
+}
+func (p *PullResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *PullResponse) SetStartIndex(val int64) {
+	p.StartIndex = val
+}
+func (p *PullResponse) SetEndIndex(val int64) {
+	p.EndIndex = val
+}
+func (p *PullResponse) SetSize(val int8) {
+	p.Size = val
+}
+func (p *PullResponse) SetErr(val string) {
+	p.Err = val
 }
 
 func (p *PullResponse) String() string {
@@ -174,7 +241,12 @@ func (p *PullResponse) String() string {
 }
 
 var fieldIDToName_PullResponse = map[int16]string{
-	1: "message",
+	1: "Msgs",
+	2: "Ret",
+	3: "Start_index",
+	4: "End_index",
+	5: "Size",
+	6: "Err",
 }
 
 type InfoRequest struct {
@@ -745,6 +817,100 @@ var fieldIDToName_ProGetBroResponse = map[int16]string{
 	2: "bro_host_port",
 }
 
+type ProSetPartStateRequest struct {
+	Topic     string `thrift:"topic,1" frugal:"1,default,string" json:"topic"`
+	Partition string `thrift:"partition,2" frugal:"2,default,string" json:"partition"`
+	Option    int8   `thrift:"option,3" frugal:"3,default,i8" json:"option"`
+	Dupnum    int8   `thrift:"dupnum,4" frugal:"4,default,i8" json:"dupnum"`
+}
+
+func NewProSetPartStateRequest() *ProSetPartStateRequest {
+	return &ProSetPartStateRequest{}
+}
+
+func (p *ProSetPartStateRequest) InitDefault() {
+}
+
+func (p *ProSetPartStateRequest) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *ProSetPartStateRequest) GetPartition() (v string) {
+	return p.Partition
+}
+
+func (p *ProSetPartStateRequest) GetOption() (v int8) {
+	return p.Option
+}
+
+func (p *ProSetPartStateRequest) GetDupnum() (v int8) {
+	return p.Dupnum
+}
+func (p *ProSetPartStateRequest) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *ProSetPartStateRequest) SetPartition(val string) {
+	p.Partition = val
+}
+func (p *ProSetPartStateRequest) SetOption(val int8) {
+	p.Option = val
+}
+func (p *ProSetPartStateRequest) SetDupnum(val int8) {
+	p.Dupnum = val
+}
+
+func (p *ProSetPartStateRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProSetPartStateRequest(%+v)", *p)
+}
+
+var fieldIDToName_ProSetPartStateRequest = map[int16]string{
+	1: "topic",
+	2: "partition",
+	3: "option",
+	4: "dupnum",
+}
+
+type ProSetPartStateResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewProSetPartStateResponse() *ProSetPartStateResponse {
+	return &ProSetPartStateResponse{}
+}
+
+func (p *ProSetPartStateResponse) InitDefault() {
+}
+
+func (p *ProSetPartStateResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *ProSetPartStateResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *ProSetPartStateResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *ProSetPartStateResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *ProSetPartStateResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProSetPartStateResponse(%+v)", *p)
+}
+
+var fieldIDToName_ProSetPartStateResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
 type ConGetBroRequest struct {
 	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
 	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
@@ -855,6 +1021,167 @@ var fieldIDToName_ConGetBroResponse = map[int16]string{
 	1: "ret",
 	2: "size",
 	3: "parts",
+}
+
+type SubRequest struct {
+	Consumer string `thrift:"consumer,1" frugal:"1,default,string" json:"consumer"`
+	Topic    string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
+	Key      string `thrift:"key,3" frugal:"3,default,string" json:"key"`
+	Option   int8   `thrift:"option,4" frugal:"4,default,i8" json:"option"`
+}
+
+func NewSubRequest() *SubRequest {
+	return &SubRequest{}
+}
+
+func (p *SubRequest) InitDefault() {
+}
+
+func (p *SubRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
+
+func (p *SubRequest) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *SubRequest) GetKey() (v string) {
+	return p.Key
+}
+
+func (p *SubRequest) GetOption() (v int8) {
+	return p.Option
+}
+func (p *SubRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
+func (p *SubRequest) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *SubRequest) SetKey(val string) {
+	p.Key = val
+}
+func (p *SubRequest) SetOption(val int8) {
+	p.Option = val
+}
+
+func (p *SubRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SubRequest(%+v)", *p)
+}
+
+var fieldIDToName_SubRequest = map[int16]string{
+	1: "consumer",
+	2: "topic",
+	3: "key",
+	4: "option",
+}
+
+type SubResponse struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewSubResponse() *SubResponse {
+	return &SubResponse{}
+}
+
+func (p *SubResponse) InitDefault() {
+}
+
+func (p *SubResponse) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *SubResponse) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *SubResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SubResponse(%+v)", *p)
+}
+
+var fieldIDToName_SubResponse = map[int16]string{
+	1: "ret",
+}
+
+type UpdatePTPOffsetRequest struct {
+	Topic  string `thrift:"topic,1" frugal:"1,default,string" json:"topic"`
+	Part   string `thrift:"part,2" frugal:"2,default,string" json:"part"`
+	Offset int64  `thrift:"offset,3" frugal:"3,default,i64" json:"offset"`
+}
+
+func NewUpdatePTPOffsetRequest() *UpdatePTPOffsetRequest {
+	return &UpdatePTPOffsetRequest{}
+}
+
+func (p *UpdatePTPOffsetRequest) InitDefault() {
+}
+
+func (p *UpdatePTPOffsetRequest) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *UpdatePTPOffsetRequest) GetPart() (v string) {
+	return p.Part
+}
+
+func (p *UpdatePTPOffsetRequest) GetOffset() (v int64) {
+	return p.Offset
+}
+func (p *UpdatePTPOffsetRequest) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *UpdatePTPOffsetRequest) SetPart(val string) {
+	p.Part = val
+}
+func (p *UpdatePTPOffsetRequest) SetOffset(val int64) {
+	p.Offset = val
+}
+
+func (p *UpdatePTPOffsetRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdatePTPOffsetRequest(%+v)", *p)
+}
+
+var fieldIDToName_UpdatePTPOffsetRequest = map[int16]string{
+	1: "topic",
+	2: "part",
+	3: "offset",
+}
+
+type UpdatePTPOffsetResponse struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewUpdatePTPOffsetResponse() *UpdatePTPOffsetResponse {
+	return &UpdatePTPOffsetResponse{}
+}
+
+func (p *UpdatePTPOffsetResponse) InitDefault() {
+}
+
+func (p *UpdatePTPOffsetResponse) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *UpdatePTPOffsetResponse) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *UpdatePTPOffsetResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdatePTPOffsetResponse(%+v)", *p)
+}
+
+var fieldIDToName_UpdatePTPOffsetResponse = map[int16]string{
+	1: "ret",
 }
 
 type BroInfoRequest struct {
@@ -989,91 +1316,6 @@ func (p *BroGetAssignResponse) String() string {
 var fieldIDToName_BroGetAssignResponse = map[int16]string{
 	1: "ret",
 	2: "assignment",
-}
-
-type SubRequest struct {
-	Consumer string `thrift:"consumer,1" frugal:"1,default,string" json:"consumer"`
-	Topic    string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
-	Key      string `thrift:"key,3" frugal:"3,default,string" json:"key"`
-	Option   int8   `thrift:"option,4" frugal:"4,default,i8" json:"option"`
-}
-
-func NewSubRequest() *SubRequest {
-	return &SubRequest{}
-}
-
-func (p *SubRequest) InitDefault() {
-}
-
-func (p *SubRequest) GetConsumer() (v string) {
-	return p.Consumer
-}
-
-func (p *SubRequest) GetTopic() (v string) {
-	return p.Topic
-}
-
-func (p *SubRequest) GetKey() (v string) {
-	return p.Key
-}
-
-func (p *SubRequest) GetOption() (v int8) {
-	return p.Option
-}
-func (p *SubRequest) SetConsumer(val string) {
-	p.Consumer = val
-}
-func (p *SubRequest) SetTopic(val string) {
-	p.Topic = val
-}
-func (p *SubRequest) SetKey(val string) {
-	p.Key = val
-}
-func (p *SubRequest) SetOption(val int8) {
-	p.Option = val
-}
-
-func (p *SubRequest) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("SubRequest(%+v)", *p)
-}
-
-var fieldIDToName_SubRequest = map[int16]string{
-	1: "consumer",
-	2: "topic",
-	3: "key",
-	4: "option",
-}
-
-type SubResponse struct {
-	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
-}
-
-func NewSubResponse() *SubResponse {
-	return &SubResponse{}
-}
-
-func (p *SubResponse) InitDefault() {
-}
-
-func (p *SubResponse) GetRet() (v bool) {
-	return p.Ret
-}
-func (p *SubResponse) SetRet(val bool) {
-	p.Ret = val
-}
-
-func (p *SubResponse) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("SubResponse(%+v)", *p)
-}
-
-var fieldIDToName_SubResponse = map[int16]string{
-	1: "ret",
 }
 
 type CreateTopicRequest struct {
@@ -1850,9 +2092,13 @@ var fieldIDToName_Client_OperationsPingpongResult = map[int16]string{
 type ZKServer_Operations interface {
 	ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
 
+	ProSetPart(ctx context.Context, req *ProSetPartStateRequest) (r *ProSetPartStateResponse, err error)
+
 	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
 
 	Sub(ctx context.Context, req *SubRequest) (r *SubResponse, err error)
+
+	UpdatePTPOffset(ctx context.Context, req *UpdatePTPOffsetRequest) (r *UpdatePTPOffsetResponse, err error)
 
 	BroInfo(ctx context.Context, req *BroInfoRequest) (r *BroInfoResponse, err error)
 
@@ -1936,6 +2182,82 @@ func (p *ZKServer_OperationsProGetBroResult) String() string {
 }
 
 var fieldIDToName_ZKServer_OperationsProGetBroResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsProSetPartArgs struct {
+	Req *ProSetPartStateRequest `thrift:"req,1" frugal:"1,default,ProSetPartStateRequest" json:"req"`
+}
+
+func NewZKServer_OperationsProSetPartArgs() *ZKServer_OperationsProSetPartArgs {
+	return &ZKServer_OperationsProSetPartArgs{}
+}
+
+func (p *ZKServer_OperationsProSetPartArgs) InitDefault() {
+}
+
+var ZKServer_OperationsProSetPartArgs_Req_DEFAULT *ProSetPartStateRequest
+
+func (p *ZKServer_OperationsProSetPartArgs) GetReq() (v *ProSetPartStateRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsProSetPartArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsProSetPartArgs) SetReq(val *ProSetPartStateRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsProSetPartArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsProSetPartArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsProSetPartArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsProSetPartArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsProSetPartResult struct {
+	Success *ProSetPartStateResponse `thrift:"success,0,optional" frugal:"0,optional,ProSetPartStateResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsProSetPartResult() *ZKServer_OperationsProSetPartResult {
+	return &ZKServer_OperationsProSetPartResult{}
+}
+
+func (p *ZKServer_OperationsProSetPartResult) InitDefault() {
+}
+
+var ZKServer_OperationsProSetPartResult_Success_DEFAULT *ProSetPartStateResponse
+
+func (p *ZKServer_OperationsProSetPartResult) GetSuccess() (v *ProSetPartStateResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsProSetPartResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsProSetPartResult) SetSuccess(x interface{}) {
+	p.Success = x.(*ProSetPartStateResponse)
+}
+
+func (p *ZKServer_OperationsProSetPartResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsProSetPartResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsProSetPartResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsProSetPartResult = map[int16]string{
 	0: "success",
 }
 
@@ -2088,6 +2410,82 @@ func (p *ZKServer_OperationsSubResult) String() string {
 }
 
 var fieldIDToName_ZKServer_OperationsSubResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsUpdatePTPOffsetArgs struct {
+	Req *UpdatePTPOffsetRequest `thrift:"req,1" frugal:"1,default,UpdatePTPOffsetRequest" json:"req"`
+}
+
+func NewZKServer_OperationsUpdatePTPOffsetArgs() *ZKServer_OperationsUpdatePTPOffsetArgs {
+	return &ZKServer_OperationsUpdatePTPOffsetArgs{}
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetArgs) InitDefault() {
+}
+
+var ZKServer_OperationsUpdatePTPOffsetArgs_Req_DEFAULT *UpdatePTPOffsetRequest
+
+func (p *ZKServer_OperationsUpdatePTPOffsetArgs) GetReq() (v *UpdatePTPOffsetRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsUpdatePTPOffsetArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsUpdatePTPOffsetArgs) SetReq(val *UpdatePTPOffsetRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsUpdatePTPOffsetArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsUpdatePTPOffsetArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsUpdatePTPOffsetResult struct {
+	Success *UpdatePTPOffsetResponse `thrift:"success,0,optional" frugal:"0,optional,UpdatePTPOffsetResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsUpdatePTPOffsetResult() *ZKServer_OperationsUpdatePTPOffsetResult {
+	return &ZKServer_OperationsUpdatePTPOffsetResult{}
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetResult) InitDefault() {
+}
+
+var ZKServer_OperationsUpdatePTPOffsetResult_Success_DEFAULT *UpdatePTPOffsetResponse
+
+func (p *ZKServer_OperationsUpdatePTPOffsetResult) GetSuccess() (v *UpdatePTPOffsetResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsUpdatePTPOffsetResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsUpdatePTPOffsetResult) SetSuccess(x interface{}) {
+	p.Success = x.(*UpdatePTPOffsetResponse)
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsUpdatePTPOffsetResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsUpdatePTPOffsetResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsUpdatePTPOffsetResult = map[int16]string{
 	0: "success",
 }
 

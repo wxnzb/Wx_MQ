@@ -32,7 +32,7 @@ func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
 	}
 }
 func (zks *ZKServer) make(opt Options) {
-
+	zks.Name = opt.Name
 }
 
 type Info_in struct {
@@ -53,7 +53,7 @@ func (zks *ZKServer) ProGetBroHandle(block Info_in) Info_out {
 func (zks *ZKServer) ConGetBroHandle(block Info_in) Info_out {
 
 }
-func (zks *ZKServer) SubHandle(sub SubRequest) error {
+func (zks *ZKServer) SubHandle(sub Info_in) error {
 
 }
 
@@ -97,5 +97,20 @@ func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 		FileName:    block.TopicName + "/" + block.PartitionName + "now.txt",
 	}
 	err := zks.zk.RegisterNode(bNode)
+	return err
+}
+
+// 自己感觉这里是可以简化的
+func (zks *ZKServer) UpdatePTPOffset(pullRequest Info_in) error {
+	str := zks.zk.TopicRoot + "/" + pullRequest.TopicName + "/" + "Partitions/" + pullRequest.PartitionName
+	_, err := zks.zk.GetPartitionNode(str)
+	if err != nil {
+		return err
+	}
+	err = zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
+		Name:     pullRequest.PartitionName,
+		Topic:    pullRequest.TopicName,
+		PTPIndex: pullRequest.Index,
+	})
 	return err
 }

@@ -144,6 +144,16 @@ func (z *ZK) GetPartitionPTPIndex(path string) int64 {
 	json.Unmarshal(data, &pNode)
 	return pNode.PTPIndex
 }
+func (z *ZK) GetPartitionNode(path string) (PartitionNode, error) {
+	var pnode PartitionNode
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return pnode, err
+	}
+	data, _, _ := z.Con.Get(path)
+	json.Unmarshal(data, &pnode)
+	return pnode, nil
+}
 func (z *ZK) GetBlockNode(path string) BlockNode {
 	var bloNode BlockNode
 	data, _, _ := z.Con.Get(path)
@@ -157,4 +167,17 @@ func (z *ZK) GetBrokerNode(path string) BrokerNode {
 	data, _, _ := z.Con.Get(path)
 	json.Unmarshal(data, &broNode)
 	return broNode
+}
+func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
+	path := z.TopicRoot + "/" + pnode.Topic + "/" + "Partitions/" + pnode.Name
+	data, err := json.Marshal(pnode)
+	if err != nil {
+		return err
+	}
+	_, sate, _ := z.Con.Get(path)
+	_, err = z.Con.Set(path, data, sate.Version)
+	if err != nil {
+		return err
+	}
+	return nil
 }
