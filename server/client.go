@@ -541,7 +541,6 @@ func (nod *Node) ReadMSGS(in Info) (MSGS, error) {
 		}
 		if nums == 0 {
 			msgs.start_index = node.Start_index
-			msgs.end_index = node.End_index
 		}
 		nums += int(node.Size)
 		nod.offset += int64(NODE_SIZE) + int64(node.Size)
