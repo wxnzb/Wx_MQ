@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -326,16 +327,31 @@ type ConsumerAck struct {
 
 // 走的是负载均衡，每个块只能被一个消费者消费
 // |node-1...50|node-51...120|node-121...200|这就是三个块，这里的1.50等都是这批消息的索引
-//需要修改成可主动关闭模式
+// 需要修改成可主动关闭模式
 func (p *Part) GetDone(close chan Part) {
+	num := 0
 	for {
 		select {
 		case finish := <-p.consumer_ack:
 
 			if finish.err == OK {
+				//要是到达这个书就要更新zookeeper中的offset
+				num++
+				if num >= UPDATENUM {
+
+				}
 				err := p.AddBlock()
 				if err != nil {
-
+					DEBUG(dERROR, err.Error())
+				}
+				if p.file.filePath != p.partition_name+"NowBlock.txt" && err == errors.New("read All file,don't find this index") {
+					p.state = DOWN
+				}
+				//这里len(p.block_status)还需要思考
+				if p.state == DOWN && len(p.block_status) == 0 {
+					p.rmu.Unlock()
+					close <- *p
+					return
 				}
 				p.rmu.Lock()
 				p.block_status[finish.start_index] = HADDO
@@ -362,6 +378,9 @@ func (p *Part) GetDone(close chan Part) {
 				delete(p.to_consumers, finish.name)
 				p.rmu.Unlock()
 			}
+		case <-time.After(time.Second * TIMEOUT): //超时
+			close <- *p
+			return
 		}
 	}
 }
@@ -390,23 +409,27 @@ func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client) {
 	//为了防止他开始让发的已经发过了，因此要在外面在加一层for循环
 	var startIndex int64
 	startIndex = 0
+	num := 0
 	for {
+		p.rmu.Lock()
 		if startIndex == 0 {
 			startIndex = p.startIndex
 		}
+		//这个消费者不是这个分区负责的
 		if _, ok := p.to_consumers[name]; !ok {
+			p.rmu.Unlock()
+			return
 		}
 		if p.block_status[startIndex] == NOTDO {
 			node := p.buffer_node[startIndex]
 			msgs := p.buffer_msgs[startIndex]
+			//表示这个块正在被处理
+			p.block_status[startIndex] = DOING
+			p.rmu.Unlock()
 			//因为Pub是byte刘，这里要进行转化
 			msgs_data := make([]byte, node.Size)
 			var err error
 			msgs_data, err = json.Marshal(msgs)
-			num := 0
-			p.rmu.Lock()
-			p.block_status[startIndex] = DOING
-			p.rmu.Unlock()
 			//循环发送
 			for {
 				err = p.Pub(toConsumer, node, msgs_data)
@@ -428,7 +451,8 @@ func (p *Part) SendOneBlock(name string, toConsumer *client_operations.Client) {
 					//要是发送成功了，不需要在这里确认，他分成两步，有先将占说明这个消息正在发送，那么不会再发给其他的消费者，然后要是发送成功并且消费者返回ack,GetDone会将他有doing修改成haddo
 					//p.block_status[startIndex] = HADDO
 					p.consumer_ack <- ConsumerAck{
-						start_index: startIndex,
+						//这个写发和上面那个有区别吗
+						start_index: node.Start_index,
 						err:         OK,
 						name:        name,
 						to_consumer: toConsumer,
@@ -481,4 +505,50 @@ func (p *Part) UpdateCons(confPartToCons []string, confCons map[string]*client_o
 		p.to_consumers[a] = confCons[a]
 		p.SendOneBlock(a, confCons[a])
 	}
+}
+
+type Node struct {
+	topic_name     string
+	partition_name string
+	option         int8
+	file           *File
+
+	fd os.File
+	//消息偏移
+	offset int64
+	//上次读去消息的索引
+	start_index int64
+}
+
+func (nod *Node) ReadMSGS(in Info) (MSGS, error) {
+	var err error
+	if nod.offset == -1 || nod.start_index != in.offset {
+		nod.offset, err = nod.file.FindOffset(&nod.fd, in.offset)
+		if err != nil {
+			return MSGS{}, nil
+		}
+	}
+	nums := 0
+	var msgs MSGS
+	for nums < int(in.size) {
+		node, msg, err := nod.file.ReadBytes(&nod.fd, nod.offset)
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				return MSGS{}, err
+			}
+		}
+		if nums == 0 {
+			msgs.start_index = node.Start_index
+		}
+		nums += int(node.Size)
+		nod.offset += int64(NODE_SIZE) + int64(node.Size)
+		msgs.size = int8(nums)
+		msgs.array = append(msgs.array, msg...)
+		msgs.end_index = node.End_index
+	}
+}
+func (f *File) ReadBytes(file *os.File, offset int64) (NodeData, []byte, error) {
+
 }

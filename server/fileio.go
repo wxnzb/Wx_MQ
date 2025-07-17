@@ -13,7 +13,8 @@ type File struct {
 	filePath  string
 	node_size int //每次往文件里面写进一批消息，这一批消息前面会有他的topic,partition呀什么的元数据，他时定长的，因此在开始时计算一次就好，为什么他是定常呢？？？
 }
-//创建一个文件，要是本来就有，那就打开并以8
+
+// 创建一个文件，要是本来就有，那就打开并以8
 func NewFile(filepath string) *File {
 	return &File{
 		rmu:       sync.RWMutex{},
@@ -37,8 +38,10 @@ func (f *File) FindOffset(fd *os.File, index int64) (int64, error) {
 	offset := int64(0) //从文件头开始扫描
 	var node NodeData
 	for {
+		f.rmu.RLock()
 		//ReadAt 直接按 offset 读取 NODE_SIZE 字节到 node_data
 		size, err := fd.ReadAt(node_data, offset)
+		f.rmu.RUnlock()
 		//这里为什么size会不等于NODE_SIZE呢
 
 		if size != NODE_SIZE {

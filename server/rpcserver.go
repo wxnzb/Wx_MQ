@@ -6,6 +6,7 @@ import (
 
 	"context"
 	"fmt"
+	"io"
 
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/server_operations"
@@ -18,8 +19,10 @@ import (
 )
 
 type RPCServer struct {
-	srv_cli server.Server
-	srv_bro server.Server
+	name string
+	//这里用指针更好？？？
+	srv_cli *server.Server
+	srv_bro *server.Server
 	////下面这两个分别对应上面那两个
 	server   *Server
 	zkServer *ZKServer
@@ -40,33 +43,44 @@ const (
 
 func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error {
 	switch opt.Tag {
+	//初始化一个broker的server结构体，他在注册的时候就要向zk注册
 	case BROKER:
 		s.server = NewServer(s.zkInfo)
 		s.server.make(opt)
+		//面向客户端的服务端
+		srv_cli := server_operations.NewServer(s, opts_cli...)
+		s.srv_cli = &srv_cli
+		go func() {
+			err := srv_cli.Run()
+			DEBUG(dLOG, "broker start rpcserver")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+		}()
+		//初始化一个zk的server结构体
 	case ZKBROKER:
 		s.zkServer = NewZKServer(s.zkInfo)
+		s.zkServer.make(opt)
+		//面向broker的服务端
+		srv_bro := zkserver_operations.NewServer(s, opts_bro...)
+		s.srv_bro = &srv_bro
+		go func() {
+			err := srv_bro.Run()
+			DEBUG(dLOG, "broker start rpcserver")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+		}()
 	}
-	s.srv_bro = zkserver_operations.NewServer(s, opts_bro...)
-	go func() {
-		err := s.srv_bro.Run()
-		DEBUG(dLOG, "broker start rpcserver")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}()
-	s.srv_cli = server_operations.NewServer(s, opts_cli...)
-	go func() {
-		err := s.srv_cli.Run()
-		DEBUG(dLOG, "broker start rpcserver")
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}()
 	return nil
 }
 func (s *RPCServer) Stop() {
-	s.srv_bro.Stop()
-	s.srv_cli.Stop()
+	if s.srv_bro != nil {
+		(*s.srv_bro).Stop()
+	}
+	if s.srv_cli != nil {
+		(*s.srv_cli).Stop()
+	}
 }
 
 //	service Server_Operations{
@@ -86,11 +100,11 @@ func (s *RPCServer) Stop() {
 // 生产者	向 Broker 投递一条消息
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
 	fmt.Println(req)
-	err = s.server.PushHandle(Push{
-		producerId: req.ProducerId,
-		topic:      req.Topic,
-		key:        req.Key,
-		message:    req.Message,
+	err = s.server.PushHandle(Info{
+		producer:  req.ProducerId,
+		topic:     req.Topic,
+		partition: req.Key,
+		message:   req.Message,
 	})
 	if err == nil {
 		return &api.PushResponse{
@@ -104,19 +118,35 @@ func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.Push
 
 // 消费者	从 Broker 拉取消息（主动消费）
 func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.PullResponse, err error) {
-	ret, err := s.server.PullHandle(PullRequest{
-		consumerId: req.ConsumerId,
-		topic:      req.Topic,
-		key:        req.Key,
+
+	ret, err := s.server.PullHandle(Info{
+		consumer:  req.ConsumerId,
+		topic:     req.Topic,
+		partition: req.Key,
+		//下面这三个是消费者向消费的消息数量,消费策略还有从分区的offset开始消费
+		size:   req.Size,
+		option: req.Option,
+		offset: req.Offset,
 	})
-	if err == nil {
+	Err := "ok"
+	if err != nil {
+		if err == io.EOF && ret.size == 0 {
+			Err = "file EOF"
+		} else {
+			DEBUG(dERROR, "pull err")
+		}
 		return &api.PullResponse{
-			Message: ret.message,
-		}, nil
+			Ret: false,
+			Err: err.Error(),
+		}, err
 	}
 	return &api.PullResponse{
-		Message: "error",
-	}, err
+		Msgs:       ret.array,
+		StartIndex: ret.start_index,
+		EndIndex:   ret.end_index,
+		Size:       ret.size,
+		Err:        Err,
+	}, nil
 }
 
 // 消费者	向 Broker 注册自己的 IP:Port（上线注册）
@@ -135,7 +165,7 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 // 消费者	指示开始消费某个分区的消息，从某个 offset 开始
 func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
 
-	err = s.server.StartGet(PartitionInfo{
+	err = s.server.StartGet(Info{
 		topic:           req.Topic_Name,
 		partition:       req.Partition_Name,
 		consumer_ipname: req.Cli_Name,
@@ -161,7 +191,7 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 //    |=== 数据同步流（HTTP / RPC / 其他） ===>
 
 func (s *RPCServer) PrepareAccept(ctx context.Context, req *api.PrepareAcceptRequest) (r *api.PrepareAcceptResponse, err error) {
-	errs, err := s.server.PrepareAcceptHandle(PartitionInfo{
+	errs, err := s.server.PrepareAcceptHandle(Info{
 		topic:     req.Topic_Name,
 		partition: req.Partition_Name,
 		file_name: req.File_Name,
@@ -178,7 +208,7 @@ func (s *RPCServer) PrepareAccept(ctx context.Context, req *api.PrepareAcceptReq
 	}, nil
 }
 func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest) (r *api.PrepareSendResponse, err error) {
-	errs, err := s.server.PrepareSendHandle(PartitionInfo{
+	errs, err := s.server.PrepareSendHandle(Info{
 		topic:     req.Topic_Name,
 		partition: req.Partition_Name,
 		file_name: req.File_Name,
@@ -261,6 +291,9 @@ func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r
 		BroHostPort: info_out.bro_host_port,
 	}, info_out.Err
 }
+
+// 生产者设置某个分区的状态
+// 需要补充
 func (s *RPCServer) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *api.ConGetBroResponse, err error) {
 	info_out := s.zkServer.ConGetBroHandle(Info_in{
 		TopicName:     req.TopicName,
@@ -276,16 +309,19 @@ func (s *RPCServer) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r
 	}
 	return &api.ConGetBroResponse{
 		Ret: true,
+		//为啥需要下面这两个
+		// Size:int64(size),
+		// Parts:parts,
 	}, info_out.Err
 }
 
 // 消费者	订阅某个 topic 的数据
 func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubResponse, error) {
-	err := s.zkServer.SubHandle(SubRequest{
-		consumer: req.Consumer,
-		topic:    req.Topic,
-		key:      req.Key,
-		option:   req.Option,
+	err := s.zkServer.SubHandle(Info_in{
+		CliName:       req.Consumer,
+		TopicName:     req.Topic,
+		PartitionName: req.Key,
+		Option:        req.Option,
 	})
 	if err == nil {
 		return &api.SubResponse{
@@ -300,13 +336,14 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 func (s *RPCServer) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
 	err = s.zkServer.BroInfoHandle(req.BroName, req.BroHostPort)
 	if err != nil {
+		DEBUG(dERROR, err.Error())
 		return &api.BroInfoResponse{
 			Ret: false,
 		}, err
 	}
 	return &api.BroInfoResponse{
-		Ret: false,
-	}, err
+		Ret: true,
+	}, nil
 }
 func (s *RPCServer) BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest) (r *api.BroGetAssignResponse, err error) {
 	// 用于broker加载缓存
