@@ -154,6 +154,12 @@ func (z *ZK) GetPartitionNode(path string) (PartitionNode, error) {
 	json.Unmarshal(data, &pnode)
 	return pnode, nil
 }
+func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode) {
+	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
+	NowBlock := z.GetBlockNode(Now_block_path)
+	NowBroker := z.GetBrokerNode(NowBlock.Name)
+	return NowBroker, NowBlock
+}
 func (z *ZK) GetBlockNode(path string) BlockNode {
 	var bloNode BlockNode
 	data, _, _ := z.Con.Get(path)

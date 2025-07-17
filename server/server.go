@@ -201,16 +201,22 @@ func (s *Server) PushHandle(push Info) error {
 type MSGS struct {
 	start_index int64
 	end_index   int64
-	size        int64
+	size        int8
 	array       []byte
 }
 
 func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 	if pullRequest.option == TOPIC_NIL_PTP {
-		s.zkclient.UpdatePTPOffset(context.Backgroud(), &api.UpdatePTPOffsetRequest{})
+		//更新消费者偏移量并写入zookeeper记录消费者上次读取的位置
+		s.zkclient.UpdatePTPOffset(context.Background(), &api.UpdatePTPOffsetRequest{
+			Topic:  pullRequest.topic,
+			Part:   pullRequest.partition,
+			Offset: pullRequest.offset,
+		})
 	}
-	s.rmu.Lock()
+	s.rmu.RLock()
 	topic, ok := s.topics[pullRequest.topic]
+	s.rmu.RUnlock()
 	if !ok {
 		return MSGS{}, errors.New("topic not exist")
 	}

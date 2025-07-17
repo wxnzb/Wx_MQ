@@ -19,14 +19,15 @@ type Producer struct {
 	zkBrokerCli     zkserver_operations.Client
 }
 
-func NewProducer(zkBrokerIpport, name string) *Producer {
-	pro := &Producer{
+func NewProducer(zkBrokerIpport, name string) (*Producer, error) {
+	pro := Producer{
 		rmu:             sync.RWMutex{},
 		Name:            name,
 		Topic_Partition: make(map[string]server_operations.Client),
 	}
-	pro.zkBrokerCli, _ = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
-	return pro
+	var err error
+	pro.zkBrokerCli, err = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
+	return &pro, err
 }
 
 type Message struct {
@@ -42,11 +43,17 @@ func (pro *Producer) Push(msg Message) error {
 	pro.rmu.RUnlock()
 	if !ok {
 		//要是找不到，就说明这个topic-partition的broker还没有连接到生产者，先要进行连接
-		resp, _ := pro.zkBrokerCli.ProGetBro(context.Background(), &api.ProGetBroRequest{
+		resp, err := pro.zkBrokerCli.ProGetBro(context.Background(), &api.ProGetBroRequest{
 			TopicName:     msg.Topic_Name,
 			PartitionName: msg.Partition_Name,
 		})
-		cli, _ := server_operations.NewClient(pro.Name, client.WithHostPorts(resp.BroHostPort))
+		if err != nil || !resp.Ret {
+			return err
+		}
+		cli, err := server_operations.NewClient(pro.Name, client.WithHostPorts(resp.BroHostPort))
+		if err != nil {
+			return err
+		}
 		pro.rmu.RLock()
 		pro.Topic_Partition[index] = cli
 		pro.rmu.RUnlock()
@@ -64,7 +71,8 @@ func (pro *Producer) Push(msg Message) error {
 		pro.rmu.Lock()
 		delete(pro.Topic_Partition, index)
 		pro.rmu.Unlock()
-		pro.Push(msg)
+		return pro.Push(msg)
+	} else {
 		return errors.New("err!=nil or resp.Ret==false\n")
 	}
 }

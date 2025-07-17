@@ -38,8 +38,10 @@ func (f *File) FindOffset(fd *os.File, index int64) (int64, error) {
 	offset := int64(0) //从文件头开始扫描
 	var node NodeData
 	for {
+		f.rmu.RLock()
 		//ReadAt 直接按 offset 读取 NODE_SIZE 字节到 node_data
 		size, err := fd.ReadAt(node_data, offset)
+		f.rmu.RUnlock()
 		//这里为什么size会不等于NODE_SIZE呢
 
 		if size != NODE_SIZE {
