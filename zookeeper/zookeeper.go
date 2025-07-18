@@ -93,9 +93,9 @@ func (z *ZK) RegisterNode(node interface{}) error {
 
 type Part struct {
 	topicName     string
-	partitionName string
-	brokerName    string
-	broHostPort   string
+	PartitionName string
+	BrokerName    string
+	BroHostPort   string
 	PTPIndex      int64 //名字解释：生产端写入某个 Topic/Partition 的偏移
 	FileName      string
 }

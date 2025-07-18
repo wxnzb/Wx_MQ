@@ -226,11 +226,29 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 		Err: "",
 	}, nil
 }
+ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
 
+	ProSetPart(ctx context.Context, req *ProSetPartStateRequest) (r *ProSetPartStateResponse, err error)
+
+	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
+
+	Sub(ctx context.Context, req *SubRequest) (r *SubResponse, err error)
+
+	UpdatePTPOffset(ctx context.Context, req *UpdatePTPOffsetRequest) (r *UpdatePTPOffsetResponse, err error)
+
+	BroInfo(ctx context.Context, req *BroInfoRequest) (r *BroInfoResponse, err error)
+
+	BroGetAssign(ctx context.Context, req *BroGetAssignRequest) (r *BroGetAssignResponse, err error)
+
+	CreateTopic(ctx context.Context, req *CreateTopicRequest) (r *CreateTopicResponse, err error)
+
+	CreatePartition(ctx context.Context, req *CreatePartitionRequest) (r *CreatePartitionResponse, err error)
+}
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // service ZKServer_Operations{
 //     //producer
 //     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
+ ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
 //     //consumer
 //     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
 //     SubResponse sub(1:SubRequest req)
@@ -295,24 +313,24 @@ func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r
 // 生产者设置某个分区的状态
 // 需要补充
 func (s *RPCServer) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *api.ConGetBroResponse, err error) {
-	info_out := s.zkServer.ConGetBroHandle(Info_in{
+	parts, size, err := s.zkServer.ConGetBroHandle(Info_in{
 		TopicName:     req.TopicName,
 		PartitionName: req.PartitionName,
 		Option:        req.Option,
 		CliName:       req.CliName,
 		Index:         req.Index,
 	})
-	if info_out.Err != nil {
+	if err != nil {
 		return &api.ConGetBroResponse{
 			Ret: false,
-		}, info_out.Err
+		}, err
 	}
 	return &api.ConGetBroResponse{
 		Ret: true,
 		//为啥需要下面这两个
-		// Size:int64(size),
-		// Parts:parts,
-	}, info_out.Err
+		Size:  int64(size),
+		Parts: parts,
+	}, nil
 }
 
 // 消费者	订阅某个 topic 的数据
@@ -332,7 +350,21 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 		Ret: false,
 	}, err
 }
-
+func (s *RPCServer) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest) (r *api.UpdatePTPOffsetResponse, err error) {
+	err = s.zkServer.UpdatePTPOffset(Info_in{
+		TopicName:     req.Topic,
+		PartitionName: req.Part,
+		Index:         req.Offset,
+	})
+	if err != nil {
+		return &api.UpdatePTPOffsetResponse{
+			Ret: false,
+		}, err
+	}
+	return &api.UpdatePTPOffsetResponse{
+		Ret: true,
+	}, nil
+}
 func (s *RPCServer) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
 	err = s.zkServer.BroInfoHandle(req.BroName, req.BroHostPort)
 	if err != nil {

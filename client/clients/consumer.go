@@ -34,7 +34,7 @@ type Consumer struct {
 	Brokers     map[string]server_operations.Client
 }
 
-func NewConsumer(zkBrokerIpport, name, port string) *Consumer {
+func NewConsumer(zkBrokerIpport, name, port string) (*Consumer,error) {
 	c := &Consumer{
 		rmu:     sync.RWMutex{},
 		state:   "alive",
@@ -42,8 +42,9 @@ func NewConsumer(zkBrokerIpport, name, port string) *Consumer {
 		port:    port,
 		Brokers: make(map[string]server_operations.Client),
 	}
-	c.zkBrokerCli, _ = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
-	return c
+	var err error
+	c.zkBrokerCli, err = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
+	return c,err
 }
 func (con *Consumer) GetState() string {
 	con.rmu.RLock()
@@ -166,10 +167,12 @@ func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
 		bro_cli, ok := con.Brokers[part.BrokerName]
 		//说明你想要开始拉取这个个分区所属与的broker你和他还没建立联系
 		if !ok {
+			//这里不需要将他添加到con里面吗
 			bro_cli, err := server_operations.NewClient(con.Name, client.WithHostPorts(part.BrokerHP))
 			if err != nil {
 				return err
 			}
+			//option这里需要理解
 			if info.Option == 1 {
 				bro_cli.StarttoGet(context.Background(), &req)
 				con.Brokers[part.BrokerName] = bro_cli

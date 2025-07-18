@@ -56,14 +56,14 @@ func (t *Topic) AddPartition(partName string) {
 }
 
 // PushRequest
-func (t *Topic) AddMessage(req Push) error {
-	part, ok := t.Parts[req.key]
+func (t *Topic) AddMessage(req Info) error {
+	part, ok := t.Parts[req.partition]
 	part.rmu.Lock()
 	if !ok {
 		DEBUG(dERROR, "no this partition")
 		//要是没有这个分区，就要创建一个新的分区
-		part = NewPartition(req.topic, req.key)
-		t.Parts[req.key] = part
+		part = NewPartition(req.topic, req.partition)
+		t.Parts[req.partition] = part
 	}
 	part.rmu.Unlock()
 
@@ -141,7 +141,7 @@ func (t *Topic) GetParts() map[string]*Partition {
 }
 
 // 返回好奇怪
-func (t *Topic) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error) {
+func (t *Topic) PrepareAcceptHandle(pinfo Info) (ret string, err error) {
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
 	part, ok := t.Parts[pinfo.partition]
@@ -151,7 +151,16 @@ func (t *Topic) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error)
 	}
 	return
 }
+func(t *Topic)PullMessage(pullRequest Info)(MSGS,error){
+	sub_name:=GetStringFromSub(pullRequest.topic,pullRequest.partition,pullRequest.option)
+	t.rmu.RLock()
+    sub,ok:=t.SubList[sub_name]
+	if !ok{
+		return MSGS{},errors.New("no this sub")
+	}
+	return sub.PullMessage(pullRequest)
 
+}
 // ---------------------------------------------------------------------------
 type Partition struct {
 	rmu   sync.RWMutex
@@ -281,6 +290,7 @@ type SubScription struct {
 	groups             []*Group
 	option             int8
 	config             *Config
+	nodes              map[string]*Node
 }
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
@@ -411,7 +421,16 @@ func (sub *SubScription) AddConsumerInConfig(req PartitionInfo, tocon *client_op
 		}
 	}
 }
-
+func(sub *SubScription)PullMessage(pullRequest Info)(MSGS,error){
+	node_name:=pullRequest.topic+pullRequest.partition+pullRequest.consumer
+	sub.rmu.RLock()
+	node,ok:=sub.nodes[node_name]
+	sub.rmu.RUnlock()
+	if !ok{
+		return MSGS{},errors.New("this sub no have node")
+	}
+	return node.ReadMSGS(pullRequest)
+}
 // -------------------------------------------------------------
 type Consistent struct {
 	rmu              sync.RWMutex

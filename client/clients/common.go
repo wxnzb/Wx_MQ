@@ -9,6 +9,10 @@ type PartKey struct {
 	BrokerName string `json:brokername`
 	BrokerHP   string `json:brokerhp`
 }
+type BrokerInfo struct {
+	Name      string `json:name`
+	Host_Port string `json:host_port`
+}
 
 // 本机所有网卡的mac地址进行拼接
 func GetIpPort() string {
@@ -24,7 +28,3 @@ func GetIpPort() string {
 	return ipport
 }
 
-type BrokerInfo struct {
-	Name      string `json:name`
-	Host_Port string `json:host_port`
-}

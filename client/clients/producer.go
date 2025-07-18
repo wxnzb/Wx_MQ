@@ -67,6 +67,7 @@ func (pro *Producer) Push(msg Message) error {
 	if err == nil && resp.Ret {
 		return nil
 		//我不再处理你这个 Partition 了
+		//这里需要在进行理解
 	} else if resp.Err == "partition remove" {
 		pro.rmu.Lock()
 		delete(pro.Topic_Partition, index)
