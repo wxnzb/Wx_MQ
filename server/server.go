@@ -59,7 +59,7 @@ func NewServer(zkInfo zookeeper.ZKInfo) *Server {
 	}
 }
 
-// 这个broker先和zk建立联系，将这个broker向zk进行注册
+// 这个broker先和zk建立联系，将这个broker像zk进行注册
 func (s *Server) make(opt Options) {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
@@ -180,13 +180,20 @@ func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 //
 // ------------------------------------------------
 // 1
+type Push struct {
+	producerId string
+	topic      string
+	key        string
+	message    string
+	option     int8
+}
 
 // 服务器将消息存在topic里面
-func (s *Server) PushHandle(push Info) error {
+func (s *Server) PushHandle(push Push) error {
 	topic, ok := s.topics[push.topic]
 	if !ok {
 		//创建一个新的topic
-		topic := NewTopic(push.topic)
+		topic := NewTopic(push)
 		s.rmu.Lock()
 		s.topics[push.topic] = topic
 		s.rmu.Unlock()
@@ -196,31 +203,17 @@ func (s *Server) PushHandle(push Info) error {
 }
 
 // 2
-// 先将他方在这里
-// 一批消息
-type MSGS struct {
-	start_index int64
-	end_index   int64
-	size        int8
-	array       []byte
+type PullRequest struct {
+	consumerId string
+	topic      string
+	key        string
+}
+type PullResponse struct {
+	message string
 }
 
-func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
-	if pullRequest.option == TOPIC_NIL_PTP {
-		//更新消费者偏移量并写入zookeeper记录消费者上次读取的位置
-		s.zkclient.UpdatePTPOffset(context.Background(), &api.UpdatePTPOffsetRequest{
-			Topic:  pullRequest.topic,
-			Part:   pullRequest.partition,
-			Offset: pullRequest.offset,
-		})
-	}
-	s.rmu.RLock()
-	topic, ok := s.topics[pullRequest.topic]
-	s.rmu.RUnlock()
-	if !ok {
-		return MSGS{}, errors.New("topic not exist")
-	}
-	return topic.PullMessage(pullRequest)
+func (s *Server) PullHandle(pullRequest PullRequest) (PullResponse, error) {
+	return PullResponse{message: ""}, nil
 }
 
 // 3
@@ -250,21 +243,19 @@ func (s *Server) InfoHandle(ip_port string) (err error) {
 
 // producer string
 // consumer string
-type Info struct {
+type PartitionInfo struct {
 	name            string
 	topic           string
 	partition       string
 	consumer_ipname string
 	option          int8
 	offset          int64
-	size            int8
 	file_name       string
 	producer        string
 	consumer        string
-	message         string
 }
 
-func (s *Server) StartGet(req Info) (err error) {
+func (s *Server) StartGet(req PartitionInfo) (err error) {
 	//先看
 	switch req.option {
 	//负载均衡
@@ -308,24 +299,30 @@ func (s *Server) StartGet(req Info) (err error) {
 }
 
 // 5所以他也把文件名传进来有什么用呢
-func (s *Server) PrepareAcceptHandle(pinfo Info) (ret string, err error) {
+func (s *Server) PrepareAcceptHandle(pinfo PartitionInfo) (ret string, err error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	topic, ok := s.topics[pinfo.topic]
+    topic,ok:=s.topics[pinfo.topic]
 	//创建一个新的topic
-	if !ok {
-		topic = NewTopic(pinfo.topic)
-		s.topics[pinfo.topic] = topic
+	if !ok{
+        topic=NewTopic(pinfo.topic)
+		s.topics[pinfo.topic]=topic
 	}
 	topic.PrepareAcceptHandle(pinfo)
 }
 
 // 6
-func (s *Server) PrepareSendHandle(pinfo Info) (ret string, err error) {
+func (s *Server) PrepareSendHandle(pinfo PartitionInfo) (ret string, err error) {
 
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了
+type SubRequest struct {
+	consumer string
+	topic    string
+	key      string
+	option   int8
+}
 type SubResponse struct {
 	size  int
 	parts []PartName

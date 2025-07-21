@@ -17,19 +17,10 @@ struct PullRequest{
     1:string consumerId
     2:string topic
     3:string key
-    //现在加了要求
-    4:i64 offset
-    5:i8 option
-    6:i8 size
 }
 //拉取到的消息
 struct PullResponse{
-    1:binary Msgs
-    2:bool Ret
-    3:i64 Start_index
-    4:i64 End_index
-    5:i8 Size
-    6:string Err
+    1:string message
 }
 //像broker注册自己并创建这个消费者对应的客户端，就可以像消费者发送pingpong和pub了
 struct infoRequest{
@@ -124,18 +115,6 @@ struct ProGetBroResponse{
     1:bool ret
     2:string bro_host_port
 }
-//生产者---设置或更改某个特定分区的状态。
-struct ProSetPartStateRequest{
-    1:string topic
-    2:string partition
-    3:i8 option
-    //副本数量
-    4:i8 dupnum
-}
-struct ProSetPartStateResponse{
-    1:bool ret
-    2:string err
-}
 //消费者想消费某个 topic 的某个 partition，于是去询问哪个 broker 负责它。
 struct ConGetBroRequest{
     1:string topic_name
@@ -149,26 +128,6 @@ struct ConGetBroResponse{
     2:i64 size
    // 3:binary bros
     3:binary parts
-}
-
-//消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
-struct SubRequest{
-    1:string consumer
-    2:string topic
-    3:string key//这里为什么要用key，感觉用分区就行了
-    4:i8 option
-}
-struct SubResponse{
-    1:bool ret
-}
-//在消费者消费消息的时候需要更新分区
-struct UpdatePTPOffsetRequest{
-    1:string topic
-    2:string part
-    3:i64 offset
-}
-struct UpdatePTPOffsetResponse{
-    1:bool ret
 }
 //bro注册自己
 struct BroInfoRequest{
@@ -185,6 +144,16 @@ struct BroGetAssignRequest{
 struct BroGetAssignResponse{
     1:bool ret
     2:binary assignment
+}
+//消费者现在要订阅一个topic下面的一个分区，那你肯定也要知道订阅模式
+struct SubRequest{
+    1:string consumer
+    2:string topic
+    3:string key//这里为什么要用key，感觉用分区就行了
+    4:i8 option
+}
+struct SubResponse{
+    1:bool ret
 }
 struct CreateTopicRequest{
     1:string topic_name
@@ -204,11 +173,9 @@ struct CreatePartitionResponse{
 service ZKServer_Operations{
     //producer
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
-    ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
     //consumer
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
     SubResponse Sub(1:SubRequest req)
-    UpdatePTPOffsetResponse UpdatePTPOffset(1:UpdatePTPOffsetRequest req)
      //broker
     BroInfoResponse  BroInfo(1:BroInfoRequest req)
     BroGetAssignResponse BroGetAssign(1:BroGetAssignRequest req)

@@ -20,13 +20,6 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ProSetPart": kitex.NewMethodInfo(
-		proSetPartHandler,
-		newZKServer_OperationsProSetPartArgs,
-		newZKServer_OperationsProSetPartResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
 	"ConGetBro": kitex.NewMethodInfo(
 		conGetBroHandler,
 		newZKServer_OperationsConGetBroArgs,
@@ -38,13 +31,6 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		subHandler,
 		newZKServer_OperationsSubArgs,
 		newZKServer_OperationsSubResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
-	"UpdatePTPOffset": kitex.NewMethodInfo(
-		updatePTPOffsetHandler,
-		newZKServer_OperationsUpdatePTPOffsetArgs,
-		newZKServer_OperationsUpdatePTPOffsetResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -160,24 +146,6 @@ func newZKServer_OperationsProGetBroResult() interface{} {
 	return api.NewZKServer_OperationsProGetBroResult()
 }
 
-func proSetPartHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsProSetPartArgs)
-	realResult := result.(*api.ZKServer_OperationsProSetPartResult)
-	success, err := handler.(api.ZKServer_Operations).ProSetPart(ctx, realArg.Req)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newZKServer_OperationsProSetPartArgs() interface{} {
-	return api.NewZKServer_OperationsProSetPartArgs()
-}
-
-func newZKServer_OperationsProSetPartResult() interface{} {
-	return api.NewZKServer_OperationsProSetPartResult()
-}
-
 func conGetBroHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.ZKServer_OperationsConGetBroArgs)
 	realResult := result.(*api.ZKServer_OperationsConGetBroResult)
@@ -212,24 +180,6 @@ func newZKServer_OperationsSubArgs() interface{} {
 
 func newZKServer_OperationsSubResult() interface{} {
 	return api.NewZKServer_OperationsSubResult()
-}
-
-func updatePTPOffsetHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsUpdatePTPOffsetArgs)
-	realResult := result.(*api.ZKServer_OperationsUpdatePTPOffsetResult)
-	success, err := handler.(api.ZKServer_Operations).UpdatePTPOffset(ctx, realArg.Req)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newZKServer_OperationsUpdatePTPOffsetArgs() interface{} {
-	return api.NewZKServer_OperationsUpdatePTPOffsetArgs()
-}
-
-func newZKServer_OperationsUpdatePTPOffsetResult() interface{} {
-	return api.NewZKServer_OperationsUpdatePTPOffsetResult()
 }
 
 func broInfoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -324,16 +274,6 @@ func (p *kClient) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r *
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error) {
-	var _args api.ZKServer_OperationsProSetPartArgs
-	_args.Req = req
-	var _result api.ZKServer_OperationsProSetPartResult
-	if err = p.c.Call(ctx, "ProSetPart", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
 func (p *kClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *api.ConGetBroResponse, err error) {
 	var _args api.ZKServer_OperationsConGetBroArgs
 	_args.Req = req
@@ -349,16 +289,6 @@ func (p *kClient) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubRespo
 	_args.Req = req
 	var _result api.ZKServer_OperationsSubResult
 	if err = p.c.Call(ctx, "Sub", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
-func (p *kClient) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest) (r *api.UpdatePTPOffsetResponse, err error) {
-	var _args api.ZKServer_OperationsUpdatePTPOffsetArgs
-	_args.Req = req
-	var _result api.ZKServer_OperationsUpdatePTPOffsetResult
-	if err = p.c.Call(ctx, "UpdatePTPOffset", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

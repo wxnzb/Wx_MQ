@@ -2,8 +2,6 @@ package main
 
 import (
 	cl2 "Wx_MQ/client/clients"
-	"fmt"
-
 	// api "Wx_MQ/kitex_gen/api"
 	// "Wx_MQ/kitex_gen/api/server_operations"
 	// "context"
@@ -24,10 +22,7 @@ func main() {
 	}
 	switch option {
 	case "p":
-		pro, err := cl2.NewProducer("0.0.0.0:5721", "producer-wx")
-		if err != nil {
-			fmt.Println(err)
-		}
+		pro := cl2.NewProducer("0.0.0.0:5721", "producer-wx")
 		msg := cl2.Message{
 			Topic_Name:     "name",
 			Partition_Name: "wuxi",
@@ -38,10 +33,7 @@ func main() {
 			time.Sleep(10 * time.Second)
 		}
 	case "c":
-		con, err := cl2.NewConsumer("0.0.0.0:5721", "consumer-wx", port)
-		if err != nil {
-			fmt.Println(err)
-		}
+		con := cl2.NewConsumer("0.0.0.0:5721", "consumer-wx", port)
 		go con.Start_server()
 		con.SubScription("name", "wuxi", 0)
 		con.StartGet(cl2.InfoReq{
