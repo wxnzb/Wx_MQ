@@ -119,19 +119,39 @@ func GetVerbosity() int {
 	return LogVerbosity
 }
 
+type logTopic string
+
 const (
 	dERROR string = "ERROR"
 	dLOG   string = "LOG"
 	dWARN  string = "warn"
+	//上面这3个可以删了哈，嘻嘻
+	dClient  logTopic = "CLNT"
+	dCommit  logTopic = "CMIT"
+	dDrop    logTopic = "DROP"
+	dError   logTopic = "ERRO"
+	dInfo    logTopic = "INFO"
+	dLeader  logTopic = "LEAD"
+	dLog     logTopic = "LOG1"
+	dLog2    logTopic = "LOG2"
+	dPersist logTopic = "PERS"
+	dSnap    logTopic = "SNAP"
+	dTerm    logTopic = "TERM"
+	dTest    logTopic = "TEST"
+	dTimer   logTopic = "TIMR"
+	dTrace   logTopic = "TRCE"
+	dVote    logTopic = "VOTE"
+	dWarn    logTopic = "WARN"
 )
 
 func DEBUG(topic, format string, args ...interface{}) {
 	mu.Lock()
 	defer mu.Unlock()
 	//这里的时间是怎样进行转换的
-	time := time.Since(logstart).Microseconds()
-	time = time / 100
-	prefix := fmt.Sprintf("%6d %v", time, topic)
+	// time := time.Since(logstart).Microseconds()
+	// time = time / 100
+	// prefix := fmt.Sprintf("%6d %v", time, topic)
+	prefix := fmt.Sprintf("%v ", string(topic))
 	format = prefix + format
 	fmt.Printf(format, args...)
 

@@ -31,7 +31,7 @@ func (p *Persister) XGsnapShot(shot []byte) {
 	defer p.rmu.Unlock()
 	p.snapShot = clone(shot)
 }
-func (p *Persister) GetsnapShot() []byte {
+func (p *Persister) GetSnapShot() []byte {
 	p.rmu.RLock()
 	defer p.rmu.RLock()
 	return clone(p.snapShot)
@@ -46,7 +46,7 @@ func clone(src []byte) []byte {
 	copy(dst, src)
 	return dst
 }
-func (p *Persister) XGRaftAndSnap(state []byte, shot []byte) {
+func (p *Persister) XGRaftstateAndSnapshot(state []byte, shot []byte) {
 	p.rmu.Lock()
 	defer p.rmu.Unlock()
 	p.raftState = clone(state)
