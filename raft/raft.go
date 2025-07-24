@@ -8,29 +8,52 @@ import (
 	"encoding/json"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
+// 在快照恢复时，日志结构一般是这样设计的：
+// rf.log = []LogEntry{
+//     {LogIndex: X, LogTerm: XTerm},  // 占位符，占据 log[0]，对应 snapshot.LastIncludedIndex
+//     {LogIndex: X+1, LogTerm: ...},
+//     {LogIndex: X+2, LogTerm: ...},
+
+// }
 type Raft struct {
 	rmu         sync.RWMutex
+	cond        sync.Cond
 	currentTerm int8
 
 	voteFor int8
 	//表示当前是你的官
 	state int8
 	//要是你是leader他就很有用了
-	leaderId         int8
+	leaderId int8
+	//在raft中，无论是leadre还是follow都是节点，me代表的是当前节点的id
+	me int
+	//leader 将要发送给节点 i 的下一个日志条目的索引（即：还没复制的第一条日志 index）
+	//节点（包括 leader)当前复制到了哪个日志索引
+	nextIndex        []int
+	matchIndex       []int
 	log              []LogNode
 	electionTimeOut  int
 	electionTimePass int
 	X                int
-	commitIndex      int8
+	commitIndex      int
 	//---------------
 	snapshot      []byte
 	persist       *Persister
 	peers         []*raft_operations.Client
 	topicName     string
 	partitionName string
+	//--------------------
+	//本节点当前日志中最后一条日志的索引
+	lastIndex int
+	//当前已经应用到状态机的最大索引
+	lastApplied int
+	//lastIndex 对应日志的任期（Term）
+	lastTerm int
+	dead     int32
 }
 
 type RequestVoteArgs struct {
@@ -188,12 +211,12 @@ func (r *Raft) AppendEntriesHandle(args *AppendEntriesArgs) (reply *AppendEntrie
 				//更新 follower 的 commitIndex，确保它不会超过 leader 已经提交的日志条目，但也不会超过自己本地日志的最大索引
 				//这里制作一个判断的原因：上面已经修改了
 				//这里i还是没太看明白，感觉这段代码逻辑有点问题
-				if r.commitIndex < args.LeaderCommit {
+				if r.commitIndex < int(args.LeaderCommit) {
 					if r.log[len(r.log)-1].LogIndex > args.LeaderCommit {
-						r.commitIndex = r.log[len(r.log)-1].LogIndex
+						r.commitIndex = int(r.log[len(r.log)-1].LogIndex)
 					}
 				} else {
-					r.commitIndex = args.LeaderCommit
+					r.commitIndex = int(args.LeaderCommit)
 				}
 			}
 		} else {
@@ -282,12 +305,12 @@ func (r *Raft) SendSnapShot(server int, args *SnapShotArgs) (*SnapShotReply, boo
 
 // 先不写这个了，态麻烦了
 // 保证 follower 的状态能赶上 leader，尤其是在日志落后太多时，leader 会发送快照来替代日志的部分内容，避免同步过大日志带来的性能问题
-func (r *Raft) SnapShotHandle(args *SnapShotArgs) (reply *SnapShotReply) {
+// func (r *Raft) SnapShotHandle(args *SnapShotArgs) (reply *SnapShotReply) {
 
-}
+// }
 
 // 接下来随便写点关于raft的函数把，这些是还没有调用的
-func Make(clients []*raft_operations.Client, persist *Persister, topicName string, partitionName string) *Raft {
+func Make(clients []*raft_operations.Client, me int, persist *Persister, topicName string, partitionName string) *Raft {
 	r := &Raft{
 		peers:         clients,
 		persist:       persist,
@@ -304,8 +327,14 @@ func Make(clients []*raft_operations.Client, persist *Persister, topicName strin
 		electionTimePass: 0,
 		X:                0,
 		commitIndex:      0,
+		me:               me,
 		//---------------
 		//snapshot      []byte
+	}
+	r.cond = sync.Cond(&r.rmu)
+	for i := 0; i < len(r.peers); i++ {
+		r.nextIndex = append(r.nextIndex, 1)
+		r.matchIndex = append(r.matchIndex, 0)
 	}
 	r.log = append(r.log, LogNode{
 		LogIndex: 0,
@@ -314,8 +343,70 @@ func Make(clients []*raft_operations.Client, persist *Persister, topicName strin
 	r.electionTimeOut = rand.Intn(150) + 150
 	LOGinit()
 	go r.ReadPersister(r.persist.GetRaftState(), r.persist.GetSnapShot())
+	go r.ticker()
 	return r
 }
 func (r *Raft) ReadPersister(state []byte, snapshot []byte) {
+	if state == nil || len(state) < 1 {
+		return
+	}
 
+	p := bytes.NewBuffer(state)
+	d := NewDecoder(p)
+	var user Per
+	if d.Decode(&user) != nil {
+		return
+	} else {
+		r.rmu.Lock()
+		r.currentTerm = user.currentTerm
+		r.voteFor = user.voteFor
+		r.log = user.log
+		r.X = user.X
+		//-----------------------
+		r.snapshot = snapshot
+		//这些都是什么，为什么要赋值r.X
+		r.lastIndex = r.X
+		r.commitIndex = r.X
+		r.lastApplied = r.X
+		//一般log[0]里面存放的是快照
+		r.lastTerm = int(r.log[0].LogTerm)
+
+		r.rmu.Unlock()
+	}
+
+}
+
+// 这个主要是在timepass>timeout是对于leadre和candiddate的处理
+func (r *Raft) ticker() {
+	for !r.killed() {
+		r.rmu.Lock()
+		if r.electionTimePass > r.electionTimeOut {
+			//重置
+			r.electionTimePass = 0
+			rand.Seed(time.Now().UnixNano())
+			r.electionTimeOut = rand.Intn(150) + 150
+			//是leader
+			if r.state == 2 {
+				//是follow，但是他没有在固定时间内收到leader的心跳，变成candidata
+				//上面设置了，这个为什么还要设置
+				r.electionTimeOut = 90
+				go r.Persist()
+				//开始发送心跳,这个还没写
+				go r.appendentries(r.currentTerm)
+			} else {
+				r.currentTerm++
+				r.voteFor = -1
+				r.state = 1
+				go r.Persist()
+				go r.requestvotes(r.currentTerm)
+			}
+		}
+		r.electionTimePass++
+		r.rmu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+}
+func (r *Raft) killed() bool {
+	z := atomic.LoadInt32(&r.dead)
+	return z == 1
 }
