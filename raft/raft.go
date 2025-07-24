@@ -38,8 +38,10 @@ type Raft struct {
 	log              []LogNode
 	electionTimeOut  int
 	electionTimePass int
-	X                int
-	commitIndex      int
+	//这是某一时间的快照
+	durX        int
+	X           int
+	commitIndex int
 	//---------------
 	snapshot      []byte
 	persist       *Persister
@@ -409,4 +411,56 @@ func (r *Raft) ticker() {
 func (r *Raft) killed() bool {
 	z := atomic.LoadInt32(&r.dead)
 	return z == 1
+}
+
+// 这个是leader调用的
+func (r *Raft) appendentries(term int8) {
+	var wg sync.WaitGroup
+	r.rmu.Lock()
+	index := len(r.log) - 1
+	i := r.log[index].LogIndex
+	t := r.log[index].LogTerm
+	l := len(r.peers)
+	r.rmu.Unlock()
+	//不包含他自己
+	wg.Add(l - 1)
+	for p := range r.peers {
+		//不要自己这个leader节点才好
+		if p != r.me {
+			go func(p int, t int8) {
+				args := &AppendEntriesArgs{}
+				args.Term = term
+				args.LeaderId = int8(r.me)
+				r.rmu.Lock()
+				//因为上面他把锁解开了，所以在并发条件下可能修改了，因此有的要重复进行判断
+				// 现在开始判断不符合条件的直接退出就行
+				//快照或者log更新
+				if r.durX != r.X || index != len(r.log)-1 {
+					r.durX = r.X
+					r.rmu.Unlock()
+					wg.Done()
+				}
+				//最后一条日志
+				if index == len(r.log)-1 {
+					//出现这种情况的原因是快照清掉了日志前缀
+					if int(i)-r.X >= 0 && r.log[int(i)-r.X].LogIndex != i {
+						r.rmu.Unlock()
+						wg.Done()
+					}
+				}
+				//term或者和state在并发下改变了
+				if r.currentTerm != t || r.state != 2 {
+					r.rmu.Unlock()
+					wg.Done()
+				}
+				//这个的作用，在发送给follower是，告诉Follower要发送的条目的上一个看能和follower对应上不
+				//leader 1 2 3 4 5,现在要发送4 5
+				//follower 1 2 3
+				//那么都是3就可以对上
+				args.PrevLogIndex = r.log[r.nextIndex[p-1]].LogIndex
+				args.PrevLogTerm = r.log[r.nextIndex[p-1]].LogTerm
+				reply, ok := r.SendAppendEntries(p, args)
+			}(p, t)
+		}
+	}
 }
