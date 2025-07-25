@@ -33,14 +33,16 @@ type Raft struct {
 	me int
 	//leader 将要发送给节点 i 的下一个日志条目的索引（即：还没复制的第一条日志 index）
 	//节点（包括 leader)当前复制到了哪个日志索引
-	nextIndex        []int
+	nextIndex []int
+	//follower已经成功复制的最大索引
 	matchIndex       []int
 	log              []LogNode
 	electionTimeOut  int
 	electionTimePass int
 	//这是某一时间的快照
-	durX        int
-	X           int
+	durX int
+	X    int
+	//对于follew来说就是；对于leader来说就是看follower要是都有了就提交给状态机
 	commitIndex int
 	//---------------
 	snapshot      []byte
@@ -457,9 +459,55 @@ func (r *Raft) appendentries(term int8) {
 				//leader 1 2 3 4 5,现在要发送4 5
 				//follower 1 2 3
 				//那么都是3就可以对上
+				//这个是用于一致性检查
 				args.PrevLogIndex = r.log[r.nextIndex[p-1]].LogIndex
 				args.PrevLogTerm = r.log[r.nextIndex[p-1]].LogTerm
+				//Leader 确认有多数 Follower 拥有该日志条目后，可以提交并应用到状态机
+				args.LeaderCommit = int8(r.commitIndex)
+				//Leader 从自己的日志中提取需要发送给某个 Follower 的日志条目（Entries），并放入 AppendEntriesArgs 中，准备发送给对应的 Follower
+				//这个 Follower 确实有日志没有同步，而且不太理解后面的
+				if len(r.log)-1 >= r.nextIndex[p] && i+1 > r.log[r.nextIndex[p]].LogIndex {
+					nums := r.log[int(r.log[r.nextIndex[p]].LogIndex)-r.X : int(i)-r.X+1]
+					args.Entries = append(args.Entries, nums...)
+				}
+				r.rmu.Unlock()
 				reply, ok := r.SendAppendEntries(p, args)
+				if ok {
+					r.rmu.Lock()
+					//首先就是传送成功，那么就要更新follower的matchIndex,和nextIndex
+					if reply.Success == true {
+						r.matchIndex[p] = int(i)
+						//i:当前 leader 认为 follower 已经成功复制的日志 index
+						//判断是否存在快照截断，感觉可以简化成这样
+						if r.durX == r.X {
+							if int(i)-r.X+1 >= 0 {
+								r.nextIndex[p] = int(i) - r.X + 1
+							} else {
+								r.nextIndex[p] = 1
+							}
+							//存在快照截断
+						} else {
+							if int(i) >= r.X {
+								r.nextIndex[p] = int(i) - r.X + 1
+							} else {
+								r.nextIndex[p] = 1
+							}
+							r.durX = r.X
+						}
+						//leader满足条件就可以提交日知道状态机上面
+						successCommit := 0
+						for in := range r.matchIndex {
+							if in >= int(i) {
+								successCommit++
+							}
+						}
+						//i和commitIndex区别：i:leader 推送给某个 follower 的日志条目的位置（在日志数组中的 offset）
+						//commitIndex:就是已经给大多数follower更新了也已经提交到状态机了，上面这个就是下一次的下面这个状态
+						if successCommit > l/2 && r.currentTerm == t && int(i) > r.commitIndex-r.X {
+							r.commitIndex = int(i)
+						}
+					}
+				}
 			}(p, t)
 		}
 	}
