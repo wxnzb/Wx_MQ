@@ -122,15 +122,10 @@ func GetVerbosity() int {
 type logTopic string
 
 const (
-	dERROR string = "ERROR"
-	dLOG   string = "LOG"
-	dWARN  string = "warn"
-	//上面这3个可以删了哈，嘻嘻
 	dClient  logTopic = "CLNT"
 	dCommit  logTopic = "CMIT"
 	dDrop    logTopic = "DROP"
 	dError   logTopic = "ERRO"
-	dInfo    logTopic = "INFO"
 	dLeader  logTopic = "LEAD"
 	dLog     logTopic = "LOG1"
 	dLog2    logTopic = "LOG2"

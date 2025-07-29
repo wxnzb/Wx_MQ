@@ -226,32 +226,15 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 		Err: "",
 	}, nil
 }
-ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
-
-	ProSetPart(ctx context.Context, req *ProSetPartStateRequest) (r *ProSetPartStateResponse, err error)
-
-	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
-
-	Sub(ctx context.Context, req *SubRequest) (r *SubResponse, err error)
-
-	UpdatePTPOffset(ctx context.Context, req *UpdatePTPOffsetRequest) (r *UpdatePTPOffsetResponse, err error)
-
-	BroInfo(ctx context.Context, req *BroInfoRequest) (r *BroInfoResponse, err error)
-
-	BroGetAssign(ctx context.Context, req *BroGetAssignRequest) (r *BroGetAssignResponse, err error)
-
-	CreateTopic(ctx context.Context, req *CreateTopicRequest) (r *CreateTopicResponse, err error)
-
-	CreatePartition(ctx context.Context, req *CreatePartitionRequest) (r *CreatePartitionResponse, err error)
-}
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // service ZKServer_Operations{
 //     //producer
 //     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
- ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
+//     ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
 //     //consumer
 //     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
 //     SubResponse sub(1:SubRequest req)
+//      ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
 //      //broker
 //     BroInfoResponse  BroInfo(1:BroInfoRequest req)
 //     BroGetAssignResponse BroGetssign(1:BroGetAssignRequest req)
@@ -309,7 +292,9 @@ func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r
 		BroHostPort: info_out.bro_host_port,
 	}, info_out.Err
 }
+func(s *RPCServer)ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error){
 
+}
 // 生产者设置某个分区的状态
 // 需要补充
 func (s *RPCServer) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *api.ConGetBroResponse, err error) {

@@ -123,6 +123,7 @@ func Register(v interface{}) {
 	checkValue(v)
 	return gob.Register(v)
 }
+
 func RegisterName(name string, v interface{}) {
 	checkValue(v)
 	gob.RegisterName(name, v)

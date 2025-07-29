@@ -84,7 +84,6 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 
 	}
 	return Info_out{
-		Err:err,
 		broker_name:broker.Name
 		bro_host_port:broker.Host+broker.Port,
 	}

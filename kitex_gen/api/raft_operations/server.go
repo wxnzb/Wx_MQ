@@ -23,3 +23,4 @@ func NewServer(handler api.Raft_Operations, opts ...server.Option) server.Server
 func RegisterService(svr server.Server, handler api.Raft_Operations, opts ...server.RegisterOption) error {
 	return svr.RegisterService(serviceInfo(), handler, opts...)
 }
+

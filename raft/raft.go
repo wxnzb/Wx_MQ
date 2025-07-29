@@ -408,10 +408,10 @@ func (r *Raft) SnapShotHandle(args *SnapShotArgs) (reply *SnapShotReply) {
 }
 func (r *Raft) sendSnapShot(server int, args *SnapShotArgs) (*SnapShotReply, bool) {
 	resp, err := (*r.peers[server]).SnapShot(context.Background(), &api.SnapShotArgs_{
-		Term:                 args.Term,
-		LeaderId:             args.LeaderId,
-		LastIncludedLogIndex: args.LastIncludedLogIndex,
-		LastIncludedLogTerm:  args.LastIncludedLogTerm,
+		Term:                 int8(args.Term),
+		LeaderId:             int8(args.LeaderId),
+		LastIncludedLogIndex: int8(args.LastIncludedLogIndex),
+		LastIncludedLogTerm:  int8(args.LastIncludedLogTerm),
 		//Log:                args.Log,
 		SnapShot:      args.SnapShot,
 		TopicName:     r.topicName,
@@ -421,7 +421,7 @@ func (r *Raft) sendSnapShot(server int, args *SnapShotArgs) (*SnapShotReply, boo
 		return nil, false
 	}
 	return &SnapShotReply{
-		Term: resp.Term,
+		Term: int(resp.Term),
 	}, true
 }
 
@@ -481,7 +481,8 @@ func Make(clients []*raft_operations.Client, me int, persist *Persister, applyCh
 		//---------------
 		//snapshot      []byte
 	}
-	r.cond = sync.Cond(&r.rmu)
+	//r.cond = sync.Cond(&r.rmu)
+	r.cond = *sync.NewCond(r.rmu.RLocker())
 	for i := 0; i < len(r.peers); i++ {
 		r.nextIndex = append(r.nextIndex, 1)
 		r.matchIndex = append(r.matchIndex, 0)
@@ -640,7 +641,7 @@ func (r *Raft) ticker() {
 				r.electionTimeOut = 90
 				go r.Persist()
 				//开始发送心跳,这个还没写
-				go r.appendentries(r.currentTerm)
+				//go r.appendentries(r.currentTerm)
 			} else {
 				r.currentTerm++
 				r.voteFor = -1
@@ -796,13 +797,13 @@ func (r *Raft) killed() bool {
 //	type SnapShotReply struct {
 //		Term int
 //	}
-func (r *Raft) sendSnapShot(term int, it int) {
+func (r *Raft) sendsnapshot(term int, it int) {
 	args := SnapShotArgs{}
 	r.rmu.Lock()
 	args.Term = term
 	args.LeaderId = r.me
-	args.LastIncludeLogIndex = r.lastIndex
-	args.LastIncludeLogTerm = r.lastTerm
+	args.LastIncludedLogIndex = r.lastIndex
+	args.LastIncludedLogTerm = r.lastTerm
 	args.Log = r.log[0].Log
 	r.rmu.Unlock()
 	reply, ok := r.SendSnapShot(it, &args)
@@ -815,7 +816,7 @@ func (r *Raft) sendSnapShot(term int, it int) {
 			r.leaderId = -1
 			r.electionTimePass = 0
 			rand.Seed(time.Now().UnixNano())
-			r.eleconstionTimeOut = rand.Intn(150) + 150
+			r.electionTimeOut = rand.Intn(150) + 150
 		}
 		r.rmu.Unlock()
 	}
@@ -920,4 +921,45 @@ func (r *Raft) Start(command Op, beleader bool, leader int) (int, int, bool) {
 		r.rmu.Unlock()
 	}
 	return index, term, isLeader
+}
+
+// 这些感觉还没有用上
+// 线程安全地在 Raft 节点日志中查找指定索引的日志命令内容
+func (r *Raft) Find(in int) interface{} {
+	var logs []LogNode
+	r.rmu.Lock()
+	logs = append(logs, r.log...)
+	r.rmu.Unlock()
+	for _, log := range logs {
+		if log.LogIndex == in {
+			return log.Log
+		}
+	}
+	return nil
+}
+
+// 让外部系统可以获取当前这个 Raft 节点的状态：它的任期 term 和是否是 leader 的布尔值
+func (r *Raft) GetState() (int, bool) {
+	var term int
+	var isLeader bool
+	r.rmu.Lock()
+	term = r.currentTerm
+	if r.state == 2 {
+		isLeader = true
+	}
+	r.rmu.Unlock()
+	return term, isLeader
+}
+
+// 获取当前快照触发条件相关的状态信息：一个是 X 的值（用于自定义触发快照的逻辑），另一个是当前 Raft 状态（包括日志和快照）在持久化存储中占用的字节大小
+func (r *Raft) RaftSize() (int, int) {
+	r.rmu.Lock()
+	XSize := r.X
+	r.rmu.Unlock()
+	return XSize, r.persist.GetRaftSize()
+}
+
+// 将当前 Raft 实例标记为“已终止”，
+func (r *Raft) Kill() {
+	atomic.StoreInt32(&r.dead, 1)
 }
