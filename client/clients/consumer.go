@@ -27,24 +27,26 @@ type Consumer struct {
 	//现在怎么感觉port和Name是一样的作用?
 	Name  string
 	state string
-	srv   server.Server
-	//下面这些的作用是什么
-	port        string ///这个port是给broker注册的
+	//------------------
+	//这个应该是为pingpong和pub做准备的，他是这两个的服务端
+	port string ///这个port是给broker注册的
+	srv  server.Server
+	//------------------
 	zkBrokerCli zkserver_operations.Client
 	Brokers     map[string]server_operations.Client
 }
 
-func NewConsumer(zkBrokerIpport, name, port string) (*Consumer,error) {
+func NewConsumer(zkBrokerIpport, name, port string) (*Consumer, error) {
 	c := &Consumer{
 		rmu:     sync.RWMutex{},
-		state:   "alive",
 		Name:    name,
+		state:   "alive",
 		port:    port,
 		Brokers: make(map[string]server_operations.Client),
 	}
 	var err error
 	c.zkBrokerCli, err = zkserver_operations.NewClient(name, client.WithHostPorts(zkBrokerIpport))
-	return c,err
+	return c, err
 }
 func (con *Consumer) GetState() string {
 	con.rmu.RLock()
@@ -73,6 +75,7 @@ func (con *Consumer) Pub(ctx context.Context, req *api.PubRequest) (r *api.PubRe
 }
 
 func (con *Consumer) Pingpong(ctx context.Context, req *api.PingpongRequest) (r *api.PingpongResponse, err error) {
+	fmt.Println("Pingpong")
 	return &api.PingpongResponse{
 		Pong: true,
 	}, nil
@@ -104,8 +107,13 @@ func (con *Consumer) RegisterSelf(port string, cli *server_operations.Client) er
 	return err
 }
 
+// 想zkserver订阅topic或者partition
 func (c *Consumer) SubScription(topic_name, partition_name string, option int8) (err error) {
-	resp, err := c.zkBrokerCli.Sub(context.Background(), &api.SubRequest{
+	//为了避免数据竞争，这里需要加锁
+	c.rmu.Lock()
+	zk := c.zkBrokerCli
+	c.rmu.Unlock()
+	resp, err := zk.Sub(context.Background(), &api.SubRequest{
 		Consumer: c.Name,
 		Topic:    topic_name,
 		Key:      partition_name,
@@ -117,6 +125,7 @@ func (c *Consumer) SubScription(topic_name, partition_name string, option int8) 
 	return nil
 }
 
+// 给后续函数共同使用
 type InfoReq struct {
 	Topic     string
 	Partition string
@@ -126,8 +135,8 @@ type InfoReq struct {
 	Cli       server_operations.Client
 }
 
-func NewInfoReq(topic, partition string, offset int64) *InfoReq {
-	return &InfoReq{
+func NewInfoReq(topic, partition string, offset int64) InfoReq {
+	return InfoReq{
 		Topic:     topic,
 		Partition: partition,
 		Offset:    offset,
@@ -135,6 +144,8 @@ func NewInfoReq(topic, partition string, offset int64) *InfoReq {
 	}
 }
 
+// 下面这两个很像，第一个是对单个partition进行拉取，第二个是对多个partition进行拉取
+// 目前的疑问：第一个函数的Cli是从哪来的
 // 这个消息发送后，broker就会开始向这个消费者发送消息(pub)
 func (con *Consumer) StartGet(info InfoReq) (err error) {
 	ret := ""
@@ -145,6 +156,7 @@ func (con *Consumer) StartGet(info InfoReq) (err error) {
 		Offset:         info.Offset,
 		Option:         info.Option,
 	}
+
 	resp, err := info.Cli.StarttoGet(context.Background(), &req)
 	if err != nil || resp.Ret == false {
 		ret = info.Topic + info.Partition + ":err!=nil or resp.ret==false\n"
@@ -155,6 +167,8 @@ func (con *Consumer) StartGet(info InfoReq) (err error) {
 		return errors.New(ret)
 	}
 }
+
+// 连接上各个broker并发送要消息的请求
 func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
 	for _, part := range parts {
 		req := api.InfoGetRequest{
@@ -167,17 +181,18 @@ func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
 		bro_cli, ok := con.Brokers[part.BrokerName]
 		//说明你想要开始拉取这个个分区所属与的broker你和他还没建立联系
 		if !ok {
-			//这里不需要将他添加到con里面吗
 			bro_cli, err := server_operations.NewClient(con.Name, client.WithHostPorts(part.BrokerHP))
 			if err != nil {
 				return err
 			}
 			//option这里需要理解
+			//持久订阅
 			if info.Option == 1 {
 				bro_cli.StarttoGet(context.Background(), &req)
 				con.Brokers[part.BrokerName] = bro_cli
 			}
 		}
+		//短暂请求
 		if info.Option == 3 {
 			bro_cli.StarttoGet(context.Background(), &req)
 		}

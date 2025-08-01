@@ -12,7 +12,7 @@ import (
 )
 
 type Producer struct {
-	// Cli             server_operations.Client //生产者需要调用的接口
+	Cli             server_operations.Client //生产者需要调用的接口
 	rmu             sync.RWMutex
 	Name            string
 	Topic_Partition map[string]server_operations.Client //这个topic的Partition是否是这个生产者负责

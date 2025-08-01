@@ -5,10 +5,12 @@ import (
 )
 
 type PartKey struct {
-	Name       string `json:name`
+	Name       string `json:name` //这个name是什么
 	BrokerName string `json:brokername`
 	BrokerHP   string `json:brokerhp`
 }
+
+// 下面这些好像还没有用上把
 type BrokerInfo struct {
 	Name      string `json:name`
 	Host_Port string `json:host_port`
@@ -27,4 +29,3 @@ func GetIpPort() string {
 	}
 	return ipport
 }
-
