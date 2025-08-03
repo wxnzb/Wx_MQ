@@ -151,16 +151,17 @@ func (t *Topic) PrepareAcceptHandle(pinfo Info) (ret string, err error) {
 	}
 	return
 }
-func(t *Topic)PullMessage(pullRequest Info)(MSGS,error){
-	sub_name:=GetStringFromSub(pullRequest.topic,pullRequest.partition,pullRequest.option)
+func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
+	sub_name := GetStringFromSub(pullRequest.topic, pullRequest.partition, pullRequest.option)
 	t.rmu.RLock()
-    sub,ok:=t.SubList[sub_name]
-	if !ok{
-		return MSGS{},errors.New("no this sub")
+	sub, ok := t.SubList[sub_name]
+	if !ok {
+		return MSGS{}, errors.New("no this sub")
 	}
 	return sub.PullMessage(pullRequest)
 
 }
+
 // ---------------------------------------------------------------------------
 type Partition struct {
 	rmu   sync.RWMutex
@@ -258,7 +259,7 @@ func (p *Partition) addMessage(req Push) {
 		Msg:            []byte(req.message),
 	}
 	p.queue = append(p.queue, msg)
-	if p.index-p.start_index >= 10 {
+	if p.index-p.start_index >= VIRTUAL_10 {
 		var msgs []Message
 		for i := 0; i < VIRTUAL_10; i++ {
 			msgs = append(msgs, p.queue[i])
@@ -269,7 +270,7 @@ func (p *Partition) addMessage(req Push) {
 		}
 		//这里用for是重试机制，只要 WriteFile() 写失败（返回 false），就不断重试，并打印错误日志，直到写成功为止
 		for !p.file.WriteFile(p.fd, node, msgs) {
-			DEBUG(dERROR, "write to %v fail\n", p.file_name)
+			//DEBUG(dERROR, "write to %v fail\n", p.file_name)
 		}
 		p.start_index = p.start_index + VIRTUAL_10 + 1
 		p.queue = p.queue[VIRTUAL_10:]
@@ -421,16 +422,17 @@ func (sub *SubScription) AddConsumerInConfig(req PartitionInfo, tocon *client_op
 		}
 	}
 }
-func(sub *SubScription)PullMessage(pullRequest Info)(MSGS,error){
-	node_name:=pullRequest.topic+pullRequest.partition+pullRequest.consumer
+func (sub *SubScription) PullMessage(pullRequest Info) (MSGS, error) {
+	node_name := pullRequest.topic + pullRequest.partition + pullRequest.consumer
 	sub.rmu.RLock()
-	node,ok:=sub.nodes[node_name]
+	node, ok := sub.nodes[node_name]
 	sub.rmu.RUnlock()
-	if !ok{
-		return MSGS{},errors.New("this sub no have node")
+	if !ok {
+		return MSGS{}, errors.New("this sub no have node")
 	}
 	return node.ReadMSGS(pullRequest)
 }
+
 // -------------------------------------------------------------
 type Consistent struct {
 	rmu              sync.RWMutex

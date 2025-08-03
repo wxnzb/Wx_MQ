@@ -5,13 +5,12 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
 
 	"Wx_MQ/kitex_gen/api/server_operations"
-
-	"errors"
 
 	"Wx_MQ/kitex_gen/api/zkserver_operations"
 
@@ -147,30 +146,57 @@ func NewInfoReq(topic, partition string, offset int64) InfoReq {
 // 下面这两个很像，第一个是对单个partition进行拉取，第二个是对多个partition进行拉取
 // 目前的疑问：第一个函数的Cli是从哪来的
 // 这个消息发送后，broker就会开始向这个消费者发送消息(pub)
-func (con *Consumer) StartGet(info InfoReq) (err error) {
-	ret := ""
-	req := api.InfoGetRequest{
-		Cli_Name:       con.Name,
-		Topic_Name:     info.Topic,
-		Partition_Name: info.Partition,
-		Offset:         info.Offset,
-		Option:         info.Option,
-	}
+func (con *Consumer) StartGet(info InfoReq) (parts []PartKey, ret string, err error) {
+	// ret := ""
+	// req := api.InfoGetRequest{
+	// 	Cli_Name:       con.Name,
+	// 	Topic_Name:     info.Topic,
+	// 	Partition_Name: info.Partition,
+	// 	Offset:         info.Offset,
+	// 	Option:         info.Option,
+	// }
 
-	resp, err := info.Cli.StarttoGet(context.Background(), &req)
-	if err != nil || resp.Ret == false {
-		ret = info.Topic + info.Partition + ":err!=nil or resp.ret==false\n"
+	// resp, err := info.Cli.StarttoGet(context.Background(), &req)
+	// if err != nil || resp.Ret == false {
+	// 	ret = info.Topic + info.Partition + ":err!=nil or resp.ret==false\n"
+	// }
+	// if ret == "" {
+	// 	return nil
+	// } else {
+	// 	return errors.New(ret)
+	// }
+	//根据这个可以得到多个broker
+	//这里我不是已经明确了ppartiiton吗，为什么他还会返回多个？
+	//partition-1:
+	// ├── block-1 → broker-A
+	// └── block-2 → broker-B
+	resp, err := con.zkBrokerCli.ConGetBro(context.Background(), &api.ConGetBroRequest{
+		TopicName:     info.Topic,
+		PartitionName: info.Partition,
+		Option:        info.Option,
+		CliName:       con.Name,
+		Index:         info.Offset,
+	})
+	if err != nil || !resp.Ret {
+		return nil, ret, err
 	}
-	if ret == "" {
-		return nil
-	} else {
-		return errors.New(ret)
+	parts = make([]PartKey, resp.Size)
+	json.Unmarshal(resp.Parts, &parts)
+	//1：ptp
+	//3：psb
+	if info.Option == 1 || info.Option == 3 {
+		ret, err = con.StartGetToBroker(parts, info)
 	}
+	return parts, ret, err
 }
 
 // 连接上各个broker并发送要消息的请求
-func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
+func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) (ret string, err error) {
 	for _, part := range parts {
+		if part.Err != "ok" {
+			ret += part.Err
+			continue
+		}
 		req := api.InfoGetRequest{
 			Cli_Name:       con.Name,
 			Topic_Name:     info.Topic,
@@ -183,19 +209,36 @@ func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) error {
 		if !ok {
 			bro_cli, err := server_operations.NewClient(con.Name, client.WithHostPorts(part.BrokerHP))
 			if err != nil {
-				return err
+				return ret, err
 			}
 			//option这里需要理解
-			//持久订阅
+			//ptp,一旦这样，就持续拉取
 			if info.Option == 1 {
 				bro_cli.StarttoGet(context.Background(), &req)
 				con.Brokers[part.BrokerName] = bro_cli
 			}
 		}
-		//短暂请求
+		//每次都是新的开始
 		if info.Option == 3 {
 			bro_cli.StarttoGet(context.Background(), &req)
 		}
 	}
-	return nil
+	return ret, nil
+}
+
+// 希iangbroker索要信息
+func (con *Consumer) Pull(info InfoReq) (int64, int64, []Message, error) {
+	resp, err := info.Cli.Pull(context.Background(), &api.PullRequest{
+		ConsumerId: con.Name,
+		Topic:      info.Topic,
+		Key:        info.Partition,
+		Offset:     info.Offset,
+		Option:     info.Option,
+	})
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	msgs := make([]Message, resp.EndIndex-resp.StartIndex)
+	json.Unmarshal(resp.Msgs, &msgs)
+	return resp.StartIndex, resp.EndIndex, msgs, nil
 }

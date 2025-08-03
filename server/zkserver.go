@@ -70,33 +70,40 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 
 		}
 		zks.rmu.Lock()
-		zks.brokers[broker.Name]=bro_cli
+		zks.brokers[broker.Name] = bro_cli
 		zks.rmu.Unlock()
 	}
 	//给broker说明准备好接收消息
-	resp,err:=bro_cli.PrepareAccept(context.Background(), &api.PrepareAcceptRequest{
-	    Topic_Name:req.TopicName,
-		Partition_Name:req.PartitionName,
-		File_Name:block.FileName,
-	}
-	)
-	if err!=nil||!resp.Ret{
+	resp, err := bro_cli.PrepareAccept(context.Background(), &api.PrepareAcceptRequest{
+		Topic_Name:     req.TopicName,
+		Partition_Name: req.PartitionName,
+		File_Name:      block.FileName,
+	})
+	if err != nil || !resp.Ret {
 
 	}
 	return Info_out{
-		broker_name:broker.Name
-		bro_host_port:broker.Host+broker.Port,
+		broker_name:   broker.Name,
+		bro_host_port: broker.Host + broker.Port,
 	}
 
 }
 func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err error) {
+	//检查该用户是否订阅了topic/part
+	zks.zk.CheckSub(zookeeper.StartGetInfo{
+		CliName:       info.CliName,
+		TopicName:     info.TopicName,
+		PartitionName: info.PartitionName,
+		Option:        info.Option,
+	})
 	var Parts []zookeeper.Part
-	//获取到消费者需要的bro以及里面的part
+	//这两个的区别：
+	//ptp:他在指定topic里面的所有partition里面找这个partition对应PTP_INDEX-系统找到的正消费到的-的block
+	//psb:特定topic特定partition的特定index-consumer指定
 	if info.Option == 1 {
-
 		Parts, err = zks.zk.GetBrokers(info.TopicName)
 	} else if info.Option == 3 {
-		//Parts, err = zks.zk.GetBroker(info.TopicName, info.PartitionName, info.Index)
+		Parts, err = zks.zk.GetBroker(info.TopicName, info.PartitionName, info.Index)
 	}
 	if err != nil {
 		return nil, 0, err

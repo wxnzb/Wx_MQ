@@ -100,20 +100,13 @@ type Part struct {
 	FileName      string
 }
 
-// 获取Topic下所有partition对应的的Broker信息
+// 获取Topic下所有partition对应的消费到的block信息
 func (z *ZK) GetBrokers(Topic string) ([]Part, error) {
 	path := z.TopicRoot + "/" + Topic + "partition"
 	exists, _, err := z.Con.Exists(path)
 	if !exists {
 		return nil, err
 	}
-	// data, _, _ := z.Con.Get(path)
-	// var tNode TopicNode
-	// err = json.Unmarshal(data, &tNode)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return tNode.Brokers, nil
 	var parts []Part
 	partitions, _, _ := z.Con.Children(path)
 	for _, partition := range partitions {
@@ -127,13 +120,39 @@ func (z *ZK) GetBrokers(Topic string) ([]Part, error) {
 				brokerInfo := z.GetBrokerNode(blockInfo.Name)
 				parts = append(parts, Part{
 					topicName:     Topic,
-					partitionName: partition,
-					brokerName:    brokerInfo.Name,
-					broHostPort:   brokerInfo.Host + ":" + brokerInfo.Port,
+					PartitionName: partition,
+					BrokerName:    brokerInfo.Name,
+					BroHostPort:   brokerInfo.Host + ":" + brokerInfo.Port,
 					PTPIndex:      PTPIndex,
 					FileName:      blockInfo.FileName,
 				})
 			}
+		}
+	}
+	return parts, nil
+}
+
+// 获取Topic下特定partition对应的消费者需要的offset的block信息
+func (z *ZK) GetBroker(topic, part string, offfset int64) ([]Part, error) {
+	path := z.TopicRoot + "/" + topic + "/partitions/" + part
+	exists, _, err := z.Con.Exists(path)
+	if !exists {
+		return nil, err
+	}
+	var parts []Part
+	blocks, _, _ := z.Con.Children(path)
+	for _, block := range blocks {
+		blockInfo := z.GetBlockNode(path + "/" + part + "/" + block)
+		//找到消费者需要的offset的block
+		if blockInfo.StartOffset <= offfset && blockInfo.EndOffset >= offfset {
+			brokerInfo := z.GetBrokerNode(blockInfo.Name)
+			parts = append(parts, Part{
+				topicName:     topic,
+				PartitionName: part,
+				BrokerName:    brokerInfo.Name,
+				BroHostPort:   brokerInfo.Host + ":" + brokerInfo.Port,
+				FileName:      blockInfo.FileName,
+			})
 		}
 	}
 	return parts, nil
@@ -186,4 +205,16 @@ func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
 		return err
 	}
 	return nil
+}
+
+type StartGetInfo struct {
+	CliName       string
+	TopicName     string
+	PartitionName string
+	Option        int8
+}
+
+// 这个还没有实现
+func (z *ZK) CheckSub(info StartGetInfo) bool {
+	return true
 }

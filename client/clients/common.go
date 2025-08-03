@@ -5,9 +5,10 @@ import (
 )
 
 type PartKey struct {
-	Name       string `json:name` //这个name是什么
+	Name       string `json:name` //这个name是partitionName
 	BrokerName string `json:brokername`
 	BrokerHP   string `json:brokerhp`
+	Err        string `json:err`
 }
 
 // 下面这些好像还没有用上把

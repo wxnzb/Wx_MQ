@@ -12,7 +12,7 @@ import (
 )
 
 type Producer struct {
-	Cli             server_operations.Client //生产者需要调用的接口
+	//Cli             server_operations.Client //生产者需要调用的接口
 	rmu             sync.RWMutex
 	Name            string
 	Topic_Partition map[string]server_operations.Client //这个topic的Partition是否是这个生产者负责
@@ -37,8 +37,8 @@ type Message struct {
 }
 
 func (pro *Producer) Push(msg Message) error {
+	index := msg.Topic_Name + msg.Partition_Name
 	pro.rmu.RLock()
-	index := msg.Topic_Name + "_" + msg.Partition_Name
 	cli, ok := pro.Topic_Partition[index]
 	pro.rmu.RUnlock()
 	if !ok {
@@ -74,7 +74,7 @@ func (pro *Producer) Push(msg Message) error {
 		pro.rmu.Unlock()
 		return pro.Push(msg)
 	} else {
-		return errors.New("err!=nil or resp.Ret==false\n")
+		return errors.New("push message failed: " + resp.Err + ", " + err.Error())
 	}
 }
 func (pro *Producer) CreateTopic(topic string) error {
@@ -92,6 +92,20 @@ func (pro *Producer) CreateTopicPartition(topic, partition string) error {
 		PartitionName: partition,
 	})
 	if !resp.Ret || err != nil {
+		return err
+	}
+	return nil
+}
+
+// Producer 向 Broker 或 Zookeeper 发送控制命令，设置某个分区的状态（如是否主分区）和副本数量
+func (pro *Producer) SetPartitionState(topic, part string, option int8, num int) error {
+	resp, err := pro.zkBrokerCli.SetPartitionState(context.Background(), &api.SetPartitionStateRequest{
+		TopicName:     topic,
+		PartitionName: part,
+		Option:        option,
+		Num:           num,
+	})
+	if err != nil || resp.Ret {
 		return err
 	}
 	return nil
