@@ -139,7 +139,7 @@ const (
 	dWarn    logTopic = "WARN"
 )
 
-func DEBUG(topic, format string, args ...interface{}) {
+func DEBUG(topic logTopic, format string, args ...interface{}) {
 	mu.Lock()
 	defer mu.Unlock()
 	//这里的时间是怎样进行转换的

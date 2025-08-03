@@ -52,7 +52,7 @@ func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error
 		s.srv_cli = &srv_cli
 		go func() {
 			err := srv_cli.Run()
-			DEBUG(dLOG, "broker start rpcserver")
+			//DEBUG(dLOG, "broker start rpcserver")
 			if err != nil {
 				fmt.Println(err.Error())
 			}
@@ -351,6 +351,8 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 		Ret: false,
 	}, err
 }
+
+// broker---->zkserver
 func (s *RPCServer) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest) (r *api.UpdatePTPOffsetResponse, err error) {
 	err = s.zkServer.UpdatePTPOffset(Info_in{
 		TopicName:     req.Topic,
@@ -369,7 +371,7 @@ func (s *RPCServer) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffse
 func (s *RPCServer) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
 	err = s.zkServer.BroInfoHandle(req.BroName, req.BroHostPort)
 	if err != nil {
-		DEBUG(dERROR, err.Error())
+		//DEBUG(dERROR, err.Error())
 		return &api.BroInfoResponse{
 			Ret: false,
 		}, err

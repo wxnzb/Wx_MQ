@@ -201,17 +201,38 @@ func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 // 1
 
 // 服务器将消息存在topic里面
-func (s *Server) PushHandle(push Info) error {
+func (s *Server) PushHandle(push Info) (ret string, err error) {
+	DEBUG(dLog, "get Message form producer\n")
+	s.rmu.RLock()
 	topic, ok := s.topics[push.topic]
+	part_raft := s.parts_rafts
+	s.rmu.RUnlock()
+	// if !ok {
+	// 	//创建一个新的topic
+	// 	topic := NewTopic(push.topic)
+	// 	s.rmu.Lock()
+	// 	s.topics[push.topic] = topic
+	// 	s.rmu.Unlock()
+	// }
+	// topic.AddMessage(push)
 	if !ok {
-		//创建一个新的topic
-		topic := NewTopic(push.topic)
-		s.rmu.Lock()
-		s.topics[push.topic] = topic
-		s.rmu.Unlock()
+		ret = "this topic is not in this broker"
+		DEBUG(dError, "Topic %v,is not in this broker", push.topic)
+		return ret, errors.New(ret)
 	}
-	topic.AddMessage(push)
-	return nil
+	switch push.ack {
+	case -1: //raft同步并写入
+		ret, err = part_raft.Append(push)
+	case 1: //leader写入，不等待同步
+		err = topic.AddMessage(push)
+	case 0: //直接返回
+		go topic.AddMessage(push)
+	}
+	if err != nil {
+		DEBUG(dError, err.Error())
+		return err.Error(), err
+	}
+	return ret, nil
 }
 
 // 2
@@ -281,6 +302,8 @@ type Info struct {
 	producer        string
 	consumer        string
 	message         string
+	ack             int8
+	cmdindex        int64
 }
 
 func (s *Server) StartGet(req Info) (err error) {
