@@ -12,7 +12,7 @@ import (
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 	ProGetBro(ctx context.Context, req *api.ProGetBroRequest, callOptions ...callopt.Option) (r *api.ProGetBroResponse, err error)
-	ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error)
+	ProSetPartState(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error)
 	ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error)
 	Sub(ctx context.Context, req *api.SubRequest, callOptions ...callopt.Option) (r *api.SubResponse, err error)
 	UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest, callOptions ...callopt.Option) (r *api.UpdatePTPOffsetResponse, err error)
@@ -56,9 +56,9 @@ func (p *kZKServer_OperationsClient) ProGetBro(ctx context.Context, req *api.Pro
 	return p.kClient.ProGetBro(ctx, req)
 }
 
-func (p *kZKServer_OperationsClient) ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error) {
+func (p *kZKServer_OperationsClient) ProSetPartState(ctx context.Context, req *api.ProSetPartStateRequest, callOptions ...callopt.Option) (r *api.ProSetPartStateResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	return p.kClient.ProSetPart(ctx, req)
+	return p.kClient.ProSetPartState(ctx, req)
 }
 
 func (p *kZKServer_OperationsClient) ConGetBro(ctx context.Context, req *api.ConGetBroRequest, callOptions ...callopt.Option) (r *api.ConGetBroResponse, err error) {

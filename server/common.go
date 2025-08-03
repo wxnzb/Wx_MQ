@@ -101,6 +101,7 @@ type Options struct {
 	Name             string
 	ZKServerHostPort string
 	BrokerHostPort   string
+	RaftHostPort     string
 }
 type Top_Info struct {
 	TopicName  string

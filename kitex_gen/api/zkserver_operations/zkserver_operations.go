@@ -20,10 +20,10 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"ProSetPart": kitex.NewMethodInfo(
-		proSetPartHandler,
-		newZKServer_OperationsProSetPartArgs,
-		newZKServer_OperationsProSetPartResult,
+	"ProSetPartState": kitex.NewMethodInfo(
+		proSetPartStateHandler,
+		newZKServer_OperationsProSetPartStateArgs,
+		newZKServer_OperationsProSetPartStateResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -160,22 +160,22 @@ func newZKServer_OperationsProGetBroResult() interface{} {
 	return api.NewZKServer_OperationsProGetBroResult()
 }
 
-func proSetPartHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsProSetPartArgs)
-	realResult := result.(*api.ZKServer_OperationsProSetPartResult)
-	success, err := handler.(api.ZKServer_Operations).ProSetPart(ctx, realArg.Req)
+func proSetPartStateHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsProSetPartStateArgs)
+	realResult := result.(*api.ZKServer_OperationsProSetPartStateResult)
+	success, err := handler.(api.ZKServer_Operations).ProSetPartState(ctx, realArg.Req)
 	if err != nil {
 		return err
 	}
 	realResult.Success = success
 	return nil
 }
-func newZKServer_OperationsProSetPartArgs() interface{} {
-	return api.NewZKServer_OperationsProSetPartArgs()
+func newZKServer_OperationsProSetPartStateArgs() interface{} {
+	return api.NewZKServer_OperationsProSetPartStateArgs()
 }
 
-func newZKServer_OperationsProSetPartResult() interface{} {
-	return api.NewZKServer_OperationsProSetPartResult()
+func newZKServer_OperationsProSetPartStateResult() interface{} {
+	return api.NewZKServer_OperationsProSetPartStateResult()
 }
 
 func conGetBroHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -324,11 +324,11 @@ func (p *kClient) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r *
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error) {
-	var _args api.ZKServer_OperationsProSetPartArgs
+func (p *kClient) ProSetPartState(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error) {
+	var _args api.ZKServer_OperationsProSetPartStateArgs
 	_args.Req = req
-	var _result api.ZKServer_OperationsProSetPartResult
-	if err = p.c.Call(ctx, "ProSetPart", &_args, &_result); err != nil {
+	var _result api.ZKServer_OperationsProSetPartStateResult
+	if err = p.c.Call(ctx, "ProSetPartState", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

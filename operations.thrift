@@ -204,7 +204,7 @@ struct CreatePartitionResponse{
 service ZKServer_Operations{
     //producer
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
-    ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
+    ProSetPartStateResponse ProSetPartState(1:ProSetPartStateRequest req)
     //consumer
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
     SubResponse Sub(1:SubRequest req)

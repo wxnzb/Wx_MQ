@@ -46,11 +46,13 @@ type Info_in struct {
 	Option        int8
 	CliName       string
 	Index         int64
+	Dupnum        int8
 }
 type Info_out struct {
 	Err           error
 	broker_name   string
 	bro_host_port string
+	Ret           string
 }
 
 // type PrepareAcceptRequest struct {
@@ -87,6 +89,48 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 		bro_host_port: broker.Host + broker.Port,
 	}
 
+}
+func (zks *ZKServer) ProSetPartStateHandle(info Info_in) Info_out {
+	node, _ := zks.zk.GetPartitionNode(info.TopicName, info.PartitionName)
+	if info.Option != node.Option {
+		//进行更新
+		zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
+			Topic:    info.TopicName,
+			Name:     info.PartitionName,
+			Option:   info.Option,
+			PTPIndex: info.Index,
+		})
+	}
+	var ret string
+	switch info.Option {
+	//说明他想变为raft
+	case -1:
+		//说明option没变
+		if node.Option == -1 {
+			ret = "HadRaft"
+		}
+		if node.Option == 0 || node.Option == 1 {
+			//说明状态由之前的fetch变为reft
+		}
+		//还有这个状态？？
+		if node.Option == -2 {
+
+		}
+		//那么就说明他想变为fetch
+	default:
+		if node.Option == 0 || node.Option == 1 {
+			ret = "HadFetch"
+		}
+		if node.Option == -1 {
+			//说明状态由之前的raft变为fetch
+		}
+		if node.Option == -2 {
+
+		}
+	}
+	return Info_out{
+		Ret: ret,
+	}
 }
 func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err error) {
 	//检查该用户是否订阅了topic/part
@@ -197,16 +241,11 @@ func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 }
 
 // 自己感觉这里是可以简化的
-func (zks *ZKServer) UpdatePTPOffset(pullRequest Info_in) error {
-	str := zks.zk.TopicRoot + "/" + pullRequest.TopicName + "/" + "Partitions/" + pullRequest.PartitionName
-	_, err := zks.zk.GetPartitionNode(str)
-	if err != nil {
-		return err
-	}
-	err = zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
-		Name:     pullRequest.PartitionName,
-		Topic:    pullRequest.TopicName,
-		PTPIndex: pullRequest.Index,
+func (zks *ZKServer) UpdatePTPOffset(info Info_in) error {
+	err := zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
+		Name:     info.PartitionName,
+		Topic:    info.TopicName,
+		PTPIndex: info.Index,
 	})
 	return err
 }

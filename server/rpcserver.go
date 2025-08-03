@@ -66,7 +66,7 @@ func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error
 		s.srv_bro = &srv_bro
 		go func() {
 			err := srv_bro.Run()
-			DEBUG(dLOG, "broker start rpcserver")
+			//DEBUG(dLOG, "broker start rpcserver")
 			if err != nil {
 				fmt.Println(err.Error())
 			}
@@ -133,7 +133,7 @@ func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.Pull
 		if err == io.EOF && ret.size == 0 {
 			Err = "file EOF"
 		} else {
-			DEBUG(dERROR, "pull err")
+			//DEBUG(dERROR, "pull err")
 		}
 		return &api.PullResponse{
 			Ret: false,
@@ -226,6 +226,7 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 		Err: "",
 	}, nil
 }
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // service ZKServer_Operations{
 //     //producer
@@ -292,9 +293,24 @@ func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r
 		BroHostPort: info_out.bro_host_port,
 	}, info_out.Err
 }
-func(s *RPCServer)ProSetPart(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error){
-
+func (s *RPCServer) ProSetPartState(ctx context.Context, req *api.ProSetPartStateRequest) (r *api.ProSetPartStateResponse, err error) {
+	info_out := s.zkServer.ProSetPartStateHandle(Info_in{
+		TopicName:     req.Topic,
+		PartitionName: req.Partition,
+		Option:        req.Option,
+		Dupnum:        req.Dupnum,
+	})
+	if info_out.Err != nil {
+		return &api.ProSetPartStateResponse{
+			Ret: false,
+		}, info_out.Err
+	}
+	return &api.ProSetPartStateResponse{
+		Ret: true,
+		Err: "ok",
+	}, nil
 }
+
 // 生产者设置某个分区的状态
 // 需要补充
 func (s *RPCServer) ConGetBro(ctx context.Context, req *api.ConGetBroRequest) (r *api.ConGetBroResponse, err error) {

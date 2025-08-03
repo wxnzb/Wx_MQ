@@ -35,9 +35,8 @@ func NewZK(info ZKInfo) *ZK {
 }
 
 type BrokerNode struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
-	Port string `json:"port"`
+	Name     string `json:"name"`
+	HostPort string `json:"hostport"`
 }
 type TopicNode struct {
 	Name string `json:"name"`
@@ -47,6 +46,7 @@ type PartitionNode struct {
 	Name     string `json:"name"`
 	Topic    string `json:"topic"`
 	PTPIndex int64  `json:"ptpindex"`
+	Option   int8   `json:option`
 }
 type BlockNode struct {
 	Name        string `json:"name"`
@@ -163,7 +163,8 @@ func (z *ZK) GetPartitionPTPIndex(path string) int64 {
 	json.Unmarshal(data, &pNode)
 	return pNode.PTPIndex
 }
-func (z *ZK) GetPartitionNode(path string) (PartitionNode, error) {
+func (z *ZK) GetPartitionNode(topic, part string) (PartitionNode, error) {
+	path := z.TopicRoot + "/" + topic + "/Partitions/" + part
 	var pnode PartitionNode
 	ok, _, err := z.Con.Exists(path)
 	if !ok {
@@ -172,6 +173,21 @@ func (z *ZK) GetPartitionNode(path string) (PartitionNode, error) {
 	data, _, _ := z.Con.Get(path)
 	json.Unmarshal(data, &pnode)
 	return pnode, nil
+}
+
+// 这个更新的时候只需要变化的成员还是结构体整个都要写上
+func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
+	path := z.TopicRoot + "/" + pnode.Topic + "/" + "Partitions/" + pnode.Name
+	data, err := json.Marshal(pnode)
+	if err != nil {
+		return err
+	}
+	_, sate, _ := z.Con.Get(path)
+	_, err = z.Con.Set(path, data, sate.Version)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode) {
 	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
@@ -193,19 +209,6 @@ func (z *ZK) GetBrokerNode(path string) BrokerNode {
 	json.Unmarshal(data, &broNode)
 	return broNode
 }
-func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
-	path := z.TopicRoot + "/" + pnode.Topic + "/" + "Partitions/" + pnode.Name
-	data, err := json.Marshal(pnode)
-	if err != nil {
-		return err
-	}
-	_, sate, _ := z.Con.Get(path)
-	_, err = z.Con.Set(path, data, sate.Version)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 type StartGetInfo struct {
 	CliName       string
@@ -217,4 +220,18 @@ type StartGetInfo struct {
 // 这个还没有实现
 func (z *ZK) CheckSub(info StartGetInfo) bool {
 	return true
+}
+
+// 创建临时节点
+func (z *ZK) CreateState(serverName string) error {
+	path := z.BrokerRoot + "/" + serverName + "/state"
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return err
+	}
+	_, err = z.Con.Create(path, nil, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
+	if err != nil {
+		return err
+	}
+	return nil
 }

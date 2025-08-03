@@ -42,13 +42,13 @@ type Msgs struct {
 
 // -------------------------------
 type Server struct {
-	topics     map[string]*Topic
-	consumers  map[string]*ToConsumer //这里的string是消费者的ip_port
-	rmu        sync.RWMutex
-	zkclient   zkserver_operations.Client
-	zk         zookeeper.ZK
-	name       string
-	parts_raft *parts_raft
+	topics      map[string]*Topic
+	consumers   map[string]*ToConsumer //这里的string是消费者的ip_port
+	rmu         sync.RWMutex
+	zkclient    zkserver_operations.Client
+	zk          zookeeper.ZK
+	name        string
+	parts_rafts *parts_raft
 }
 
 var ip_name string //加了这个
@@ -67,6 +67,7 @@ func (s *Server) make(opt Options) {
 	ip_name = GetIpPort()
 	s.CheckList()
 	s.name = opt.Name
+
 	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, client.WithHostPorts(opt.ZKServerHostPort))
 	resp, err := s.zkclient.BroInfo(context.Background(), &api.BroInfoRequest{
 		BroName:     opt.Name,
@@ -77,8 +78,21 @@ func (s *Server) make(opt Options) {
 	}
 	//s.InitBroker()
 	//本地创建一个parts_raft,为raft同步做准备
-	s.parts_raft = NewPartRaft()
-	//go s.parts_raft.make(opt.Name,opt.RaftHostPort)
+	s.parts_rafts = NewPartRaft()
+	go s.parts_rafts.make(opt.Name, opt.RaftHostPort)
+	//下面这是干什么
+	err = s.zk.RegisterNode(zookeeper.BrokerNode{
+		Name:     s.name,
+		HostPort: opt.BrokerHostPort,
+	})
+	if err != nil {
+
+	}
+	//创建临时节点，用于zkserver的watch
+	err = s.zk.CreateState(s.name)
+	if err != nil {
+
+	}
 }
 func (s *Server) InitBroker() {
 	s.rmu.Lock()

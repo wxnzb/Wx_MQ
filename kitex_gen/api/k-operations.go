@@ -7461,7 +7461,7 @@ func (p *ZKServer_OperationsProGetBroResult) field0Length() int {
 	return l
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) FastRead(buf []byte) (int, error) {
+func (p *ZKServer_OperationsProSetPartStateArgs) FastRead(buf []byte) (int, error) {
 
 	var err error
 	var offset int
@@ -7505,12 +7505,12 @@ func (p *ZKServer_OperationsProSetPartArgs) FastRead(buf []byte) (int, error) {
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_ZKServer_OperationsProSetPartArgs[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_ZKServer_OperationsProSetPartStateArgs[fieldId]), err)
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) FastReadField1(buf []byte) (int, error) {
+func (p *ZKServer_OperationsProSetPartStateArgs) FastReadField1(buf []byte) (int, error) {
 	offset := 0
 	_field := NewProSetPartStateRequest()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
@@ -7522,11 +7522,11 @@ func (p *ZKServer_OperationsProSetPartArgs) FastReadField1(buf []byte) (int, err
 	return offset, nil
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) FastWrite(buf []byte) int {
+func (p *ZKServer_OperationsProSetPartStateArgs) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+func (p *ZKServer_OperationsProSetPartStateArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
 		offset += p.fastWriteField1(buf[offset:], w)
@@ -7535,7 +7535,7 @@ func (p *ZKServer_OperationsProSetPartArgs) FastWriteNocopy(buf []byte, w thrift
 	return offset
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) BLength() int {
+func (p *ZKServer_OperationsProSetPartStateArgs) BLength() int {
 	l := 0
 	if p != nil {
 		l += p.field1Length()
@@ -7544,21 +7544,21 @@ func (p *ZKServer_OperationsProSetPartArgs) BLength() int {
 	return l
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
+func (p *ZKServer_OperationsProSetPartStateArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
 	offset += p.Req.FastWriteNocopy(buf[offset:], w)
 	return offset
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) field1Length() int {
+func (p *ZKServer_OperationsProSetPartStateArgs) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
 	l += p.Req.BLength()
 	return l
 }
 
-func (p *ZKServer_OperationsProSetPartResult) FastRead(buf []byte) (int, error) {
+func (p *ZKServer_OperationsProSetPartStateResult) FastRead(buf []byte) (int, error) {
 
 	var err error
 	var offset int
@@ -7602,12 +7602,12 @@ func (p *ZKServer_OperationsProSetPartResult) FastRead(buf []byte) (int, error) 
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_ZKServer_OperationsProSetPartResult[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_ZKServer_OperationsProSetPartStateResult[fieldId]), err)
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
-func (p *ZKServer_OperationsProSetPartResult) FastReadField0(buf []byte) (int, error) {
+func (p *ZKServer_OperationsProSetPartStateResult) FastReadField0(buf []byte) (int, error) {
 	offset := 0
 	_field := NewProSetPartStateResponse()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
@@ -7619,11 +7619,11 @@ func (p *ZKServer_OperationsProSetPartResult) FastReadField0(buf []byte) (int, e
 	return offset, nil
 }
 
-func (p *ZKServer_OperationsProSetPartResult) FastWrite(buf []byte) int {
+func (p *ZKServer_OperationsProSetPartStateResult) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
 
-func (p *ZKServer_OperationsProSetPartResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+func (p *ZKServer_OperationsProSetPartStateResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p != nil {
 		offset += p.fastWriteField0(buf[offset:], w)
@@ -7632,7 +7632,7 @@ func (p *ZKServer_OperationsProSetPartResult) FastWriteNocopy(buf []byte, w thri
 	return offset
 }
 
-func (p *ZKServer_OperationsProSetPartResult) BLength() int {
+func (p *ZKServer_OperationsProSetPartStateResult) BLength() int {
 	l := 0
 	if p != nil {
 		l += p.field0Length()
@@ -7641,7 +7641,7 @@ func (p *ZKServer_OperationsProSetPartResult) BLength() int {
 	return l
 }
 
-func (p *ZKServer_OperationsProSetPartResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
+func (p *ZKServer_OperationsProSetPartStateResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetSuccess() {
 		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 0)
@@ -7650,7 +7650,7 @@ func (p *ZKServer_OperationsProSetPartResult) fastWriteField0(buf []byte, w thri
 	return offset
 }
 
-func (p *ZKServer_OperationsProSetPartResult) field0Length() int {
+func (p *ZKServer_OperationsProSetPartStateResult) field0Length() int {
 	l := 0
 	if p.IsSetSuccess() {
 		l += thrift.Binary.FieldBeginLength()
@@ -9117,11 +9117,11 @@ func (p *ZKServer_OperationsProGetBroResult) GetResult() interface{} {
 	return p.Success
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) GetFirstArgument() interface{} {
+func (p *ZKServer_OperationsProSetPartStateArgs) GetFirstArgument() interface{} {
 	return p.Req
 }
 
-func (p *ZKServer_OperationsProSetPartResult) GetResult() interface{} {
+func (p *ZKServer_OperationsProSetPartStateResult) GetResult() interface{} {
 	return p.Success
 }
 

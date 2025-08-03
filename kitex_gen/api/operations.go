@@ -2092,7 +2092,7 @@ var fieldIDToName_Client_OperationsPingpongResult = map[int16]string{
 type ZKServer_Operations interface {
 	ProGetBro(ctx context.Context, req *ProGetBroRequest) (r *ProGetBroResponse, err error)
 
-	ProSetPart(ctx context.Context, req *ProSetPartStateRequest) (r *ProSetPartStateResponse, err error)
+	ProSetPartState(ctx context.Context, req *ProSetPartStateRequest) (r *ProSetPartStateResponse, err error)
 
 	ConGetBro(ctx context.Context, req *ConGetBroRequest) (r *ConGetBroResponse, err error)
 
@@ -2185,79 +2185,79 @@ var fieldIDToName_ZKServer_OperationsProGetBroResult = map[int16]string{
 	0: "success",
 }
 
-type ZKServer_OperationsProSetPartArgs struct {
+type ZKServer_OperationsProSetPartStateArgs struct {
 	Req *ProSetPartStateRequest `thrift:"req,1" frugal:"1,default,ProSetPartStateRequest" json:"req"`
 }
 
-func NewZKServer_OperationsProSetPartArgs() *ZKServer_OperationsProSetPartArgs {
-	return &ZKServer_OperationsProSetPartArgs{}
+func NewZKServer_OperationsProSetPartStateArgs() *ZKServer_OperationsProSetPartStateArgs {
+	return &ZKServer_OperationsProSetPartStateArgs{}
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) InitDefault() {
+func (p *ZKServer_OperationsProSetPartStateArgs) InitDefault() {
 }
 
-var ZKServer_OperationsProSetPartArgs_Req_DEFAULT *ProSetPartStateRequest
+var ZKServer_OperationsProSetPartStateArgs_Req_DEFAULT *ProSetPartStateRequest
 
-func (p *ZKServer_OperationsProSetPartArgs) GetReq() (v *ProSetPartStateRequest) {
+func (p *ZKServer_OperationsProSetPartStateArgs) GetReq() (v *ProSetPartStateRequest) {
 	if !p.IsSetReq() {
-		return ZKServer_OperationsProSetPartArgs_Req_DEFAULT
+		return ZKServer_OperationsProSetPartStateArgs_Req_DEFAULT
 	}
 	return p.Req
 }
-func (p *ZKServer_OperationsProSetPartArgs) SetReq(val *ProSetPartStateRequest) {
+func (p *ZKServer_OperationsProSetPartStateArgs) SetReq(val *ProSetPartStateRequest) {
 	p.Req = val
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) IsSetReq() bool {
+func (p *ZKServer_OperationsProSetPartStateArgs) IsSetReq() bool {
 	return p.Req != nil
 }
 
-func (p *ZKServer_OperationsProSetPartArgs) String() string {
+func (p *ZKServer_OperationsProSetPartStateArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("ZKServer_OperationsProSetPartArgs(%+v)", *p)
+	return fmt.Sprintf("ZKServer_OperationsProSetPartStateArgs(%+v)", *p)
 }
 
-var fieldIDToName_ZKServer_OperationsProSetPartArgs = map[int16]string{
+var fieldIDToName_ZKServer_OperationsProSetPartStateArgs = map[int16]string{
 	1: "req",
 }
 
-type ZKServer_OperationsProSetPartResult struct {
+type ZKServer_OperationsProSetPartStateResult struct {
 	Success *ProSetPartStateResponse `thrift:"success,0,optional" frugal:"0,optional,ProSetPartStateResponse" json:"success,omitempty"`
 }
 
-func NewZKServer_OperationsProSetPartResult() *ZKServer_OperationsProSetPartResult {
-	return &ZKServer_OperationsProSetPartResult{}
+func NewZKServer_OperationsProSetPartStateResult() *ZKServer_OperationsProSetPartStateResult {
+	return &ZKServer_OperationsProSetPartStateResult{}
 }
 
-func (p *ZKServer_OperationsProSetPartResult) InitDefault() {
+func (p *ZKServer_OperationsProSetPartStateResult) InitDefault() {
 }
 
-var ZKServer_OperationsProSetPartResult_Success_DEFAULT *ProSetPartStateResponse
+var ZKServer_OperationsProSetPartStateResult_Success_DEFAULT *ProSetPartStateResponse
 
-func (p *ZKServer_OperationsProSetPartResult) GetSuccess() (v *ProSetPartStateResponse) {
+func (p *ZKServer_OperationsProSetPartStateResult) GetSuccess() (v *ProSetPartStateResponse) {
 	if !p.IsSetSuccess() {
-		return ZKServer_OperationsProSetPartResult_Success_DEFAULT
+		return ZKServer_OperationsProSetPartStateResult_Success_DEFAULT
 	}
 	return p.Success
 }
-func (p *ZKServer_OperationsProSetPartResult) SetSuccess(x interface{}) {
+func (p *ZKServer_OperationsProSetPartStateResult) SetSuccess(x interface{}) {
 	p.Success = x.(*ProSetPartStateResponse)
 }
 
-func (p *ZKServer_OperationsProSetPartResult) IsSetSuccess() bool {
+func (p *ZKServer_OperationsProSetPartStateResult) IsSetSuccess() bool {
 	return p.Success != nil
 }
 
-func (p *ZKServer_OperationsProSetPartResult) String() string {
+func (p *ZKServer_OperationsProSetPartStateResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("ZKServer_OperationsProSetPartResult(%+v)", *p)
+	return fmt.Sprintf("ZKServer_OperationsProSetPartStateResult(%+v)", *p)
 }
 
-var fieldIDToName_ZKServer_OperationsProSetPartResult = map[int16]string{
+var fieldIDToName_ZKServer_OperationsProSetPartStateResult = map[int16]string{
 	0: "success",
 }
 

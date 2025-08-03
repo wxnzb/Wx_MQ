@@ -98,12 +98,12 @@ func (pro *Producer) CreateTopicPartition(topic, partition string) error {
 }
 
 // Producer 向 Broker 或 Zookeeper 发送控制命令，设置某个分区的状态（如是否主分区）和副本数量
-func (pro *Producer) SetPartitionState(topic, part string, option int8, num int) error {
-	resp, err := pro.zkBrokerCli.SetPartitionState(context.Background(), &api.SetPartitionStateRequest{
-		TopicName:     topic,
-		PartitionName: part,
-		Option:        option,
-		Num:           num,
+func (pro *Producer) SetPartitionState(topic, part string, option int8, num int8) error {
+	resp, err := pro.zkBrokerCli.ProSetPartState(context.Background(), &api.ProSetPartStateRequest{
+		Topic:     topic,
+		Partition: part,
+		Option:    option,
+		Dupnum:    num,
 	})
 	if err != nil || resp.Ret {
 		return err
