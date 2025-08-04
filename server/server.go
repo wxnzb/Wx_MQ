@@ -5,11 +5,13 @@ import (
 	"os"
 	"sync"
 
-	"errors"
-	//cl "github.com/cloudwego/kitex/client"
 	api "Wx_MQ/kitex_gen/api"
+	"Wx_MQ/kitex_gen/api/raft_operations"
 	"Wx_MQ/kitex_gen/api/zkserver_operations"
 	"Wx_MQ/zookeeper"
+	"errors"
+
+	cl "github.com/cloudwego/kitex/client"
 
 	//"github.com/docker/docker/client"
 	"context"
@@ -49,6 +51,9 @@ type Server struct {
 	zk          zookeeper.ZK
 	name        string
 	parts_rafts *parts_raft
+	//这里的brokers为了达到raft共识,k:其他
+	brokers map[string]*raft_operations.Client
+	aplych  chan Info
 }
 
 var ip_name string //加了这个
@@ -123,7 +128,7 @@ func (s *Server) HandleTopics(topics map[string]Top_Info) {
 		if !ok {
 			s.HandlePartitions(topic_name, top.Partitions)
 		} else {
-			DEBUG(dWARN, "This topic(%v) had in s.topics\n", topic_name)
+			DEBUG(dWarn, "This topic(%v) had in s.topics\n", topic_name)
 		}
 	}
 }
@@ -134,7 +139,7 @@ func (s *Server) HandlePartitions(topic_name string, partitions map[string]Part_
 			s.topics[topic_name] = NewTopic(topic_name)
 			s.HandleBlocks(topic_name, partition_name, part.Blocks)
 		} else {
-			DEBUG(dWARN, "This partition(%v) had in s.topics[%v].Parts\n", partition_name, topic_name)
+			DEBUG(dWarn, "This partition(%v) had in s.topics[%v].Parts\n", partition_name, topic_name)
 		}
 	}
 }
@@ -303,7 +308,12 @@ type Info struct {
 	consumer        string
 	message         string
 	ack             int8
-	cmdindex        int64
+	//cmdindex：幂等编号，防止重复提交
+	cmdindex int64
+	//这里的k-broker名字，v-raft地址
+	brokers map[string]string
+	//这个是干什么的？？
+	me int
 }
 
 func (s *Server) StartGet(req Info) (err error) {
@@ -349,22 +359,53 @@ func (s *Server) StartGet(req Info) (err error) {
 	return err
 }
 
-// 5所以他也把文件名传进来有什么用呢
-func (s *Server) PrepareAcceptHandle(pinfo Info) (ret string, err error) {
+// 检查topic和partition是否存在，不存在则需要创建他
+// 设置partition的file和fd,start_index等信息
+func (s *Server) PrepareAcceptHandle(in Info) (ret string, err error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	topic, ok := s.topics[pinfo.topic]
+	topic, ok := s.topics[in.topic]
 	//创建一个新的topic
 	if !ok {
-		topic = NewTopic(pinfo.topic)
-		s.topics[pinfo.topic] = topic
+		topic = NewTopic(in.topic)
+		s.topics[in.topic] = topic
 	}
-	topic.PrepareAcceptHandle(pinfo)
+	var peers []*raft_operations.Client
+	// 遍历 in.brokers（这个 partition 的所有副本）
+	// 如果当前 k 不是自己（s.Name），说明是另一个副本，需要建立连接，k-broker名字，v-raft地址
+	for k, v := range in.brokers {
+		if s.name != k {
+			bro_cli, ok := s.brokers[k]
+			if !ok {
+				cli, err := raft_operations.NewClient(s.name, cl.WithHostPorts(v))
+				if err != nil {
+					return ret, err
+				}
+				s.brokers[k] = &cli
+				bro_cli = &cli
+			}
+			peers = append(peers, bro_cli)
+		}
+	}
+	// 检查或创建底层praft_raft
+	s.parts_rafts.AddPart_Raft(peers, in.me, in.topic, in.partition, s.aplych)
+	return topic.PrepareAcceptHandle(in)
 }
 
-// 6
-func (s *Server) PrepareSendHandle(pinfo Info) (ret string, err error) {
-
+// 准备发送信息，
+// 检查topic和subscription是否存在，不存在则需要创建
+// 检查该文件的config是否存在，不存在则创建，并开启协程
+// 协程设置超时时间，时间到则关闭
+func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	topic, ok := s.topics[in.topic]
+	//创建一个新的topic
+	if !ok {
+		topic = NewTopic(in.topic)
+		s.topics[in.topic] = topic
+	}
+	//return topic.PrePareSendHandle(in, &s.zkclient)
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了
@@ -373,38 +414,38 @@ type SubResponse struct {
 	parts []PartName
 }
 
-// // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
-// // 通过Sub结构体来订阅消息
-// func (s *Server) SubHandle(req SubRequest) (err error) {
-// 	s.rmu.Lock()
-// 	defer s.rmu.Unlock()
-// 	DEBUG(dLOG, "get sub information")
-// 	//这里还得先判断一下这个topic有没有
-// 	topic, ok := s.topics[req.topic]
-// 	if !ok {
-// 		return errors.New("topic not exist")
-// 	}
-// 	sub, err := topic.AddScription(req, s.consumers[req.consumer])
-// 	if err != nil {
-// 		return err
-// 	}
-// 	s.consumers[req.consumer].AddScription(sub)
-// 	return nil
-// }
+// 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
+// 通过Sub结构体来订阅消息
+func (s *Server) SubHandle(in Info) (err error) {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	DEBUG(dLog, "get sub information")
+	//这里还得先判断一下这个topic有没有
+	topic, ok := s.topics[in.topic]
+	if !ok {
+		return errors.New("topic not exist")
+	}
+	sub, err := topic.AddScription(in)
+	if err != nil {
+		return err
+	}
+	s.consumers[in.consumer].AddScription(sub)
+	return nil
+}
 
-// func (s *Server) UnSubHandle(req SubRequest) error {
-// 	s.rmu.Lock()
-// 	defer s.rmu.Unlock()
-// 	//这里还得先判断一下这个topic有没有
-// 	topic, ok := s.topics[req.topic]
-// 	if !ok {
-// 		return errors.New("topic not exist")
-// 	}
-// 	//这里消费者要删除这个订阅就把这个订阅全部删除了吗？感觉好奇怪
-// 	sub_name, err := topic.ReduceScription(req)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	s.consumers[req.consumer].ReduceScription(sub_name)
-// 	return nil
-// }
+func (s *Server) UnSubHandle(in Info) error {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	//这里还得先判断一下这个topic有没有
+	topic, ok := s.topics[in.topic]
+	if !ok {
+		return errors.New("topic not exist")
+	}
+	//这里消费者要删除这个订阅就把这个订阅全部删除了吗？感觉好奇怪
+	sub_name, err := topic.ReduceScription(in)
+	if err != nil {
+		return err
+	}
+	s.consumers[in.consumer].ReduceScription(sub_name)
+	return nil
+}

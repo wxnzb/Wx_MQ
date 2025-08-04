@@ -562,7 +562,7 @@ type Op struct {
 type LogNode struct {
 	LogTerm  int
 	LogIndex int
-	Log      Op
+	Log      interface{}
 	BeLeader bool
 	Leader   int
 }
@@ -660,128 +660,132 @@ func (r *Raft) killed() bool {
 	return z == 1
 }
 
-// // 这个是leader调用的
-// func (r *Raft) appendentries(term int) {
-// 	var wg sync.WaitGroup
-// 	r.rmu.Lock()
-// 	index := len(r.log) - 1
-// 	i := r.log[index].LogIndex
-// 	t := r.log[index].LogTerm
-// 	l := len(r.peers)
-// 	r.rmu.Unlock()
-// 	//不包含他自己
-// 	wg.Add(l - 1)
-// 	for p := range r.peers {
-// 		//不要自己这个leader节点才好
-// 		if p != r.me {
-// 			go func(p int, t int) {
-// 				args := &AppendEntriesArgs{}
-// 				args.Term = term
-// 				args.LeaderId = int(r.me)
-// 				r.rmu.Lock()
-// 				//因为上面他把锁解开了，所以在并发条件下可能修改了，因此有的要重复进行判断
-// 				// 现在开始判断不符合条件的直接退出就行
-// 				//要是上一次记录的快照和当前leader不一样或者index也不一样那，说明更新了
-// 				if r.durX != r.X || index != len(r.log)-1 {
-// 					r.durX = r.X
-// 					r.rmu.Unlock()
-// 					wg.Done()
-// 				}
-// 				//最后一条日志
-// 				if index == len(r.log)-1 {
-// 					//出现这种情况的原因是快照清掉了日志前缀，也就是检查当前i是否存在
-// 					if int(i)-r.X >= 0 && r.log[int(i)-r.X].LogIndex != i {
-// 						r.rmu.Unlock()
-// 						wg.Done()
-// 					}
-// 				}
-// 				//term或者和state在并发下改变了
-// 				if r.currentTerm != t || r.state != 2 {
-// 					r.rmu.Unlock()
-// 					wg.Done()
-// 				}
-// 				//这个的作用，在发送给follower是，告诉Follower要发送的条目的上一个看能和follower对应上不
-// 				//leader 1 2 3 4 5,现在要发送4 5
-// 				//follower 1 2 3
-// 				//那么都是3就可以对上
-// 				//这个是用于一致性检查，这里不用考虑r.X吗
-// 				args.PrevLogIndex = r.log[r.nextIndex[p]-1].LogIndex
-// 				args.PrevLogTerm = r.log[r.nextIndex[p]-1].LogTerm
-// 				//Leader 确认有多数 Follower 拥有该日志条目后，可以提交并应用到状态机
-// 				args.LeaderCommit = int(r.commitIndex)
-// 				//Leader 从自己的日志中提取需要发送给某个 Follower 的日志条目（Entries），并放入 AppendEntriesArgs 中，准备发送给对应的 Follower
-// 				//这个 Follower 确实有日志没有同步，而且不太理解后面的
-// 				if len(r.log)-1 >= r.nextIndex[p] && i+1 > r.log[r.nextIndex[p]].LogIndex {
-// 					nums := r.log[int(r.log[r.nextIndex[p]].LogIndex)-r.X : int(i)-r.X+1]
-// 					args.Entries = append(args.Entries, nums...)
-// 				}
-// 				r.rmu.Unlock()
-// 				reply, ok := r.SendAppendEntries(p, args)
-// 				 if ok {
-// 					r.rmu.Lock()
-// 					//首先就是传送成功，那么就要更新follower的matchIndex,和nextIndex
-// 					if reply.Success == true {
-// 						r.matchIndex[p] = int(i)
-// 						//i:当前 leader 认为 follower 已经成功复制的日志 index
-// 						//判断是否存在快照截断，感觉可以简化成这样
-// 						if r.durX == r.X {
-// 							if int(i)-r.X+1 >= 0 {
-// 								r.nextIndex[p] = int(i) - r.X + 1
-// 							} else {
-// 								r.nextIndex[p] = 1
-// 							}
-// 							//存在快照截断
-// 						} else {
-// 							if int(i) >= r.X {
-// 								r.nextIndex[p] = int(i) - r.X + 1
-// 							} else {
-// 								r.nextIndex[p] = 1
-// 							}
-// 							r.durX = r.X
-// 						}
-// 						//leader满足条件就可以提交日知道状态机上面
-// 						successCommit := 0
-// 						for in := range r.matchIndex {
-// 							if in >= int(i) {
-// 								successCommit++
-// 							}
-// 						}
-// 						//i和commitIndex区别：i:leader 推送给某个 follower 的日志条目的位置（在日志数组中的 offset）
-// 						//commitIndex:就是已经给大多数follower更新了也已经提交到状态机了，上面这个就是下一次的下面这个状态
-// 						if successCommit > l/2 && r.currentTerm == t && int(i) > r.commitIndex-r.X {
-// 							r.commitIndex = int(i)
-// 						}
-// 					}else{
-// 						if reply.Term > r.currentTerm {
-// 							r.currentTerm = reply.Term
-// 							r.voteFor = -1
-// 							r.state = 0
-// 							r.leaderId = -1
-// 							//-----
-// 							r.electionTimePass = 0
-// 							rand.Seed(time.Now().UnixNano())
-// 							r.electionTimeOut = rand.Intn(150) + 150
-// 							//2是什么状态？？
-// 							//这个分支不太明白
-// 						} else if r.state==2{
-// 							if int(reply.TermFirstIndex)<r.X{
-// 								go r.sendSnapShot(r.currentTerm,it)
-// 							}else if int(reply.TermFirstIndex)-r.X>1 {
-// 								r.nextIndex[p]=int(reply.TermFirstIndex)-r.X
-// 								if r.nextIndex[p]>len(r.log){
-// 									r.nextIndex[p] = len(r.log)
-// 								}
-// 				 		}else{
-// 				 			r.nextIndex[p] = 1
-// 				 		}
-// 				 	}
-// 				 }
-// 				 wg.Done()
-// 			}(p, t)
-// 		}
-// 	}
-// 	wg.Wait()
-// }
+// 这个是leader调用的
+func (r *Raft) appendentries(term int) {
+	var wg sync.WaitGroup
+	r.rmu.Lock()
+	index := len(r.log) - 1
+	i := r.log[index].LogIndex
+	t := r.log[index].LogTerm
+	l := len(r.peers)
+	r.rmu.Unlock()
+	//不包含他自己
+	wg.Add(l - 1)
+	for p := range r.peers {
+		//不要自己这个leader节点才好
+		if p != r.me {
+			go func(p int, t int) {
+				args := &AppendEntriesArgs{}
+				args.Term = term
+				args.LeaderId = int(r.me)
+				r.rmu.Lock()
+				//因为上面他把锁解开了，所以在并发条件下可能修改了，因此有的要重复进行判断
+				// 现在开始判断不符合条件的直接退出就行
+				//要是上一次记录的快照和当前leader不一样或者index也不一样那，说明更新了
+				if r.durX != r.X || index != len(r.log)-1 {
+					r.durX = r.X
+					r.rmu.Unlock()
+					wg.Done()
+					return
+				}
+				//最后一条日志
+				if index == len(r.log)-1 {
+					//出现这种情况的原因是快照清掉了日志前缀，也就是检查当前i是否存在
+					if int(i)-r.X >= 0 && r.log[int(i)-r.X].LogIndex != i {
+						r.rmu.Unlock()
+						wg.Done()
+						return
+					}
+				}
+				//term或者和state在并发下改变了
+				if r.currentTerm != t || r.state != 2 {
+					r.rmu.Unlock()
+					wg.Done()
+					return
+				}
+				//这个的作用，在发送给follower是，告诉Follower要发送的条目的上一个看能和follower对应上不
+				//leader 1 2 3 4 5,现在要发送4 5
+				//follower 1 2 3
+				//那么都是3就可以对上
+				//这个是用于一致性检查，这里不用考虑r.X吗
+				args.PrevLogIndex = r.log[r.nextIndex[p]-1].LogIndex
+				args.PrevLogTerm = r.log[r.nextIndex[p]-1].LogTerm
+				//Leader 确认有多数 Follower 拥有该日志条目后，可以提交并应用到状态机
+				args.LeaderCommit = int(r.commitIndex)
+				//Leader 从自己的日志中提取需要发送给某个 Follower 的日志条目（Entries），并放入 AppendEntriesArgs 中，准备发送给对应的 Follower
+				//这个 Follower 确实有日志没有同步，而且不太理解后面的
+				if len(r.log)-1 >= r.nextIndex[p] && i+1 > r.log[r.nextIndex[p]].LogIndex {
+					nums := r.log[int(r.log[r.nextIndex[p]].LogIndex)-r.X : int(i)-r.X+1]
+					args.Entries = append(args.Entries, nums...)
+				}
+				r.rmu.Unlock()
+				reply, ok := r.SendAppendEntries(p, args)
+				if ok {
+					r.rmu.Lock()
+					//首先就是传送成功，那么就要更新follower的matchIndex,和nextIndex
+					if reply.Success == true {
+						r.matchIndex[p] = int(i)
+						//i:当前 leader 认为 follower 已经成功复制的日志 index
+						//判断是否存在快照截断，感觉可以简化成这样
+						if r.durX == r.X {
+							if int(i)-r.X+1 >= 0 {
+								r.nextIndex[p] = int(i) - r.X + 1
+							} else {
+								r.nextIndex[p] = 1
+							}
+							//存在快照截断
+						} else {
+							if int(i) >= r.X {
+								r.nextIndex[p] = int(i) - r.X + 1
+							} else {
+								r.nextIndex[p] = 1
+							}
+							r.durX = r.X
+						}
+						//leader满足条件就可以提交日知道状态机上面
+						successCommit := 0
+						for in := range r.matchIndex {
+							if in >= int(i) {
+								successCommit++
+							}
+						}
+						//i和commitIndex区别：i:leader 推送给某个 follower 的日志条目的位置（在日志数组中的 offset）
+						//commitIndex:就是已经给大多数follower更新了也已经提交到状态机了，上面这个就是下一次的下面这个状态
+						if successCommit > l/2 && r.currentTerm == t && int(i) > r.commitIndex-r.X {
+							r.commitIndex = int(i)
+						}
+					}
+				} else {
+					if reply.Term > r.currentTerm {
+						r.currentTerm = reply.Term
+						r.voteFor = -1
+						r.state = 0
+						r.leaderId = -1
+						//-----
+						r.electionTimePass = 0
+						rand.Seed(time.Now().UnixNano())
+						r.electionTimeOut = rand.Intn(150) + 150
+						//2是什么状态？？
+						//这个分支不太明白
+					} else if r.state == 2 {
+						if int(reply.TermFirstIndex) < r.X {
+							go r.SendSnapShot(r.currentTerm, i)
+						} else if int(reply.TermFirstIndex)-r.X > 1 {
+							r.nextIndex[p] = int(reply.TermFirstIndex) - r.X
+							if r.nextIndex[p] > len(r.log) {
+								r.nextIndex[p] = len(r.log)
+							}
+						} else {
+							r.nextIndex[p] = 1
+						}
+					}
+				}
+				wg.Done()
+			}(p, t)
+		}
+	}
+	wg.Wait()
+}
 
 //	type SnapShotArgs struct {
 //		Term     int
@@ -891,12 +895,14 @@ func (r *Raft) requestvotes(term int) {
 	wg.Wait()
 }
 
-// 它用于 Leader 接收到客户端新命令时，将命令附加到日志中，并启动日志复制流程。
-func (r *Raft) Start(command Op, beleader bool, leader int) (int, int, bool) {
+// 如果当前节点是 Leader，就把客户端传入的 command 封装成日志项，追加到本地日志中，然后触发 Raft 的日志复制过程
+func (r *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
 	isLeader := false
+
 	if !r.killed() {
+
 		r.rmu.Lock()
 		if r.state == 2 {
 			isLeader = true
@@ -904,19 +910,18 @@ func (r *Raft) Start(command Op, beleader bool, leader int) (int, int, bool) {
 				LogTerm:  r.currentTerm,
 				LogIndex: len(r.log) + r.X,
 				Log:      command,
-				BeLeader: beleader,
-				Leader:   leader,
 			}
 			r.log = append(r.log, com)
+			r.matchIndex[r.me]++
 
 			index = com.LogIndex
 			term = r.currentTerm
-			r.matchIndex[r.me]++
+			DEBUG(dLog, "S%d have log %v\n", r.me, com)
 
 			go r.Persist()
 			r.electionTimePass = 0
 			//启动日志同步
-			//go r.appendentries(r.currentTime)
+			go r.appendentries(r.currentTerm)
 		}
 		r.rmu.Unlock()
 	}

@@ -27,7 +27,7 @@ import (
 const (
 	ALIVE     = "alive"
 	DOWN      = "down"
-	TIMEOUT   = 60 * 10
+	TOUT      = 60 * 10
 	UPDATENUM = 10
 )
 
@@ -45,7 +45,7 @@ type ToConsumer struct {
 func NewToConsumer(ip_port string) (*ToConsumer, error) {
 	client, err := client_operations.NewClient("clients", client2.WithHostPorts(ip_port))
 	if err != nil {
-		DEBUG(dERROR, "NewClient err:%v", err)
+		DEBUG(dError, "NewClient err:%v", err)
 		return nil, err
 	}
 	return &ToConsumer{
@@ -378,7 +378,7 @@ func (p *Part) GetDone(close chan Part) {
 				delete(p.to_consumers, finish.name)
 				p.rmu.Unlock()
 			}
-		case <-time.After(time.Second * TIMEOUT): //超时
+		case <-time.After(time.Second * TOUT): //超时
 			close <- *p
 			return
 		}

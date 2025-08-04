@@ -28,6 +28,11 @@ type parts_raft struct {
 	// applyindex["topicA-part1"] = 250
 	// topicA-part1，状态机已经处理到 Raft 日志的第 250 条日志
 	applyindex map[string]int
+	Add        chan COMD
+}
+type COMD struct {
+	index int
+	num   int
 }
 
 func NewPartRaft() *parts_raft {
@@ -125,7 +130,7 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 	}
 	//检查快照是否已恢复,没恢复说明还没准备好
 	if praft.applyindex[str] == 0 {
-		DEBUG(dLog, "S%d the snap noot applied applyindex is %v\n", praft.me, praft.applyindexs[str])
+		DEBUG(dLog, "S%d the snap noot applied applyindex is %v\n", praft.me, praft.applyindex[str])
 		praft.rmu.Unlock()
 		time.Sleep(200 * time.Millisecond)
 		return ErrTimeOut, nil
@@ -139,6 +144,7 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 		praft.CDM[str][in.producer] = 0
 	}
 	praft.rmu.Unlock()
+	//构造日志
 	O := Op{
 		Ser_index: int64(praft.me),
 		Cli_index: in.producer,
@@ -157,11 +163,13 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 	}
 	//这里要判断leader
 	//即使已经提交（cmdindex 和 CSM 相等），但还要确保你是 leader，否则你不能承认自己已经处理了这条命令
+	var index int
 	praft.rmu.Unlock()
 	if in2 == in.cmdindex {
 		_, isLeader = praft.parts[str].GetState()
 	} else {
-		//index,_,isLeader=praft.parts[str].Start(0)
+		//Start() 成功 → 写 CSM → 日志 apply → 写 CDM
+		index, _, isLeader = praft.parts[str].Start(O)
 	}
 	if !isLeader {
 		return ErrWrongLeader, nil
@@ -174,5 +182,41 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 		}
 		praft.CSM[str][in.producer] = in.cmdindex
 		praft.rmu.Unlock()
+		//等待 apply 成功或超时
+		for {
+			select {
+			case out := <-praft.Add:
+				if index == out.index {
+					return OK, nil
+				} else {
+					DEBUG(dLog, "S%d index!=out.index pytappend %d != %d\n", praft.me, index, out.index)
+				}
+			case <-time.After(TOUT * time.Microsecond):
+				_, isLeader = praft.parts[str].GetState()
+				ret := ErrTimeOut
+				praft.rmu.Lock()
+				DEBUG(dLog, "S%d lock 332\n", praft.me)
+				DEBUG(dLeader, "S%d time out\n", praft.me)
+				if !isLeader {
+					ret = ErrWrongLeader
+					praft.CSM[str][in.producer] = lastindex
+				}
+				praft.rmu.Unlock()
+				return ret, nil
+			}
+		}
 	}
+}
+
+// 添加一个需要raft同步的partition
+func (praft *parts_raft) AddPart_Raft(peers []*raft_operations.Client, me int, topic, part string, aplych chan Info) {
+	str := topic + part
+	praft.rmu.Lock()
+	_, ok := praft.parts[str]
+	if !ok {
+		per := &raft.Persister{}
+		part_raft := raft.Make(peers, me, per, aplych, topic, part)
+		praft.parts[str] = part_raft
+	}
+	praft.rmu.Unlock()
 }

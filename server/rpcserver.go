@@ -100,19 +100,18 @@ func (s *RPCServer) Stop() {
 // 生产者	向 Broker 投递一条消息
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
 	fmt.Println(req)
-	err = s.server.PushHandle(Info{
+	ret, err = s.server.PushHandle(Info{
 		producer:  req.ProducerId,
 		topic:     req.Topic,
 		partition: req.Key,
 		message:   req.Message,
 	})
 	if err == nil {
-		return &api.PushResponse{
-			Ret: true,
-		}, nil
+		//
 	}
 	return &api.PushResponse{
 		Ret: false,
+		Err: ret,
 	}, err
 }
 

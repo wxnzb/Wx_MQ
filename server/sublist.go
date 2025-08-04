@@ -24,7 +24,7 @@ type Topic struct {
 	rmu     sync.RWMutex
 	Parts   map[string]*Partition    //分区列表
 	SubList map[string]*SubScription //订阅列表
-	Files   map[string]string
+	Files   map[string]*File
 	Name    string
 }
 
@@ -34,7 +34,7 @@ func NewTopic(topicName string) *Topic {
 		rmu:     sync.RWMutex{},
 		Parts:   make(map[string]*Partition),
 		SubList: make(map[string]*SubScription),
-		Files:   make(map[string]string),
+		Files:   make(map[string]*File),
 		Name:    topicName,
 	}
 	str, _ := os.Getwd()
@@ -60,7 +60,7 @@ func (t *Topic) AddMessage(req Info) error {
 	part, ok := t.Parts[req.partition]
 	part.rmu.Lock()
 	if !ok {
-		DEBUG(dERROR, "no this partition")
+		DEBUG(dError, "no this partition")
 		//要是没有这个分区，就要创建一个新的分区
 		part = NewPartition(req.topic, req.partition)
 		t.Parts[req.partition] = part
@@ -71,41 +71,37 @@ func (t *Topic) AddMessage(req Info) error {
 }
 
 // 消费者要订阅topic里面的一个分区
-func (t *Topic) AddScription(req SubRequest, con *ToConsumer) (*SubScription, error) {
-	ret := GetStringFromSub(req.topic, req.key, req.option)
+func (t *Topic) AddScription(in Info) (*SubScription, error) {
+	ret := GetStringFromSub(in.topic, in.partition, in.option)
 	//说明这个订阅已经存在了，将新的消费者加入到订阅这个的列表里面
 	t.rmu.RLock()
 	subScription, ok := t.SubList[ret]
 	t.rmu.RUnlock()
 	if ok {
-		subScription.AddConsumer(req)
+		subScription.AddConsumer(in)
 	} else {
-		subScription = NewSubScription(req, ret)
+		//后面那两个主要是干啥的，为啥要传进去
+		subScription = NewSubScription(in, ret, t.Parts, t.Files)
 		//更新订阅列表
 		t.rmu.Lock()
 		t.SubList[ret] = subScription
 		t.rmu.Unlock()
 	}
-	//t.Parts.AddConsumer(con)这个现在还不太清楚，先把他删了把
-	//t.Rebalance()
 	return subScription, nil
 }
 
 // 减少一个订阅，如果订阅存在就删出他，并重新进行负载均衡
-func (t *Topic) ReduceScription(req SubRequest) (string, error) {
-	ret := GetStringFromSub(req.topic, req.key, req.option)
+func (t *Topic) ReduceScription(in Info) (string, error) {
+	ret := GetStringFromSub(in.topic, in.partition, in.option)
 	t.rmu.Lock()
 	subscription, ok := t.SubList[ret]
 	if ok {
-		//delete(t.SubList, ret)
-		//这个是新加的
-		subscription.ReduceConsumer(req.consumer)
+		subscription.ReduceConsumer(in)
 	} else {
 		return ret, errors.New("订阅不存在")
 	}
 	delete(t.SubList, ret)
 	t.rmu.Unlock()
-	//t.Rebalance()
 	return ret, nil
 }
 
@@ -284,55 +280,61 @@ func (p *Partition) AddFile(path string) *File {
 
 // -----------------------------------------------------------
 type SubScription struct {
-	name               string //topicname+option类型
-	rmu                sync.RWMutex
+	rmu sync.RWMutex
+
+	name               string //topicname+partitionname+option类型
 	topic_name         string
 	consumer_partition map[string]string //一个消费者对应的分区
 	groups             []*Group
 	option             int8
 	config             *Config
 	nodes              map[string]*Node
+	partitions         map[string]*Partition
+	Files              map[string]*File
+	PTP_config         *Config
+	PSB_config         map[string]*PSBConfig_PUSH
+}
+type PSBConfig_PUSH struct {
+	rmu        sync.RWMutex
+	part_close chan *Part
+	file       *File
+	Cli        *client_operations.Client
+	part       *Part
 }
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
-func NewSubScription(sub SubRequest, ret string) *SubScription {
+func NewSubScription(in Info, name string, parts map[string]*Partition, files map[string]*File) *SubScription {
 	subScription := &SubScription{
-		rmu:                sync.RWMutex{},
-		topic_name:         sub.topic,
-		consumer_partition: make(map[string]string),
-		option:             sub.option,
-		name:               ret,
+		rmu:        sync.RWMutex{},
+		name:       name,
+		topic_name: in.topic,
+		option:     in.option,
+		partitions: parts,
+		Files:      files,
+		PTP_config: nil,
+		PSB_config: make(map[string]*PSBConfig_PUSH),
 	}
-	group := NewGroup(sub.topic, sub.consumer)
+	group := NewGroup(in.topic, in.consumer)
 	subScription.groups = append(subScription.groups, group)
-	subScription.consumer_partition[sub.consumer] = sub.key
-	//直接在这里加上点对点还是先有点问题
-	// if sub.option == TOPIC_NIL_PTP {
-	// 	//初始化哈希，然后将这个消费者加进去
-	// 	subScription.consistent = NewConsistent()
-	// 	subScription.consistent.Add(sub.consumer)
-	// }
 	return subScription
 }
 
 // ---这个也不要了吗
 // 将消费者加入到这个订阅队列里面
-func (sub *SubScription) AddConsumer(req SubRequest) {
+func (sub *SubScription) AddConsumer(in Info) {
 	sub.rmu.Lock()
 	defer sub.rmu.Unlock()
-	switch req.option {
+	switch in.option {
 	//点对点订阅，全部放在一个消费者组里面
 	case TOPIC_NIL_PTP:
 		{
-			//sub.groups[0].consumers[req.consumer]=true
-			sub.groups[0].AddConsumer(req.consumer)
+			sub.groups[0].AddConsumer(in.consumer)
 		}
 	//按key发布的订阅，创建新的消费者组
 	case TOPIC_KEY_PSB:
 		{
-			group := NewGroup(req.topic, req.consumer)
+			group := NewGroup(in.topic, in.consumer)
 			sub.groups = append(sub.groups, group)
-			sub.consumer_partition[req.consumer] = req.key
 		}
 	}
 }
@@ -360,19 +362,19 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	//sub.Rebalance()好像不需要这句
 	return sub.topic_name
 }
-func (sub *SubScription) ReduceConsumer(consumer_name string) {
+func (sub *SubScription) ReduceConsumer(in Info) {
 	sub.rmu.Lock()
-	switch sub.option {
+	switch in.option {
 	case TOPIC_NIL_PTP:
 		{
-			sub.groups[0].DeleteConsumer(consumer_name)
-			//sub.consistent.Reduce(consumer_name)
+			sub.groups[0].DeleteConsumer(in.consumer)
+			sub.PTP_config.DeleteConsumer(in.partition, in.consumer)
 
 		}
 	case TOPIC_KEY_PSB:
 		{
 			for _, group := range sub.groups {
-				group.DeleteConsumer(consumer_name)
+				group.DeleteConsumer(in.consumer)
 			}
 		}
 	}
@@ -380,19 +382,19 @@ func (sub *SubScription) ReduceConsumer(consumer_name string) {
 }
 
 // 恢复消费者
-func (sub *SubScription) RecoverConsumer(req SubRequest) {
+func (sub *SubScription) RecoverConsumer(in Info) {
 	sub.rmu.Lock()
 	switch sub.option {
 	case TOPIC_NIL_PTP:
 		{
-			sub.groups[0].RecoverConsumer(req.consumer)
+			sub.groups[0].RecoverConsumer(in.consumer)
 			//sub.consistent.Add(req.consumer)
 		}
 	case TOPIC_KEY_PSB:
 		{
-			group := NewGroup(req.topic, req.consumer)
+			group := NewGroup(in.topic, in.consumer)
 			sub.groups = append(sub.groups, group)
-			sub.consumer_partition[req.consumer] = req.key
+			//sub.consumer_partition[req.consumer] = req.key
 		}
 	}
 	sub.rmu.Unlock()
@@ -573,11 +575,16 @@ func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_
 	if c.con_part == true {
 		err := c.consistent.Add(consumer)
 		if err != nil {
-			DEBUG(dERROR, err.Error())
+			DEBUG(dError, err.Error())
 		}
 	}
 	c.RebalancePtoC() //更新配置
 	c.UpdateParts()   //应用配置
+}
+
+// 从配置中删除一个 client（consumer）在指定 partition 上的绑定关系，并进行负载均衡
+func (c *Config) DeleteConsumer(part, consumer string) {
+
 }
 func GetPartitionArry(partitions map[string]*Partition) []string {
 	var arry []string

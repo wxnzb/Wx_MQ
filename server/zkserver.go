@@ -194,7 +194,8 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 
 }
 func (zks *ZKServer) SubHandle(sub Info_in) error {
-
+	// 在zookeeper上创建sub节点，要是节点已经存在，就加入group
+	return nil
 }
 
 // 创建一个新的broker
