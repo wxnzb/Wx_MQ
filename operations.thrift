@@ -3,9 +3,18 @@ namespace go api
 //下面的key是分区
 struct PushRequest{
     1:string producerId
+
     2:string topic
     3:string key
-    4:string message
+
+    4:binary message
+    //虾米在哪这两个会用到吗
+    5:i64 StartIndex
+    6:i64 EndIndex
+    7:i8 Size
+
+    8:i8 Ack
+    9:i64 Comindex
 }
 //推送消息是否成功
 struct PushResponse{
@@ -15,12 +24,14 @@ struct PushResponse{
 //拉取消息所需的信息
 struct PullRequest{
     1:string consumerId
+
     2:string topic
     3:string key
-    //现在加了要求
+
     4:i64 offset
-    5:i8 option
-    6:i8 size
+    5:i8 size
+
+    6:i8 option
 }
 //拉取到的消息
 struct PullResponse{
@@ -162,14 +173,14 @@ struct SubResponse{
     1:bool ret
 }
 //在消费者消费消息的时候需要更新分区
-struct UpdatePTPOffsetRequest{
-    1:string topic
-    2:string part
-    3:i64 offset
-}
-struct UpdatePTPOffsetResponse{
-    1:bool ret
-}
+// struct UpdatePTPOffsetRequest{
+//     1:string topic
+//     2:string part
+//     3:i64 offset
+// }
+// struct UpdatePTPOffsetResponse{
+//     1:bool ret
+// }
 //bro注册自己
 struct BroInfoRequest{
     1:string bro_name
@@ -185,6 +196,37 @@ struct BroGetAssignRequest{
 struct BroGetAssignResponse{
     1:bool ret
     2:binary assignment
+}
+struct UpdateOffsetRequest{
+    1:string topic
+    2:string part
+    3:i64 offset
+}
+struct UpdateOffsetResponse{
+    1:bool ret
+}
+struct UpdateDupRequest{
+    1:string topic
+    2:string part
+    3:string brokerName
+    4:string blockName
+    5:i64 EndIndex
+    6:bool leader
+}
+struct UpdateDupResponse{
+    1:bool ret
+}
+struct ConStartGetBroRequest{
+    1:string topic
+    2:string part
+    3:i64 offset
+    4:i8 option
+    5:string cli_name
+}
+struct ConStartGetBroResponse{
+    1:bool ret
+    2:i64 size
+    3:binary parts
 }
 struct CreateTopicRequest{
     1:string topic_name
@@ -208,10 +250,13 @@ service ZKServer_Operations{
     //consumer
     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
     SubResponse Sub(1:SubRequest req)
-    UpdatePTPOffsetResponse UpdatePTPOffset(1:UpdatePTPOffsetRequest req)
+    //UpdatePTPOffsetResponse UpdatePTPOffset(1:UpdatePTPOffsetRequest req)
      //broker
     BroInfoResponse  BroInfo(1:BroInfoRequest req)
     BroGetAssignResponse BroGetAssign(1:BroGetAssignRequest req)
+    UpdateOffsetResponse UpdateOffset(1:UpdateOffsetRequest req)
+    UpdateDupResponse UpdateDup(1:UpdateDupRequest req)
+    ConStartGetBroResponse ConStartGetBro(1:ConStartGetBroRequest req)
     //------------------
     CreateTopicResponse CreateTopic(1:CreateTopicRequest req)
     CreatePartitionResponse CreatePartition(1:CreatePartitionRequest req)

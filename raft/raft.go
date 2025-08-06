@@ -896,7 +896,7 @@ func (r *Raft) requestvotes(term int) {
 }
 
 // 如果当前节点是 Leader，就把客户端传入的 command 封装成日志项，追加到本地日志中，然后触发 Raft 的日志复制过程
-func (r *Raft) Start(command interface{}) (int, int, bool) {
+func (r *Raft) Start(command Op, beleader bool, leader int) (int, int, bool) {
 	index := -1
 	term := -1
 	isLeader := false
@@ -910,14 +910,17 @@ func (r *Raft) Start(command interface{}) (int, int, bool) {
 				LogTerm:  r.currentTerm,
 				LogIndex: len(r.log) + r.X,
 				Log:      command,
+				BeLeader: beleader,
+				Leader:   leader,
 			}
 			r.log = append(r.log, com)
+			//matchIndex 表示该节点上已复制的最新日志索引
 			r.matchIndex[r.me]++
 
 			index = com.LogIndex
 			term = r.currentTerm
 			DEBUG(dLog, "S%d have log %v\n", r.me, com)
-
+			//进行持久化
 			go r.Persist()
 			r.electionTimePass = 0
 			//启动日志同步

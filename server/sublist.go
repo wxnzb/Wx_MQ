@@ -1,7 +1,9 @@
 package server
 
 import (
+	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
+	"context"
 	"errors"
 	"hash/crc32"
 	"os"
@@ -12,10 +14,14 @@ import (
 )
 
 const (
-	OFFSET        = 0
-	TOPIC_NIL_PTP = 1
-	TOPIC_NIL_PSB = 2
-	TOPIC_KEY_PSB = 3
+	OFFSET = 0
+
+	TOPIC_NIL_PTP_PUSH = 1
+	TOPIC_NIL_PTP_PULL = 2
+	TOPIC_KEY_PSB_PUSH = 3
+	TOPIC_KEY_PSB_PULL = 4
+	//下面这个主要是干什么的？
+	TOPIC_NIL_PSB = 10
 	VIRTUAL_10    = 10
 	VIRTUAL_20    = 20
 )
@@ -55,18 +61,18 @@ func (t *Topic) AddPartition(partName string) {
 	t.rmu.Unlock()
 }
 
-// PushRequest
+// PushRequest，这里添加将消息写入分区
 func (t *Topic) AddMessage(req Info) error {
 	part, ok := t.Parts[req.partition]
-	part.rmu.Lock()
 	if !ok {
 		DEBUG(dError, "no this partition")
 		//要是没有这个分区，就要创建一个新的分区
 		part = NewPartition(req.topic, req.partition)
 		t.Parts[req.partition] = part
 	}
+	part.rmu.Lock()
+	part.AddMessage(req)
 	part.rmu.Unlock()
-
 	return nil
 }
 
@@ -105,16 +111,14 @@ func (t *Topic) ReduceScription(in Info) (string, error) {
 	return ret, nil
 }
 
+// 根据订阅选项生成订阅字符串
 // topic + "nil" + "ptp" (point to point consumer比partition为 1 : n)
-// topic + key   + "psb" (pub and sub consumer比partition为 n : 1)
-// topic + "nil" + "psb" (pub and sub consumer比partition为 n : n)
+// topic + key   + "psb" (pub and sub consumer比partition为 n : 1)按键分发
 func GetStringFromSub(topic_name, partition_name string, option int8) string {
 	ret := topic_name
-	if option == TOPIC_NIL_PTP {
-		ret = ret + "nil" + "ptp"
-	} else if option == TOPIC_NIL_PSB {
-		ret = ret + "nil" + "psb"
-	} else if option == TOPIC_KEY_PSB {
+	if option == TOPIC_NIL_PTP_PUSH || option == TOPIC_NIL_PTP_PULL {
+		ret = ret + "NIL" + "ptp"
+	} else if option == TOPIC_KEY_PSB_PUSH || option == TOPIC_KEY_PSB_PULL {
 		ret = ret + partition_name + "psb"
 	}
 	return ret
@@ -158,6 +162,18 @@ func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
 
 }
 
+// 根据 sub_name 找到对应的订阅（Sub）对象，然后将当前消费者 cli 注册到这个订阅下，并更新其配置（负载均衡相关配置）
+func (t *Topic) StartToGetHandle(sub_name string, in Info, cli *client_operations.Client) error {
+	t.rmu.RLock()
+	defer t.rmu.RUnlock()
+	sub, ok := t.SubList[sub_name]
+	if !ok {
+		return errors.New("no this sub")
+	}
+	sub.AddConsumerInConfig(in, cli)
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 type Partition struct {
 	rmu   sync.RWMutex
@@ -169,6 +185,7 @@ type Partition struct {
 	fd          *os.File
 	index       int64 //文件指向的位置
 	start_index int64
+	state       string
 }
 
 // 创建一个新的分区
@@ -182,6 +199,51 @@ func NewPartition(topic, partition string) *Partition {
 	str += "/" + ip_name + "/" + topic + "/" + partition
 
 	return part
+}
+
+// 内存队列中累积消息，并在队列达到一定长度后批量写入文件
+func (p *Partition) AddMessage(req Info) (ret string, err error) {
+	p.rmu.Lock()
+	if p.state == DOWN {
+		ret = "this part close"
+		return ret, errors.New(ret)
+	}
+	p.index++
+	msg := Message{
+		Topic_name:     req.topic,
+		Partition_name: req.partition,
+		Index:          p.index,
+		Msg:            req.message,
+		Size:           req.size,
+	}
+	p.queue = append(p.queue, msg)
+	//达到一定大小后写入磁盘
+	if p.index-p.start_index >= VIRTUAL_10 {
+		var msgs []Message
+		for i := 0; i < VIRTUAL_10; i++ {
+			msgs = append(msgs, p.queue[i])
+		}
+		node := NodeData{
+			Start_index: p.start_index,
+			End_index:   p.start_index + VIRTUAL_10 - 1,
+		}
+		//这里用for是重试机制，只要 WriteFile() 写失败（返回 false），就不断重试，并打印错误日志，直到写成功为止
+		for !p.file.WriteFile(p.fd, node, msgs) {
+			//DEBUG(dERROR, "write to %v fail\n", p.file_name)
+		}
+		p.start_index = p.start_index + VIRTUAL_10 + 1
+		p.queue = p.queue[VIRTUAL_10:]
+	}
+	p.rmu.Unlock()
+	(*req.zkclient).UpdateDup(context.Background(), &api.UpdateDupRequest{
+		Topic: req.topic,
+		Part:  req.partition,
+		//但是这个是啥时候传进去的？？
+		BrokerName: req.BrokerName,
+		BlockName:  GetBlockName(req.file_name),
+		EndIndex:   p.index,
+	})
+	return ret, err
 }
 
 // 在新创建了一个分区之后，要做的是，发布消息给所有分区的消费者，但是现在还没有消费者呀，好奇怪？？？？
@@ -241,36 +303,6 @@ func (p *Partition) GetFile() *File {
 	p.rmu.RLock()
 	defer p.rmu.Unlock()
 	return p.file
-}
-
-// 内存队列中累积消息，并在队列达到一定长度后批量写入文件
-func (p *Partition) addMessage(req Push) {
-	p.rmu.Lock()
-	defer p.rmu.Unlock()
-	p.index++
-	msg := Message{
-		Topic_name:     req.topic,
-		Partition_name: req.key,
-		Index:          p.index,
-		Msg:            []byte(req.message),
-	}
-	p.queue = append(p.queue, msg)
-	if p.index-p.start_index >= VIRTUAL_10 {
-		var msgs []Message
-		for i := 0; i < VIRTUAL_10; i++ {
-			msgs = append(msgs, p.queue[i])
-		}
-		node := NodeData{
-			Start_index: p.start_index,
-			End_index:   p.start_index + VIRTUAL_10,
-		}
-		//这里用for是重试机制，只要 WriteFile() 写失败（返回 false），就不断重试，并打印错误日志，直到写成功为止
-		for !p.file.WriteFile(p.fd, node, msgs) {
-			//DEBUG(dERROR, "write to %v fail\n", p.file_name)
-		}
-		p.start_index = p.start_index + VIRTUAL_10 + 1
-		p.queue = p.queue[VIRTUAL_10:]
-	}
 }
 
 // 为partition添加一个文件存储他
@@ -409,20 +441,25 @@ func (sub *SubScription) GetConfig() *Config {
 	defer sub.rmu.RUnlock()
 	return sub.config
 }
-func (sub *SubScription) AddConsumerInConfig(req PartitionInfo, tocon *client_operations.Client) {
+func (sub *SubScription) AddConsumerInConfig(req Info, tocon *client_operations.Client) {
 	sub.rmu.Lock()
 	defer sub.rmu.Unlock()
 	switch req.option {
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
-			sub.config.AddToconsumer(req.partition, req.consumer_ipname, tocon)
+			sub.PTP_config.AddToconsumer(req.partition, req.consumer_ipname, tocon)
 		}
-	case TOPIC_KEY_PSB:
-		{
-			group := NewGroup(req.topic, req.consumer_ipname)
-			sub.groups = append(sub.groups, group)
+	case TOPIC_KEY_PSB_PUSH:
+		config, ok := sub.PSB_config[req.partition+req.consumer_ipname]
+		if !ok {
+			DEBUG(dError, "this PSBconfig PUSH is not been\n")
 		}
+		config.Start(req, tocon)
 	}
+}
+
+func (pc *PSBConfig_PUSH) Start(req Info, tocon *client_operations.Client) {
+
 }
 func (sub *SubScription) PullMessage(pullRequest Info) (MSGS, error) {
 	node_name := pullRequest.topic + pullRequest.partition + pullRequest.consumer

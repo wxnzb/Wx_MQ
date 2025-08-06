@@ -49,42 +49,47 @@ type PartitionNode struct {
 	Option   int8   `json:option`
 }
 type BlockNode struct {
-	Name        string `json:"name"`
-	Topic       string `json:"topic"`
-	Partition   string `json:"partition"`
-	StartOffset int64  `json:"start_offset"`
-	EndOffset   int64  `json:"end_offset"`
-	FileName    string `json:filename`
+	Name         string `json:"name"`
+	Topic        string `json:"topic"`
+	Partition    string `json:"partition"`
+	StartOffset  int64  `json:"start_offset"`
+	EndOffset    int64  `json:"end_offset"`
+	FileName     string `json:filename`
+	LeaderBroker string `json:leaderbroker`
 }
 
-// 使用反射确定节点类型
-func (z *ZK) RegisterNode(node interface{}) error {
+// 在zk指定路径创建永久节点
+func (z *ZK) RegisterNode(node interface{}) (err error) {
 	path := ""
 	var bronode BrokerNode
 	var tNode TopicNode
 	var pNode PartitionNode
 	var bloNode BlockNode
+	//reflect.TypeOf(node) 反射的作用是获取 node 的类型信息
 	i := reflect.TypeOf(node)
 	var data []byte
 	switch i.Name() {
 	case "BrokerNode":
 		bronode = node.(BrokerNode)
 		path = z.BrokerRoot + "/" + bronode.Name
-		data, _ = json.Marshal(bronode)
+		data, err = json.Marshal(bronode)
 	case "TopicNode":
 		tNode = node.(TopicNode)
 		path = z.TopicRoot + "/" + tNode.Name
-		data, _ = json.Marshal(tNode)
+		data, err = json.Marshal(tNode)
 	case "PartitionNode":
 		pNode = node.(PartitionNode)
 		path = z.TopicRoot + "/" + pNode.Topic + pNode.Name
-		data, _ = json.Marshal(pNode)
+		data, err = json.Marshal(pNode)
 	case "BlockNode":
 		bloNode = node.(BlockNode)
 		path = z.TopicRoot + "/" + bloNode.Topic + "/" + bloNode.Partition + "/" + bloNode.Name
-		data, _ = json.Marshal(bloNode)
+		data, err = json.Marshal(bloNode)
 	}
-	_, err := z.Con.Create(path, data, 0, zk.WorldACL(zk.PermAll))
+	if err != nil {
+		return err
+	}
+	_, err = z.Con.Create(path, data, 0, zk.WorldACL(zk.PermAll))
 	if err != nil {
 		return err
 	}
@@ -98,6 +103,7 @@ type Part struct {
 	BroHostPort   string
 	PTPIndex      int64 //名字解释：生产端写入某个 Topic/Partition 的偏移
 	FileName      string
+	Err           string
 }
 
 // 获取Topic下所有partition对应的消费到的block信息
@@ -191,9 +197,27 @@ func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
 }
 func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode) {
 	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
-	NowBlock := z.GetBlockNode(Now_block_path)
-	NowBroker := z.GetBrokerNode(NowBlock.Name)
-	return NowBroker, NowBlock
+	for {
+		NowBlock := z.GetBlockNode(Now_block_path)
+		NowBroker := z.GetBrokerNode(NowBlock.LeaderBroker)
+		ret := z.CheckBroker(z.BrokerRoot + NowBlock.LeaderBroker)
+		if ret {
+			return NowBroker, NowBlock
+		} else {
+			time.Sleep(time.Second * 1)
+		}
+	}
+}
+
+// 检查broker是否在线
+func (z *ZK) CheckBroker(brokerpath string) bool {
+	brokerpath = brokerpath + "/state"
+	ok, _, _ := z.Con.Exists(brokerpath)
+	if !ok {
+		return false
+	} else {
+		return true
+	}
 }
 func (z *ZK) GetBlockNode(path string) BlockNode {
 	var bloNode BlockNode
@@ -201,11 +225,11 @@ func (z *ZK) GetBlockNode(path string) BlockNode {
 	json.Unmarshal(data, &bloNode)
 	return bloNode
 }
-func (z *ZK) GetBrokerNode(path string) BrokerNode {
+func (z *ZK) GetBrokerNode(name string) BrokerNode {
 	//这个为什么path和上面的不一样
-	path = z.BrokerRoot + "/" + path
+	name = z.BrokerRoot + "/" + name
 	var broNode BrokerNode
-	data, _, _ := z.Con.Get(path)
+	data, _, _ := z.Con.Get(name)
 	json.Unmarshal(data, &broNode)
 	return broNode
 }
@@ -223,8 +247,8 @@ func (z *ZK) CheckSub(info StartGetInfo) bool {
 }
 
 // 创建临时节点
-func (z *ZK) CreateState(serverName string) error {
-	path := z.BrokerRoot + "/" + serverName + "/state"
+func (z *ZK) CreateState(brokerName string) error {
+	path := z.BrokerRoot + "/" + brokerName + "/state"
 	ok, _, err := z.Con.Exists(path)
 	if !ok {
 		return err

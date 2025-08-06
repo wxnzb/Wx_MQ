@@ -15,15 +15,15 @@ import (
 )
 
 type ZKServer struct {
-	rmu sync.RWMutex
-	zk  zookeeper.ZK
+	rmu  sync.RWMutex
+	zk   zookeeper.ZK
+	Name string
 
 	info_brokers   map[string]zookeeper.BrokerNode
 	info_topics    map[string]zookeeper.TopicNode
 	info_partition map[string]zookeeper.PartitionNode
-
+	//连接各个brokers
 	brokers map[string]server_operations.Client
-	Name    string
 }
 
 func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
@@ -45,6 +45,7 @@ type Info_in struct {
 	PartitionName string
 	Option        int8
 	CliName       string
+	BlockName     string
 	Index         int64
 	Dupnum        int8
 }
@@ -53,6 +54,21 @@ type Info_out struct {
 	broker_name   string
 	bro_host_port string
 	Ret           string
+}
+
+func (zks *ZKServer) UpdateDupHandle(in Info_in) error {
+	str := zks.zk.TopicRoot + "/" + in.TopicName + "/" + in.PartitionName + "/" + in.BlockName
+	BlockNode, err := zks.zk.GetBlockNode(str)
+	if err != nil {
+		return err
+	}
+	if in.Index > BlockNode.EndOffset {
+		BlockNode.EndOffset = in.Index
+		err = zks.zk.RegisterNode(BlockNode)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // type PrepareAcceptRequest struct {
@@ -64,10 +80,10 @@ type Info_out struct {
 func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 	broker, block := zks.zk.GetNowPartBrokerNode(req.TopicName, req.PartitionName)
 	zks.rmu.RLock()
-	bro_cli, ok := zks.brokers[broker.Name]
+	bro_cli, ok := zks.brokers[block.LeaderBroker]
 	zks.rmu.RUnlock()
 	if !ok {
-		bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(broker.Host+broker.Port))
+		bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(broker.HostPort))
 		if err != nil {
 
 		}
@@ -86,7 +102,7 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 	}
 	return Info_out{
 		broker_name:   broker.Name,
-		bro_host_port: broker.Host + broker.Port,
+		bro_host_port: broker.HostPort,
 	}
 
 }
@@ -198,13 +214,135 @@ func (zks *ZKServer) SubHandle(sub Info_in) error {
 	return nil
 }
 
-// 创建一个新的broker
+// 将broker发送过来想要连接的名字，通过地址和名字联系起来，也就是两者有了联系
 func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
-	brocli, err := server_operations.NewClient(zks.Name, client.WithHost(brohostport))
+	brocli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(brohostport))
+	if err != nil {
+		DEBUG(dError, err.Error())
+	}
 	zks.rmu.Lock()
 	zks.brokers[broname] = brocli
 	zks.rmu.Unlock()
-	return err
+	return nil
+}
+
+// func (s *Server) StartGet(req Info) (err error) {
+// 	//先看
+// 	switch req.option {
+// 	//负载均衡
+// 	case TOPIC_NIL_PTP:
+// 		{
+// 			s.rmu.Lock()
+// 			defer s.rmu.Unlock()
+// 			//先看这个是否订阅
+// 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
+// 			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
+// 			sub := s.consumers[req.consumer_ipname].GetSub(sub_name)
+// 			if ret == true {
+// 				sub.AddConsumerInConfig(req, s.consumers[req.consumer_ipname].GetToConsumer())
+// 			} else {
+// 				err = errors.New("not subscribe")
+// 			}
+// 		}
+// 		//广播
+// 	case TOPIC_KEY_PSB:
+// 		{
+// 			s.rmu.Lock()
+// 			defer s.rmu.Unlock()
+// 			//先看这个是否订阅
+// 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
+// 			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
+// 			if ret == true {
+// 				//下面这三行是为了没有这个分区的时候新建一个
+// 				// toConsumers := make(map[string]*client_operations.Client)
+// 				// toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
+// 				// file := s.topics[req.topic].GetFile(req.partition)
+// 				// go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
+// 			} else {
+// 				err = errors.New("not subscribe")
+// 			}
+// 		}
+// 	default:
+// 		err = errors.New("option error")
+
+//		}
+//		return err
+//	}
+//
+// 感觉和server的这个差不多，先看看
+func (zks *ZKServer) ConStartGetBroHandle(in Info_in) (rets []byte, size int, err error) {
+
+	//先检查这个consumer收否订阅了这个topic/partition
+	zks.zk.CheckSub(zookeeper.StartGetInfo{
+		CliName:       in.CliName,
+		TopicName:     in.TopicName,
+		PartitionName: in.PartitionName,
+		Option:        in.Option,
+	})
+	//获取topic或者part的broker,需要保证在先，要是全部离线则ERR
+	var Parts []zookeeper.Part
+	if in.Option == 1 {
+		Parts, err = zks.zk.GetBrokers(in.TopicName)
+	} else if in.Option == 3 {
+		Parts, err = zks.zk.GetBroker(in.TopicName, in.PartitionName, in.Index)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	//-----------------
+	partkeys := zks.SendPrepare(Parts, in)
+	data, err := json.Marshal(partkeys)
+	if err != nil {
+		DEBUG(dError, "turn partkeys to json fail %v", err.Error())
+	}
+	return data, len(partkeys), nil
+
+}
+
+// 对一组分区 (Parts) 所属的 broker 发起 “PrepareSend” 请求，准备将某段数据推送过去，并记录结果（partkeys）返回
+func (zks *ZKServer) SendPrepare(Parts []zookeeper.Part, info Info_in) (partkeys []clients.PartKey) {
+	for _, part := range Parts {
+		if part.Err != OK {
+			partkeys = append(partkeys, clients.PartKey{
+				Err: part.Err,
+			})
+			continue
+		}
+		zks.rmu.RLock()
+		bro_cli, ok := zks.brokers[part.BrokerName]
+		zks.rmu.RUnlock()
+		if !ok {
+			bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(part.BroHostPort))
+			if err != nil {
+				return nil
+			}
+			zks.rmu.Lock()
+			zks.brokers[part.BrokerName] = bro_cli
+			zks.rmu.Unlock()
+		}
+		rep := &api.PrepareSendRequest{
+			Topic_Name:     info.TopicName,
+			Partition_Name: info.PartitionName,
+			File_Name:      part.FileName,
+			Option:         info.Option,
+		}
+		if info.Option == 1 {
+			rep.Offset = part.PTPIndex
+		} else if info.Option == 3 {
+			rep.Offset = info.Index
+		}
+		resp, err := bro_cli.PrepareSend(context.Background(), rep)
+		if err != nil || !resp.Ret {
+			return nil
+		}
+		partkeys = append(partkeys, clients.PartKey{
+			Name:       part.PartitionName,
+			BrokerName: part.BrokerName,
+			BrokerHP:   part.BroHostPort,
+			Err:        OK,
+		})
+	}
+	return partkeys
 }
 func (zks *ZKServer) CreateTopicHandle(topic Info_in) Info_out {
 	tNode := zookeeper.TopicNode{
@@ -220,6 +358,7 @@ func (zks *ZKServer) CreatePartitionHandle(part Info_in) Info_out {
 		Name:     part.PartitionName,
 		Topic:    part.TopicName,
 		PTPIndex: int64(0),
+		Option:   -2,
 	}
 	err := zks.zk.RegisterNode(pNode)
 	err = zks.CreateNowBlock(part)
@@ -242,7 +381,7 @@ func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 }
 
 // 自己感觉这里是可以简化的
-func (zks *ZKServer) UpdatePTPOffset(info Info_in) error {
+func (zks *ZKServer) UpdateOffset(info Info_in) error {
 	err := zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
 		Name:     info.PartitionName,
 		Topic:    info.TopicName,

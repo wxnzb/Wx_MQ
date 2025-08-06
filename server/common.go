@@ -124,3 +124,8 @@ type Broker_Power struct {
 type Broker_Assign struct {
 	Topics map[string]Top_Info
 }
+
+func GetBlockName(file_name string) (ret string) {
+	ret = file_name[:len(file_name)-4]
+	return ret
+}

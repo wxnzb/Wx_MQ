@@ -12,6 +12,7 @@ package server
 import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
+	"Wx_MQ/kitex_gen/api/zkserver_operations"
 	"context"
 	"encoding/json"
 	"errors"
@@ -129,7 +130,7 @@ func (con *ToConsumer) GetSub(sub_name string) *SubScription {
 	//先这样做吧，这里应该先判断一下她存在不？？
 	ok := con.CheckSubscription(sub_name)
 	if !ok {
-		DEBUG(dERROR, "no such sub:%s", sub_name)
+		DEBUG(dError, "no such sub:%s", sub_name)
 	}
 	return con.subList[sub_name]
 }
@@ -230,6 +231,7 @@ type Part struct {
 	endIndex     int64 //-----------------------------------------------------------------------
 	consumer_ack (chan ConsumerAck)
 	block_status map[int64]string //------------------------------------------------------------
+	zkclient     *zkserver_operations.Client
 }
 
 func NewPart(partinfo Info_in, file *File) *Part {
@@ -276,13 +278,13 @@ func (p *Part) Start(close chan Part) {
 	//这里得到的是这一块消息的偏移，他无法得到这一批消息的偏移，但是先在感觉这句根本就没有用上阿，为什么要放在这里？？
 	p.blockOffset, err = p.file.FindOffset(&p.fd, p.lastIndex)
 	if err != nil {
-		DEBUG(dERROR, err.Error())
+		DEBUG(dError, err.Error())
 	}
 	//开始从磁盘读取5个快放在buffer中
 	for i := 0; i < BUFF_NUM; i++ {
 		err = p.AddBlock()
 		if err != nil {
-			DEBUG(dERROR, err.Error())
+			DEBUG(dError, err.Error())
 		}
 	}
 	//开启一个携程接收消费者发送过来的ack
@@ -294,7 +296,7 @@ func (p *Part) Start(close chan Part) {
 		p.state = ALIVE
 	} else {
 		p.rmu.Unlock()
-		DEBUG(dERROR, "the part start already is alive\n")
+		DEBUG(dError, "the part start already is alive\n")
 		return
 	}
 	for name, toConsumer := range p.to_consumers {
@@ -328,7 +330,7 @@ type ConsumerAck struct {
 // 走的是负载均衡，每个块只能被一个消费者消费
 // |node-1...50|node-51...120|node-121...200|这就是三个块，这里的1.50等都是这批消息的索引
 // 需要修改成可主动关闭模式
-func (p *Part) GetDone(close chan Part) {
+func (p *Part) GetDone(close chan *Part) {
 	num := 0
 	for {
 		select {
@@ -337,12 +339,9 @@ func (p *Part) GetDone(close chan Part) {
 			if finish.err == OK {
 				//要是到达这个书就要更新zookeeper中的offset
 				num++
-				if num >= UPDATENUM {
-
-				}
 				err := p.AddBlock()
 				if err != nil {
-					DEBUG(dERROR, err.Error())
+					DEBUG(dError, err.Error())
 				}
 				if p.file.filePath != p.partition_name+"NowBlock.txt" && err == errors.New("read All file,don't find this index") {
 					p.state = DOWN
@@ -350,7 +349,7 @@ func (p *Part) GetDone(close chan Part) {
 				//这里len(p.block_status)还需要思考
 				if p.state == DOWN && len(p.block_status) == 0 {
 					p.rmu.Unlock()
-					close <- *p
+					close <- p
 					return
 				}
 				p.rmu.Lock()
@@ -366,6 +365,11 @@ func (p *Part) GetDone(close chan Part) {
 						delete(p.buffer_msgs, p.startIndex)
 						//p.startIndex = p.buffer_node[p.startIndex].End_index + 1
 						p.startIndex = node.End_index + 1
+						(*p.zkclient).UpdateOffset(context.Background(), &api.UpdateOffsetRequest{
+							Topic:  p.topic_name,
+							Part:   p.partition_name,
+							Offset: p.startIndex,
+						})
 					} else {
 						break
 					}

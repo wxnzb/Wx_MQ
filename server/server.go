@@ -15,8 +15,6 @@ import (
 
 	//"github.com/docker/docker/client"
 	"context"
-
-	"github.com/docker/docker/client"
 )
 
 type NodeData struct {
@@ -34,6 +32,7 @@ type Message struct {
 	Partition_name string `json:partition_name`
 	Index          int64  `json:"index"`
 	Msg            []byte `json:msg`
+	Size           int8   `json:size`
 }
 type Msgs struct {
 	producer string
@@ -69,35 +68,36 @@ func NewServer(zkInfo zookeeper.ZKInfo) *Server {
 func (s *Server) make(opt Options) {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
-	ip_name = GetIpPort()
+	ip_name = GetIpPort() //本地ipport
+	//为 当前 Broker 节点 创建一个 本地存储目录。目录名是 当前工作目录/ip_name,这是为了把broker的日志什么的存进去
 	s.CheckList()
 	s.name = opt.Name
-
-	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, client.WithHostPorts(opt.ZKServerHostPort))
+	//向zk注册自己，也就是让
+	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, cl.WithHostPorts(opt.ZKServerHostPort))
 	resp, err := s.zkclient.BroInfo(context.Background(), &api.BroInfoRequest{
 		BroName:     opt.Name,
 		BroHostPort: opt.BrokerHostPort,
 	})
 	if resp.Ret == false || err != nil {
-		//DEBUG(dERROR, "broker register failed")
+		DEBUG(dError, "broker register failed")
 	}
 	//s.InitBroker()
-	//本地创建一个parts_raft,为raft同步做准备
-	s.parts_rafts = NewPartRaft()
-	go s.parts_rafts.make(opt.Name, opt.RaftHostPort)
-	//下面这是干什么
+	//创建一个永久节点在zk中，/brokerroot/brokername里面存放了这个broker的json的name和ipport，作用：要是broker挂了，历史数据在者可以找到；用于其他节点的发现
 	err = s.zk.RegisterNode(zookeeper.BrokerNode{
 		Name:     s.name,
 		HostPort: opt.BrokerHostPort,
 	})
 	if err != nil {
-
+		DEBUG(dError, err.Error())
 	}
-	//创建临时节点，用于zkserver的watch
+	//创建临时节点，表示当前Broker 是否在线，为什么要用，broker挂了，但是永久节点还在，其他节点无法判断这个broker的状态，所以可以通过这个函数检查这个broker的状态
 	err = s.zk.CreateState(s.name)
 	if err != nil {
-
+		DEBUG(dError, err.Error())
 	}
+	//在这个节点的后台启动一个raft//这里还需要详细了解
+	s.parts_rafts = NewPartRaft()
+	go s.parts_rafts.make(opt.Name, opt.RaftHostPort, s.aplych)
 }
 func (s *Server) InitBroker() {
 	s.rmu.Lock()
@@ -210,25 +210,21 @@ func (s *Server) PushHandle(push Info) (ret string, err error) {
 	DEBUG(dLog, "get Message form producer\n")
 	s.rmu.RLock()
 	topic, ok := s.topics[push.topic]
-	part_raft := s.parts_rafts
+	broker_part_raft := s.parts_rafts
 	s.rmu.RUnlock()
-	// if !ok {
-	// 	//创建一个新的topic
-	// 	topic := NewTopic(push.topic)
-	// 	s.rmu.Lock()
-	// 	s.topics[push.topic] = topic
-	// 	s.rmu.Unlock()
-	// }
-	// topic.AddMessage(push)
+
 	if !ok {
 		ret = "this topic is not in this broker"
 		DEBUG(dError, "Topic %v,is not in this broker", push.topic)
 		return ret, errors.New(ret)
 	}
+
 	switch push.ack {
-	case -1: //raft同步并写入
-		ret, err = part_raft.Append(push)
-	case 1: //leader写入，不等待同步
+	//生产者要求 消息必须经过 Raft 共识（同步复制到多数节点）后再返回成功
+	case -1:
+		ret, err = broker_part_raft.Append(push)
+		//直接写入本地（Leader）Topic 的消息队列。不等待 Raft 复制。
+	case 1:
 		err = topic.AddMessage(push)
 	case 0: //直接返回
 		go topic.AddMessage(push)
@@ -251,7 +247,7 @@ type MSGS struct {
 }
 
 func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
-	if pullRequest.option == TOPIC_NIL_PTP {
+	if pullRequest.option == TOPIC_NIL_PTP_PULL {
 		//更新消费者偏移量并写入zookeeper记录消费者上次读取的位置
 		s.zkclient.UpdatePTPOffset(context.Background(), &api.UpdatePTPOffsetRequest{
 			Topic:  pullRequest.topic,
@@ -306,7 +302,7 @@ type Info struct {
 	file_name       string
 	producer        string
 	consumer        string
-	message         string
+	message         []byte
 	ack             int8
 	//cmdindex：幂等编号，防止重复提交
 	cmdindex int64
@@ -314,43 +310,49 @@ type Info struct {
 	brokers map[string]string
 	//这个是干什么的？？
 	me int
+	//update dup
+	zkclient   *zkserver_operations.Client
+	BrokerName string
 }
 
 func (s *Server) StartGet(req Info) (err error) {
-	//先看
+	/*
+		新开启一个consumer关于一个topic和partition的协程来消费该partition的信息；
+
+		查询是否有该订阅的信息；
+
+		PTP：需要负载均衡
+
+		PSB：不需要负载均衡
+	*/
 	switch req.option {
 	//负载均衡
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
-			s.rmu.Lock()
-			defer s.rmu.Unlock()
+			s.rmu.RLock()
+			defer s.rmu.RUnlock()
 			//先看这个是否订阅
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
-			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
-			sub := s.consumers[req.consumer_ipname].GetSub(sub_name)
-			if ret == true {
-				sub.AddConsumerInConfig(req, s.consumers[req.consumer_ipname].GetToConsumer())
-			} else {
-				err = errors.New("not subscribe")
-			}
+			return s.topics[req.topic].StartToGetHandle(sub_name, req, s.consumers[req.consumer_ipname].GetToConsumer())
 		}
 		//广播
-	case TOPIC_KEY_PSB:
+	case TOPIC_KEY_PSB_PUSH:
 		{
-			s.rmu.Lock()
-			defer s.rmu.Unlock()
+			s.rmu.RLock()
+			defer s.rmu.RUnlock()
 			//先看这个是否订阅
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
-			ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
-			if ret == true {
-				//下面这三行是为了没有这个分区的时候新建一个
-				// toConsumers := make(map[string]*client_operations.Client)
-				// toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
-				// file := s.topics[req.topic].GetFile(req.partition)
-				// go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
-			} else {
-				err = errors.New("not subscribe")
-			}
+			DEBUG(dLog, "%s\n", sub_name)
+			//ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
+			// if ret == true {
+			// 	//下面这三行是为了没有这个分区的时候新建一个
+			// 	// toConsumers := make(map[string]*client_operations.Client)
+			// 	// toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
+			// 	// file := s.topics[req.topic].GetFile(req.partition)
+			// 	// go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
+			// } else {
+			// 	err = errors.New("not subscribe")
+			// }
 		}
 	default:
 		err = errors.New("option error")
@@ -414,6 +416,7 @@ type SubResponse struct {
 	parts []PartName
 }
 
+// 现在完全看不到是在那里调用了他
 // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
 // 通过Sub结构体来订阅消息
 func (s *Server) SubHandle(in Info) (err error) {

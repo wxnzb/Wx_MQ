@@ -41,13 +41,6 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
-	"UpdatePTPOffset": kitex.NewMethodInfo(
-		updatePTPOffsetHandler,
-		newZKServer_OperationsUpdatePTPOffsetArgs,
-		newZKServer_OperationsUpdatePTPOffsetResult,
-		false,
-		kitex.WithStreamingMode(kitex.StreamingNone),
-	),
 	"BroInfo": kitex.NewMethodInfo(
 		broInfoHandler,
 		newZKServer_OperationsBroInfoArgs,
@@ -59,6 +52,27 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		broGetAssignHandler,
 		newZKServer_OperationsBroGetAssignArgs,
 		newZKServer_OperationsBroGetAssignResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"UpdateOffset": kitex.NewMethodInfo(
+		updateOffsetHandler,
+		newZKServer_OperationsUpdateOffsetArgs,
+		newZKServer_OperationsUpdateOffsetResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"UpdateDup": kitex.NewMethodInfo(
+		updateDupHandler,
+		newZKServer_OperationsUpdateDupArgs,
+		newZKServer_OperationsUpdateDupResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"ConStartGetBro": kitex.NewMethodInfo(
+		conStartGetBroHandler,
+		newZKServer_OperationsConStartGetBroArgs,
+		newZKServer_OperationsConStartGetBroResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -214,24 +228,6 @@ func newZKServer_OperationsSubResult() interface{} {
 	return api.NewZKServer_OperationsSubResult()
 }
 
-func updatePTPOffsetHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	realArg := arg.(*api.ZKServer_OperationsUpdatePTPOffsetArgs)
-	realResult := result.(*api.ZKServer_OperationsUpdatePTPOffsetResult)
-	success, err := handler.(api.ZKServer_Operations).UpdatePTPOffset(ctx, realArg.Req)
-	if err != nil {
-		return err
-	}
-	realResult.Success = success
-	return nil
-}
-func newZKServer_OperationsUpdatePTPOffsetArgs() interface{} {
-	return api.NewZKServer_OperationsUpdatePTPOffsetArgs()
-}
-
-func newZKServer_OperationsUpdatePTPOffsetResult() interface{} {
-	return api.NewZKServer_OperationsUpdatePTPOffsetResult()
-}
-
 func broInfoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.ZKServer_OperationsBroInfoArgs)
 	realResult := result.(*api.ZKServer_OperationsBroInfoResult)
@@ -266,6 +262,60 @@ func newZKServer_OperationsBroGetAssignArgs() interface{} {
 
 func newZKServer_OperationsBroGetAssignResult() interface{} {
 	return api.NewZKServer_OperationsBroGetAssignResult()
+}
+
+func updateOffsetHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsUpdateOffsetArgs)
+	realResult := result.(*api.ZKServer_OperationsUpdateOffsetResult)
+	success, err := handler.(api.ZKServer_Operations).UpdateOffset(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsUpdateOffsetArgs() interface{} {
+	return api.NewZKServer_OperationsUpdateOffsetArgs()
+}
+
+func newZKServer_OperationsUpdateOffsetResult() interface{} {
+	return api.NewZKServer_OperationsUpdateOffsetResult()
+}
+
+func updateDupHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsUpdateDupArgs)
+	realResult := result.(*api.ZKServer_OperationsUpdateDupResult)
+	success, err := handler.(api.ZKServer_Operations).UpdateDup(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsUpdateDupArgs() interface{} {
+	return api.NewZKServer_OperationsUpdateDupArgs()
+}
+
+func newZKServer_OperationsUpdateDupResult() interface{} {
+	return api.NewZKServer_OperationsUpdateDupResult()
+}
+
+func conStartGetBroHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsConStartGetBroArgs)
+	realResult := result.(*api.ZKServer_OperationsConStartGetBroResult)
+	success, err := handler.(api.ZKServer_Operations).ConStartGetBro(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsConStartGetBroArgs() interface{} {
+	return api.NewZKServer_OperationsConStartGetBroArgs()
+}
+
+func newZKServer_OperationsConStartGetBroResult() interface{} {
+	return api.NewZKServer_OperationsConStartGetBroResult()
 }
 
 func createTopicHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -354,16 +404,6 @@ func (p *kClient) Sub(ctx context.Context, req *api.SubRequest) (r *api.SubRespo
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) UpdatePTPOffset(ctx context.Context, req *api.UpdatePTPOffsetRequest) (r *api.UpdatePTPOffsetResponse, err error) {
-	var _args api.ZKServer_OperationsUpdatePTPOffsetArgs
-	_args.Req = req
-	var _result api.ZKServer_OperationsUpdatePTPOffsetResult
-	if err = p.c.Call(ctx, "UpdatePTPOffset", &_args, &_result); err != nil {
-		return
-	}
-	return _result.GetSuccess(), nil
-}
-
 func (p *kClient) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
 	var _args api.ZKServer_OperationsBroInfoArgs
 	_args.Req = req
@@ -379,6 +419,36 @@ func (p *kClient) BroGetAssign(ctx context.Context, req *api.BroGetAssignRequest
 	_args.Req = req
 	var _result api.ZKServer_OperationsBroGetAssignResult
 	if err = p.c.Call(ctx, "BroGetAssign", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) UpdateOffset(ctx context.Context, req *api.UpdateOffsetRequest) (r *api.UpdateOffsetResponse, err error) {
+	var _args api.ZKServer_OperationsUpdateOffsetArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsUpdateOffsetResult
+	if err = p.c.Call(ctx, "UpdateOffset", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) UpdateDup(ctx context.Context, req *api.UpdateDupRequest) (r *api.UpdateDupResponse, err error) {
+	var _args api.ZKServer_OperationsUpdateDupArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsUpdateDupResult
+	if err = p.c.Call(ctx, "UpdateDup", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ConStartGetBro(ctx context.Context, req *api.ConStartGetBroRequest) (r *api.ConStartGetBroResponse, err error) {
+	var _args api.ZKServer_OperationsConStartGetBroArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsConStartGetBroResult
+	if err = p.c.Call(ctx, "ConStartGetBro", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
