@@ -163,14 +163,14 @@ func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
 }
 
 // 根据 sub_name 找到对应的订阅（Sub）对象，然后将当前消费者 cli 注册到这个订阅下，并更新其配置（负载均衡相关配置）
-func (t *Topic) StartToGetHandle(sub_name string, in Info, cli *client_operations.Client) error {
+func (t *Topic) StartToGetHandle(sub_name string, in Info, consumer_to_broker *client_operations.Client) error {
 	t.rmu.RLock()
 	defer t.rmu.RUnlock()
 	sub, ok := t.SubList[sub_name]
 	if !ok {
 		return errors.New("no this sub")
 	}
-	sub.AddConsumerInConfig(in, cli)
+	sub.AddConsumerInConfig(in, consumer_to_broker)
 	return nil
 }
 
@@ -235,11 +235,11 @@ func (p *Partition) AddMessage(req Info) (ret string, err error) {
 		p.queue = p.queue[VIRTUAL_10:]
 	}
 	p.rmu.Unlock()
-	//RPC 将当前 partition 的最新索引（EndIndex）上报给 zkserver
+	//你要知道zkerver管一切，因此这个partition变化必须上传给zkserver
 	(*req.zkclient).UpdateDup(context.Background(), &api.UpdateDupRequest{
 		Topic: req.topic,
 		Part:  req.partition,
-		//但是这个是啥时候传进去的？？，还有下面的file_name
+		//但是这个是啥时候传进去的？？，还有下面的file_name,真是奇怪？？？
 		BrokerName: req.BrokerName,
 		BlockName:  GetBlockName(req.file_name),
 		EndIndex:   p.index,
@@ -480,6 +480,9 @@ type Consistent struct {
 	circleNodes      map[uint32]string //虚拟节点对应的世纪节点
 	virtualNodeCount int               //虚拟节点数量
 	nodes            map[string]bool   //已绑定的世纪节点为true，这个还不太了解
+	//consumer以负责一个partition则为true
+	ConH     map[string]bool
+	FreeNode int //一般是len(ConH)
 }
 
 func NewConsistent() *Consistent {
@@ -494,7 +497,7 @@ func NewConsistent() *Consistent {
 func (c *Consistent) hashKey(key string) uint32 {
 	return crc32.ChecksumIEEE([]byte(key))
 }
-func (c *Consistent) Add(node string) error {
+func (c *Consistent) Add(node string, power int) error {
 	if node == "" {
 		return nil
 	}
@@ -505,7 +508,9 @@ func (c *Consistent) Add(node string) error {
 		return errors.New("node already exist")
 	}
 	c.nodes[node] = true
-	for i := 0; i < c.virtualNodeCount; i++ {
+	//需要了解
+	c.ConH[node] = false
+	for i := 0; i < c.virtualNodeCount*power; i++ {
 		virtualnode := c.hashKey(node + strconv.Itoa(i))
 		c.circleNodes[virtualnode] = node
 		c.hashSortNodes = append(c.hashSortNodes, virtualnode)
@@ -560,6 +565,46 @@ func (c *Consistent) getposition(hashKey uint32) int {
 	}
 	return i
 }
+func (c *Consistent) SetFreeNode() {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	c.FreeNode = len(c.ConH)
+}
+func (c *Consistent) GetFreeNode() int {
+	c.rmu.RLock()
+	defer c.rmu.RUnlock()
+	return c.FreeNode
+}
+
+// 将conH全部设置成false
+func (c *Consistent) TurnZero() {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	for k := range c.ConH {
+		c.ConH[k] = false
+	}
+}
+
+// 给这个partition再分配一个除了主节点之外的空闲节点
+func (c *Consistent) GetNodeFree(key string) string {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	hash := c.hashKey(key)   //根据key生成一个hash值
+	i := c.getposition(hash) //根据hash值找到对应的节点
+	i++
+	for {
+		if i == len(c.hashSortNodes)-1 {
+			i = 0
+		}
+		con := c.circleNodes[c.hashSortNodes[i]] /// 取出节点名称？
+		if !c.ConH[con] {
+			c.ConH[con] = true
+			c.FreeNode--
+			return con
+		}
+		i++
+	}
+}
 
 // -------------------------------------------------------------
 // 提供一个线程安全的管理机制，管理消息传递系统中的分区和消费者的关系
@@ -605,16 +650,9 @@ func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_
 	//c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
 	c.toconsumers[consumer] = toconsumer
 	c.con_nums++
-	//这里要是消费者数量多且现在是消费者做节点，就将节点转换为分区座节点，多个消费者key映射到一个节点
-	if c.con_nums > c.part_nums && c.con_part {
-		c.con_part = false
-		c.consistent = TurnConsistent(GetPartitionArry(c.partitions))
-	}
-	if c.con_part == true {
-		err := c.consistent.Add(consumer)
-		if err != nil {
-			DEBUG(dError, err.Error())
-		}
+	err := c.consistent.Add(consumer, 1)
+	if err != nil {
+		DEBUG(dError, err.Error())
 	}
 	c.RebalancePtoC() //更新配置
 	c.UpdateParts()   //应用配置
@@ -647,26 +685,53 @@ func TurnConsistent(arry []string) *Consistent {
 	return consistent
 }
 
-// 主要是c的part_consumsres
+// 负载均衡，将调整后的配置存入PartToCon
+// 将Consisitent中的ConH置false, 循环两次Partitions
+// 第一次拿取 1个 Consumer
+// 第二次拿取 靠前的 ConH 为 true 的 Consumer
+// 直到遇到ConH为 false 的
 func (c *Config) RebalancePtoC() {
-	c.rmu.Lock()
-	defer c.rmu.Unlock()
-	var newMap = make(map[string][]string)
-	//无论这两个总的哪一个，都是part对应con
-	if c.con_part {
-		//con是node,partition是key,多个key对应一个node
-		for key, _ := range c.partitions {
-			node := c.consistent.GetNode(key)
-			newMap[key] = append(newMap[key], node)
-		}
-	} else {
-		//patt是node,con是key,多个key对应一个node
-		for key, _ := range c.toconsumers {
-			node := c.consistent.GetNode(key)
-			newMap[node] = append(newMap[node], key)
+	//清空之前记录的负载状态，准备好新的分配（rebalance）
+	c.consistent.SetFreeNode() //将空闲节点设为len(consumers)
+	c.consistent.TurnZero()    //将consumer全设置成空闲
+
+	var parttocon = make(map[string][]string)
+	c.rmu.RLock()
+	Parts := c.partitions
+	c.rmu.RUnlock()
+	//为每个 Partition 分配一个主节点
+	for name := range Parts {
+		node := c.consistent.GetNode(name)
+		var arry []string
+		arry, ok := parttocon[name]
+		//这是因为一个partition对应多个消费者
+		arry = append(arry, node)
+		if !ok {
+			parttocon[name] = arry
 		}
 	}
-	c.PartToCon = newMap
+	//将空闲的consumer节点（free node）尽可能均匀地分配给每一个partition，构建副本（副消费者）列表
+	for {
+		for name := range Parts {
+			if c.consistent.GetFreeNode() > 0 {
+				node := c.consistent.GetNodeFree(name)
+				var arry []string
+				arry, ok := parttocon[name]
+				arry = append(arry, node)
+				if !ok {
+					parttocon[name] = arry
+				}
+			} else {
+				break
+			}
+		}
+		if c.consistent.GetFreeNode() <= 0 {
+			break
+		}
+	}
+	c.rmu.Lock()
+	c.PartToCon = parttocon
+	c.rmu.Unlock()
 	return
 }
 func (c *Config) UpdateParts() {

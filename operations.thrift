@@ -51,7 +51,7 @@ struct infoResponse{
 }
 //cli_Name来从broker中拿topic_oartition下面从index的数据以opyion的方式
 struct InfoGetRequest{
-			1:string  cli_Name  
+			1:string  consumer_Name  
 			2:string  topic_Name 
 			3:string  partition_Name 
 			4:i64     offset 
@@ -254,6 +254,7 @@ service ZKServer_Operations{
      //broker
     BroInfoResponse  BroInfo(1:BroInfoRequest req)
     BroGetAssignResponse BroGetAssign(1:BroGetAssignRequest req)
+     //broker更新topic-partition的offset
     UpdateOffsetResponse UpdateOffset(1:UpdateOffsetRequest req)
     UpdateDupResponse UpdateDup(1:UpdateDupRequest req)
     ConStartGetBroResponse ConStartGetBro(1:ConStartGetBroRequest req)

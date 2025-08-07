@@ -353,7 +353,7 @@ var fieldIDToName_InfoResponse = map[int16]string{
 }
 
 type InfoGetRequest struct {
-	Cli_Name       string `thrift:"cli_Name,1" frugal:"1,default,string" json:"cli_Name"`
+	Consumer_Name  string `thrift:"consumer_Name,1" frugal:"1,default,string" json:"consumer_Name"`
 	Topic_Name     string `thrift:"topic_Name,2" frugal:"2,default,string" json:"topic_Name"`
 	Partition_Name string `thrift:"partition_Name,3" frugal:"3,default,string" json:"partition_Name"`
 	Offset         int64  `thrift:"offset,4" frugal:"4,default,i64" json:"offset"`
@@ -367,8 +367,8 @@ func NewInfoGetRequest() *InfoGetRequest {
 func (p *InfoGetRequest) InitDefault() {
 }
 
-func (p *InfoGetRequest) GetCli_Name() (v string) {
-	return p.Cli_Name
+func (p *InfoGetRequest) GetConsumer_Name() (v string) {
+	return p.Consumer_Name
 }
 
 func (p *InfoGetRequest) GetTopic_Name() (v string) {
@@ -386,8 +386,8 @@ func (p *InfoGetRequest) GetOffset() (v int64) {
 func (p *InfoGetRequest) GetOption() (v int8) {
 	return p.Option
 }
-func (p *InfoGetRequest) SetCli_Name(val string) {
-	p.Cli_Name = val
+func (p *InfoGetRequest) SetConsumer_Name(val string) {
+	p.Consumer_Name = val
 }
 func (p *InfoGetRequest) SetTopic_Name(val string) {
 	p.Topic_Name = val
@@ -410,7 +410,7 @@ func (p *InfoGetRequest) String() string {
 }
 
 var fieldIDToName_InfoGetRequest = map[int16]string{
-	1: "cli_Name",
+	1: "consumer_Name",
 	2: "topic_Name",
 	3: "partition_Name",
 	4: "offset",

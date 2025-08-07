@@ -249,7 +249,7 @@ type MSGS struct {
 func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 	if pullRequest.option == TOPIC_NIL_PTP_PULL {
 		//更新消费者偏移量并写入zookeeper记录消费者上次读取的位置
-		s.zkclient.UpdatePTPOffset(context.Background(), &api.UpdatePTPOffsetRequest{
+		s.zkclient.UpdateOffset(context.Background(), &api.UpdateOffsetRequest{
 			Topic:  pullRequest.topic,
 			Part:   pullRequest.partition,
 			Offset: pullRequest.offset,
@@ -264,7 +264,7 @@ func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 	return topic.PullMessage(pullRequest)
 }
 
-// 3
+// 处理消费者的连接请求,将消费者添加到这个broker里面
 func (s *Server) InfoHandle(ip_port string) (err error) {
 	s.rmu.Lock()
 	consumer, ok := s.consumers[ip_port]
@@ -333,6 +333,7 @@ func (s *Server) StartGet(req Info) (err error) {
 			defer s.rmu.RUnlock()
 			//先看这个是否订阅
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
+			//第三个参数是consumer对应的broker接口，下面具体处理流程会回到这个s
 			return s.topics[req.topic].StartToGetHandle(sub_name, req, s.consumers[req.consumer_ipname].GetToConsumer())
 		}
 		//广播
@@ -340,19 +341,8 @@ func (s *Server) StartGet(req Info) (err error) {
 		{
 			s.rmu.RLock()
 			defer s.rmu.RUnlock()
-			//先看这个是否订阅
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
 			DEBUG(dLog, "%s\n", sub_name)
-			//ret := s.consumers[req.consumer_ipname].CheckSubscription(sub_name)
-			// if ret == true {
-			// 	//下面这三行是为了没有这个分区的时候新建一个
-			// 	// toConsumers := make(map[string]*client_operations.Client)
-			// 	// toConsumers[req.consumer_ipname] = s.consumers[req.consumer_ipname].GetToConsumer()
-			// 	// file := s.topics[req.topic].GetFile(req.partition)
-			// 	// go s.consumers[req.consumer_ipname].StartPart(req, toConsumers, file)
-			// } else {
-			// 	err = errors.New("not subscribe")
-			// }
 		}
 	default:
 		err = errors.New("option error")

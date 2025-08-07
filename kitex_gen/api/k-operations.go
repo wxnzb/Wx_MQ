@@ -1567,7 +1567,7 @@ func (p *InfoGetRequest) FastReadField1(buf []byte) (int, error) {
 		offset += l
 		_field = v
 	}
-	p.Cli_Name = _field
+	p.Consumer_Name = _field
 	return offset, nil
 }
 
@@ -1660,7 +1660,7 @@ func (p *InfoGetRequest) BLength() int {
 func (p *InfoGetRequest) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 1)
-	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Cli_Name)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Consumer_Name)
 	return offset
 }
 
@@ -1695,7 +1695,7 @@ func (p *InfoGetRequest) fastWriteField5(buf []byte, w thrift.NocopyWriter) int 
 func (p *InfoGetRequest) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
-	l += thrift.Binary.StringLengthNocopy(p.Cli_Name)
+	l += thrift.Binary.StringLengthNocopy(p.Consumer_Name)
 	return l
 }
 

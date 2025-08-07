@@ -101,13 +101,18 @@ func (s *RPCServer) Stop() {
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
 	fmt.Println(req)
 	ret, err := s.server.PushHandle(Info{
-		producer:  req.ProducerId,
+		producer: req.ProducerId,
+		//-----------------
 		topic:     req.Topic,
 		partition: req.Key,
-		message:   req.Message,
-		size:      req.Size,
-		ack:       req.Ack,
-		cmdindex:  req.Comindex,
+		//------------------
+		message: req.Message,
+		size:    req.Size,
+		//-----------------
+		//检验类型
+		ack: req.Ack,
+		//这个在ack==-1的时候leader同步会用到
+		cmdindex: req.Comindex,
 	})
 	if err == nil {
 		DEBUG(dError, err.Error())
@@ -170,7 +175,7 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 	err = s.server.StartGet(Info{
 		topic:           req.Topic_Name,
 		partition:       req.Partition_Name,
-		consumer_ipname: req.Cli_Name,
+		consumer_ipname: req.Consumer_Name,
 		offset:          req.Offset,
 	})
 	if err != nil {
@@ -372,7 +377,7 @@ func (s *RPCServer) UpdateOffset(ctx context.Context, req *api.UpdateOffsetReque
 	}, nil
 }
 
-// broker---->zkserver
+// broker---->zkserver，push中的addmessage的时候会用到
 func (s *RPCServer) UpdateDup(ctx context.Context, req *api.UpdateDupRequest) (r *api.UpdateDupResponse, err error) {
 	err = s.zkServer.UpdateDupHandle(Info_in{
 		TopicName:     req.Topic,
