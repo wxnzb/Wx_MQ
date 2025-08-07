@@ -57,8 +57,17 @@ type BlockNode struct {
 	FileName     string `json:filename`
 	LeaderBroker string `json:leaderbroker`
 }
+type DuplicateNode struct {
+	Name        string `json:"name"`
+	Topic       string `json:"topic"`
+	Partition   string `json:"partition"`
+	StartOffset int64  `json:"start_offset"`
+	EndOffset   int64  `json:"end_offset"`
+	BrokerName  string `json:"brokername"`
+	BlockNode   string `json:"blockname"`
+}
 
-// 在zk指定路径创建永久节点
+// 在 Zookeeper 指定路径下创建一个永久节点，并且把给定的结构体内容（如 BlockNode、BrokerNode 等）转成 JSON 后写入该节点中。
 func (z *ZK) RegisterNode(node interface{}) (err error) {
 	path := ""
 	var bronode BrokerNode
@@ -198,7 +207,7 @@ func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
 func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode) {
 	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
 	for {
-		NowBlock := z.GetBlockNode(Now_block_path)
+		NowBlock, _ := z.GetBlockNode(Now_block_path)
 		NowBroker := z.GetBrokerNode(NowBlock.LeaderBroker)
 		ret := z.CheckBroker(z.BrokerRoot + NowBlock.LeaderBroker)
 		if ret {
@@ -219,11 +228,26 @@ func (z *ZK) CheckBroker(brokerpath string) bool {
 		return true
 	}
 }
-func (z *ZK) GetBlockNode(path string) BlockNode {
+
+// 从 zk 获取该 block 对应的元数据结构
+func (z *ZK) GetBlockNode(path string) (BlockNode, error) {
 	var bloNode BlockNode
-	data, _, _ := z.Con.Get(path)
+	data, _, err := z.Con.Get(path)
+	if err != nil {
+		return bloNode, err
+	}
 	json.Unmarshal(data, &bloNode)
-	return bloNode
+	return bloNode, nil
+}
+func (z *ZK) GetDuplicateNode(path string) (DuplicateNode, error) {
+	var dupNode DuplicateNode
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return dupNode, err
+	}
+	data, _, err := z.Con.Get(path)
+	json.Unmarshal(data, &dupNode)
+	return dupNode, nil
 }
 func (z *ZK) GetBrokerNode(name string) BrokerNode {
 	//这个为什么path和上面的不一样

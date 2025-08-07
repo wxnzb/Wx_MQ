@@ -136,18 +136,6 @@ const (
 	ErrTimeOut     = "ErrTimeOut"
 )
 
-type Op struct {
-	Ser_index int64
-	Cli_index string
-	Cmd_index int64
-	Topic     string
-	Partition string
-	Message   string
-	Tpart     string
-	Size      int8
-	Operation string
-}
-
 // Raft 分区组 praft接收到来自客户端的 Append 请求，尝试将 in.message 写入分区 in.topic_name/in.part_name，返回结果字符串和错误
 func (praft *parts_raft) Append(in Info) (ret string, err error) {
 	str := in.topic + in.partition

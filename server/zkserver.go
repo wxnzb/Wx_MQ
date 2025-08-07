@@ -56,12 +56,16 @@ type Info_out struct {
 	Ret           string
 }
 
+// 更新 Zookeeper 中某个 partition 的“数据块”与“副本”的处理进度（即 EndOffset）
 func (zks *ZKServer) UpdateDupHandle(in Info_in) error {
 	str := zks.zk.TopicRoot + "/" + in.TopicName + "/" + in.PartitionName + "/" + in.BlockName
 	BlockNode, err := zks.zk.GetBlockNode(str)
 	if err != nil {
 		return err
 	}
+	// 如果当前 Broker 上报的 index 比记录的 EndOffset 大：
+	// 更新 BlockNode 的 EndOffset，表示这个数据块写入更多了
+	// 将更新后的 BlockNode 注册（写回）zk
 	if in.Index > BlockNode.EndOffset {
 		BlockNode.EndOffset = in.Index
 		err = zks.zk.RegisterNode(BlockNode)
@@ -69,6 +73,17 @@ func (zks *ZKServer) UpdateDupHandle(in Info_in) error {
 			return err
 		}
 	}
+	//获取这个 Broker 对应的 副本节点
+	DupNode, err := zks.zk.GetDuplicateNode(str + "/" + in.CliName)
+	if err != nil {
+		return err
+	}
+	DupNode.EndOffset = in.Index
+	err = zks.zk.RegisterNode(DupNode)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // type PrepareAcceptRequest struct {

@@ -235,10 +235,11 @@ func (p *Partition) AddMessage(req Info) (ret string, err error) {
 		p.queue = p.queue[VIRTUAL_10:]
 	}
 	p.rmu.Unlock()
+	//RPC 将当前 partition 的最新索引（EndIndex）上报给 zkserver
 	(*req.zkclient).UpdateDup(context.Background(), &api.UpdateDupRequest{
 		Topic: req.topic,
 		Part:  req.partition,
-		//但是这个是啥时候传进去的？？
+		//但是这个是啥时候传进去的？？，还有下面的file_name
 		BrokerName: req.BrokerName,
 		BlockName:  GetBlockName(req.file_name),
 		EndIndex:   p.index,
