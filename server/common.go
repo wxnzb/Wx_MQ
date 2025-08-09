@@ -36,7 +36,6 @@ func GetIpPort() string {
 	return ipport
 }
 
-// 现在还没有用到
 // 判断一个文件是否存在
 func FileOrDirExist(filePath string) bool {
 	_, err := os.Stat(filePath)
@@ -128,4 +127,7 @@ type Broker_Assign struct {
 func GetBlockName(file_name string) (ret string) {
 	ret = file_name[:len(file_name)-4]
 	return ret
+}
+func MovName(oldFilePath, newFilePath string) error {
+	return os.Rename(oldFilePath, newFilePath)
 }

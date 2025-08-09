@@ -214,6 +214,28 @@ func (s *RPCServer) PrepareAccept(ctx context.Context, req *api.PrepareAcceptReq
 		Err: "",
 	}, nil
 }
+
+// zkserver控制broker停止接收某个partition的信息
+// 修改文件名，关闭partition中的信息
+// 调用者要想zookeeper修改节点
+func (s *RPCServer) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest) (r *api.CloseAcceptResponse, err error) {
+	start, end, _, err := s.server.CloseAcceptHandle(Info{
+		topic:        req.Topic_Name,
+		partition:    req.Partition_Name,
+		file_name:    req.OldFile_Name,
+		newfile_name: req.NewFile_Name_,
+	})
+	if err != nil {
+		return &api.CloseAcceptResponse{
+			Ret: false,
+		}, err
+	}
+	return &api.CloseAcceptResponse{
+		Ret:        true,
+		Startindex: start,
+		Endindex:   end,
+	}, nil
+}
 func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest) (r *api.PrepareSendResponse, err error) {
 	errs, err := s.server.PrepareSendHandle(Info{
 		topic:     req.Topic_Name,

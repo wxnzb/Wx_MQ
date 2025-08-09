@@ -3,6 +3,7 @@ package server
 import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
+	"Wx_MQ/kitex_gen/api/zkserver_operations"
 	"context"
 	"errors"
 	"hash/crc32"
@@ -32,6 +33,7 @@ type Topic struct {
 	SubList map[string]*SubScription //订阅列表
 	Files   map[string]*File
 	Name    string
+	Broker  string
 }
 
 // 创建一个新的topic,这里push里面必须要有topic和key
@@ -140,17 +142,53 @@ func (t *Topic) GetParts() map[string]*Partition {
 	return t.Parts
 }
 
-// 返回好奇怪
-func (t *Topic) PrepareAcceptHandle(pinfo Info) (ret string, err error) {
+func (t *Topic) prepareAcceptHandle(in Info) (ret string, err error) {
 	t.rmu.Lock()
-	defer t.rmu.Unlock()
-	part, ok := t.Parts[pinfo.partition]
+
+	part, ok := t.Parts[in.partition]
 	if !ok {
-		part = NewPartition(pinfo.topic, pinfo.partition)
-		t.Parts[pinfo.partition] = part
+		part = NewPartition(in.topic, in.partition)
+		t.Parts[in.partition] = part
 	}
-	return
+	//设置partition值噢部分file的fd,start_index等信息
+	str, _ := os.Getwd()
+	str += "/" + t.Broker + "/" + in.topic + "/" + in.partition + "/" + in.file_name
+
+	file, fd, Err, err := NewFile(str)
+	if err != nil {
+		return Err, err
+	}
+	t.rmu.Unlock()
+	ret = part.StartGetMessage(file, fd, in)
+	if ret == OK {
+
+	} else {
+
+	}
+	return ret, nil
 }
+func (t *Topic) closeAcceptHandle(in Info) (start, end int64, ret string, err error) {
+	t.rmu.RLock()
+	part, ok := t.Parts[in.partition]
+	t.rmu.RUnlock()
+	if !ok {
+		ret = "this partition is not in this broker"
+		return 0, 0, ret, errors.New(ret)
+	}
+	start, end, ret, err = part.CloseAcceptMessage(in)
+	if err != nil {
+
+	} else {
+		str, _ := os.Getwd()
+		str += "/" + t.Broker + "/" + in.topic + "/" + in.partition + "/"
+		t.rmu.Lock()
+		t.Files[str+in.newfile_name] = t.Files[str+in.file_name]
+		delete(t.Files, str+in.file_name)
+		t.rmu.Unlock()
+	}
+	return start, end, ret, err
+}
+func (t *Topic) prepareSendHandle(in Info, zkclient *zkserver_operations.Client)
 func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
 	sub_name := GetStringFromSub(pullRequest.topic, pullRequest.partition, pullRequest.option)
 	t.rmu.RLock()
@@ -186,6 +224,7 @@ type Partition struct {
 	index       int64 //文件指向的位置
 	start_index int64
 	state       string
+	Broker      string
 }
 
 // 创建一个新的分区
@@ -199,6 +238,41 @@ func NewPartition(topic, partition string) *Partition {
 	str += "/" + ip_name + "/" + topic + "/" + partition
 
 	return part
+}
+func (p *Partition) StartGetMessage(file *File, fd *os.File, in Info) string {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	ret := ""
+	switch p.state {
+	case ALIVE:
+		ret = ErrHadStart
+	case CLOSE:
+		p.state = ALIVE
+		p.file = file
+		p.fd = fd
+		p.index = file.GetIndex(fd)
+		p.start_index = p.index
+		ret = OK
+	}
+	return ret
+}
+func (p *Partition) CloseAcceptMessage(in Info) (start, end int64, ret string, err error) {
+	p.rmu.Lock()
+	defer p.rmu.Unlock()
+	if p.state == ALIVE {
+		str, _ := os.Getwd()
+		str += "/" + p.Broker + "/" + in.topic + "/" + in.partition
+		p.file.UpFileName(str, in.newfile_name)
+		p.file_name = in.newfile_name
+		p.state = CLOSE
+		end = p.index
+		start = p.file.GetFirstIndex(p.fd)
+		p.fd.Close()
+	} else if p.state == DOWN {
+		ret = "this part had close"
+		err = errors.New(ret)
+	}
+	return start, end, ret, err
 }
 
 // 内存队列中累积消息，并在队列达到一定长度后批量写入文件

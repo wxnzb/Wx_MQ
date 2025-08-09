@@ -26,10 +26,12 @@ import (
 
 // 这是消费者客户端的状态,state
 const (
-	ALIVE     = "alive"
-	DOWN      = "down"
-	TOUT      = 60 * 10
-	UPDATENUM = 10
+	ALIVE       = "alive"
+	CLOSE       = "close"
+	DOWN        = "down"
+	TOUT        = 60 * 10
+	UPDATENUM   = 10
+	ErrHadStart = "this partition had Start"
 )
 
 // 这是一个消费者实体的内存镜像，又是消费者的客户端

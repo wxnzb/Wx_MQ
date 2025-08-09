@@ -531,6 +531,109 @@ var fieldIDToName_PrepareAcceptResponse = map[int16]string{
 	2: "err",
 }
 
+type CloseAcceptRequest struct {
+	Topic_Name     string `thrift:"topic_Name,1" frugal:"1,default,string" json:"topic_Name"`
+	Partition_Name string `thrift:"partition_Name,2" frugal:"2,default,string" json:"partition_Name"`
+	OldFile_Name   string `thrift:"OldFile_Name,3" frugal:"3,default,string" json:"OldFile_Name"`
+	NewFile_Name_  string `thrift:"NewFile_Name,4" frugal:"4,default,string" json:"NewFile_Name"`
+}
+
+func NewCloseAcceptRequest() *CloseAcceptRequest {
+	return &CloseAcceptRequest{}
+}
+
+func (p *CloseAcceptRequest) InitDefault() {
+}
+
+func (p *CloseAcceptRequest) GetTopic_Name() (v string) {
+	return p.Topic_Name
+}
+
+func (p *CloseAcceptRequest) GetPartition_Name() (v string) {
+	return p.Partition_Name
+}
+
+func (p *CloseAcceptRequest) GetOldFile_Name() (v string) {
+	return p.OldFile_Name
+}
+
+func (p *CloseAcceptRequest) GetNewFile_Name_() (v string) {
+	return p.NewFile_Name_
+}
+func (p *CloseAcceptRequest) SetTopic_Name(val string) {
+	p.Topic_Name = val
+}
+func (p *CloseAcceptRequest) SetPartition_Name(val string) {
+	p.Partition_Name = val
+}
+func (p *CloseAcceptRequest) SetOldFile_Name(val string) {
+	p.OldFile_Name = val
+}
+func (p *CloseAcceptRequest) SetNewFile_Name_(val string) {
+	p.NewFile_Name_ = val
+}
+
+func (p *CloseAcceptRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseAcceptRequest(%+v)", *p)
+}
+
+var fieldIDToName_CloseAcceptRequest = map[int16]string{
+	1: "topic_Name",
+	2: "partition_Name",
+	3: "OldFile_Name",
+	4: "NewFile_Name",
+}
+
+type CloseAcceptResponse struct {
+	Ret        bool  `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Startindex int64 `thrift:"startindex,2" frugal:"2,default,i64" json:"startindex"`
+	Endindex   int64 `thrift:"endindex,3" frugal:"3,default,i64" json:"endindex"`
+}
+
+func NewCloseAcceptResponse() *CloseAcceptResponse {
+	return &CloseAcceptResponse{}
+}
+
+func (p *CloseAcceptResponse) InitDefault() {
+}
+
+func (p *CloseAcceptResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *CloseAcceptResponse) GetStartindex() (v int64) {
+	return p.Startindex
+}
+
+func (p *CloseAcceptResponse) GetEndindex() (v int64) {
+	return p.Endindex
+}
+func (p *CloseAcceptResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *CloseAcceptResponse) SetStartindex(val int64) {
+	p.Startindex = val
+}
+func (p *CloseAcceptResponse) SetEndindex(val int64) {
+	p.Endindex = val
+}
+
+func (p *CloseAcceptResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseAcceptResponse(%+v)", *p)
+}
+
+var fieldIDToName_CloseAcceptResponse = map[int16]string{
+	1: "ret",
+	2: "startindex",
+	3: "endindex",
+}
+
 type PrepareSendRequest struct {
 	Topic_Name     string `thrift:"topic_Name,1" frugal:"1,default,string" json:"topic_Name"`
 	Partition_Name string `thrift:"partition_Name,2" frugal:"2,default,string" json:"partition_Name"`
@@ -1732,6 +1835,8 @@ type Server_Operations interface {
 
 	PrepareAccept(ctx context.Context, req *PrepareAcceptRequest) (r *PrepareAcceptResponse, err error)
 
+	CloseAccept(ctx context.Context, req *CloseAcceptRequest) (r *CloseAcceptRequest, err error)
+
 	PrepareSend(ctx context.Context, req *PrepareSendRequest) (r *PrepareSendResponse, err error)
 }
 
@@ -2112,6 +2217,82 @@ func (p *Server_OperationsPrepareAcceptResult) String() string {
 }
 
 var fieldIDToName_Server_OperationsPrepareAcceptResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsCloseAcceptArgs struct {
+	Req *CloseAcceptRequest `thrift:"req,1" frugal:"1,default,CloseAcceptRequest" json:"req"`
+}
+
+func NewServer_OperationsCloseAcceptArgs() *Server_OperationsCloseAcceptArgs {
+	return &Server_OperationsCloseAcceptArgs{}
+}
+
+func (p *Server_OperationsCloseAcceptArgs) InitDefault() {
+}
+
+var Server_OperationsCloseAcceptArgs_Req_DEFAULT *CloseAcceptRequest
+
+func (p *Server_OperationsCloseAcceptArgs) GetReq() (v *CloseAcceptRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsCloseAcceptArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsCloseAcceptArgs) SetReq(val *CloseAcceptRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsCloseAcceptArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsCloseAcceptArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseAcceptArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseAcceptArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsCloseAcceptResult struct {
+	Success *CloseAcceptRequest `thrift:"success,0,optional" frugal:"0,optional,CloseAcceptRequest" json:"success,omitempty"`
+}
+
+func NewServer_OperationsCloseAcceptResult() *Server_OperationsCloseAcceptResult {
+	return &Server_OperationsCloseAcceptResult{}
+}
+
+func (p *Server_OperationsCloseAcceptResult) InitDefault() {
+}
+
+var Server_OperationsCloseAcceptResult_Success_DEFAULT *CloseAcceptRequest
+
+func (p *Server_OperationsCloseAcceptResult) GetSuccess() (v *CloseAcceptRequest) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsCloseAcceptResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsCloseAcceptResult) SetSuccess(x interface{}) {
+	p.Success = x.(*CloseAcceptRequest)
+}
+
+func (p *Server_OperationsCloseAcceptResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsCloseAcceptResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseAcceptResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseAcceptResult = map[int16]string{
 	0: "success",
 }
 

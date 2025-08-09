@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,13 +16,27 @@ type File struct {
 	node_size int //每次往文件里面写进一批消息，这一批消息前面会有他的topic,partition呀什么的元数据，他时定长的，因此在开始时计算一次就好，为什么他是定常呢？？？
 }
 
-// 创建一个文件，要是本来就有，那就打开并以8
-func NewFile(filepath string) *File {
-	return &File{
+// 先检查该磁盘是否存在该文件，要是不存在在进行创建
+func NewFile(filepath string) (file *File, fd *os.File, Err string, err error) {
+	if !FileOrDirExist(filepath) {
+		fd, err = CreateFile(filepath)
+		if err != nil {
+			Err = "CreateFileFail"
+			return nil, nil, Err, err
+		}
+	} else {
+		fd, err = os.OpenFile(filepath, os.O_RDWR, 0666)
+		if err != nil {
+			Err = "OpenFileFail"
+			return nil, nil, Err, err
+		}
+	}
+	file = &File{
 		rmu:       sync.RWMutex{},
 		filePath:  filepath,
-		node_size: 0,
+		node_size: NODE_SIZE,
 	}
+	return file, fd, "ok", err
 }
 
 // 打开一个已有的文件或者创建一个新的文件
@@ -136,13 +152,55 @@ func (f *File) ReadFile(fd *os.File, blockoffset int64) (NodeData, []Message, er
 
 }
 
-// 这个还没有实现
+// 遍历一个文件里按记录写入的若干 “节点头 + 数据块” 记录，找到并返回最后一个记录的 End_index（也就是该文件当前的最大索引）
 func (f *File) GetIndex(file *os.File) int64 {
-	return 0
+	data_node := make([]byte, NODE_SIZE)
+	var offset int64
+	offset = 0
+	var index int64
+	index = -1
+	var node NodeData
+	for {
+		_, err := file.ReadAt(data_node, offset)
+		//读到文件末尾了
+		if err == io.EOF {
+			if index == 0 {
+				json.Unmarshal(data_node, &node)
+				index = node.End_index
+			} else {
+				index = 0
+			}
+			return index
+		} else {
+			index = 0
+		}
+		buf := &bytes.Buffer{}
+		binary.Write(buf, binary.BigEndian, data_node)
+		binary.Read(buf, binary.BigEndian, &node)
+		offset = offset + NODE_SIZE + int64(node.Size)
+	}
 }
 
-// 修改文件名
-func (f *File) UpFileName(newname string) {
+// 修改本地文件文件名
+func (f *File) UpFileName(path, newname string) error {
+	oldFilePath := f.filePath
+	newFilePath := path + "/" + newname
 	f.rmu.Lock()
+	f.filePath = newFilePath
 	defer f.rmu.Unlock()
+	return MovName(oldFilePath, newFilePath)
+}
+func (f *File) GetFirstIndex(file *os.File) int64 {
+	f.rmu.RLock()
+	defer f.rmu.RUnlock()
+	data_node := make([]byte, NODE_SIZE)
+	_, err := file.ReadAt(data_node, 0)
+	if err == io.EOF {
+		return 0
+	}
+	buf := &bytes.Buffer{}
+	var node NodeData
+	binary.Write(buf, binary.BigEndian, data_node)
+	binary.Read(buf, binary.BigEndian, &node)
+	return node.Start_index
 }

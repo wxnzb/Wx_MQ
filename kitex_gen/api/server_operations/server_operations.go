@@ -48,6 +48,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"closeAccept": kitex.NewMethodInfo(
+		closeAcceptHandler,
+		newServer_OperationsCloseAcceptArgs,
+		newServer_OperationsCloseAcceptResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"prepareSend": kitex.NewMethodInfo(
 		prepareSendHandler,
 		newServer_OperationsPrepareSendArgs,
@@ -211,6 +218,24 @@ func newServer_OperationsPrepareAcceptResult() interface{} {
 	return api.NewServer_OperationsPrepareAcceptResult()
 }
 
+func closeAcceptHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Server_OperationsCloseAcceptArgs)
+	realResult := result.(*api.Server_OperationsCloseAcceptResult)
+	success, err := handler.(api.Server_Operations).CloseAccept(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newServer_OperationsCloseAcceptArgs() interface{} {
+	return api.NewServer_OperationsCloseAcceptArgs()
+}
+
+func newServer_OperationsCloseAcceptResult() interface{} {
+	return api.NewServer_OperationsCloseAcceptResult()
+}
+
 func prepareSendHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.Server_OperationsPrepareSendArgs)
 	realResult := result.(*api.Server_OperationsPrepareSendResult)
@@ -284,6 +309,16 @@ func (p *kClient) PrepareAccept(ctx context.Context, req *api.PrepareAcceptReque
 	_args.Req = req
 	var _result api.Server_OperationsPrepareAcceptResult
 	if err = p.c.Call(ctx, "prepareAccept", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest) (r *api.CloseAcceptRequest, err error) {
+	var _args api.Server_OperationsCloseAcceptArgs
+	_args.Req = req
+	var _result api.Server_OperationsCloseAcceptResult
+	if err = p.c.Call(ctx, "closeAccept", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

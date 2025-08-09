@@ -300,6 +300,7 @@ type Info struct {
 	offset          int64
 	size            int8
 	file_name       string
+	newfile_name    string
 	producer        string
 	consumer        string
 	message         []byte
@@ -355,33 +356,26 @@ func (s *Server) StartGet(req Info) (err error) {
 // 设置partition的file和fd,start_index等信息
 func (s *Server) PrepareAcceptHandle(in Info) (ret string, err error) {
 	s.rmu.Lock()
-	defer s.rmu.Unlock()
 	topic, ok := s.topics[in.topic]
 	//创建一个新的topic
 	if !ok {
 		topic = NewTopic(in.topic)
 		s.topics[in.topic] = topic
 	}
-	var peers []*raft_operations.Client
-	// 遍历 in.brokers（这个 partition 的所有副本）
-	// 如果当前 k 不是自己（s.Name），说明是另一个副本，需要建立连接，k-broker名字，v-raft地址
-	for k, v := range in.brokers {
-		if s.name != k {
-			bro_cli, ok := s.brokers[k]
-			if !ok {
-				cli, err := raft_operations.NewClient(s.name, cl.WithHostPorts(v))
-				if err != nil {
-					return ret, err
-				}
-				s.brokers[k] = &cli
-				bro_cli = &cli
-			}
-			peers = append(peers, bro_cli)
-		}
+	s.rmu.Unlock()
+	return topic.prepareAcceptHandle(in)
+}
+
+// 停止接收文件，并将文件名修改成newfile,为什么要修改文件名
+func (s *Server) CloseAcceptHandle(in Info) (start, end int64, ret string, err error) {
+	s.rmu.RLock()
+	topic, ok := s.topics[in.topic]
+	if !ok {
+		ret = "this topic is not in this broker"
+		return 0, 0, ret, err
 	}
-	// 检查或创建底层praft_raft
-	s.parts_rafts.AddPart_Raft(peers, in.me, in.topic, in.partition, s.aplych)
-	return topic.PrepareAcceptHandle(in)
+	s.rmu.RUnlock()
+	return topic.closeAcceptHandle(in)
 }
 
 // 准备发送信息，
@@ -390,14 +384,14 @@ func (s *Server) PrepareAcceptHandle(in Info) (ret string, err error) {
 // 协程设置超时时间，时间到则关闭
 func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
 	s.rmu.Lock()
-	defer s.rmu.Unlock()
 	topic, ok := s.topics[in.topic]
 	//创建一个新的topic
 	if !ok {
 		topic = NewTopic(in.topic)
 		s.topics[in.topic] = topic
 	}
-	//return topic.PrePareSendHandle(in, &s.zkclient)
+	s.rmu.Unlock()
+	return topic.PrePareSendHandle(in, &s.zkclient)
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了
