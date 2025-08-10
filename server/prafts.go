@@ -4,6 +4,7 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/raft_operations"
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -77,6 +78,19 @@ func (praft *parts_raft) make(name string, hostport string, appench chan Info) e
 	err := praft.srv_raft.Run()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+func (praft *parts_raft) DeleteRaft_raft(topicname, partitionname string) error {
+	str := topicname + partitionname
+	praft.rmu.Lock()
+	defer praft.rmu.Unlock()
+	raft, ok := praft.parts[str]
+	if !ok {
+		return errors.New("raft not exist")
+	} else {
+		raft.kill()
+		delete(praft.parts, str)
 	}
 	return nil
 }

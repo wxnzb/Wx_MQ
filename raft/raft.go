@@ -71,6 +71,10 @@ type ResponseVoteReply struct {
 	Term        int
 }
 
+func (r *Raft) kill() {
+	atomic.StoreInt32(&r.dead, 1)
+}
+
 // 太神奇了，自己掉自己，嘻嘻
 // 在你follow进行竞选的时候需要什么？竞选ID，Term
 // LastLogIndex=log[len(log)-1].LogIndex,存起来确实感觉有点麻烦

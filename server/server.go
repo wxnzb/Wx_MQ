@@ -11,6 +11,7 @@ import (
 	"Wx_MQ/zookeeper"
 	"errors"
 
+	"github.com/cloudwego/kitex/client"
 	cl "github.com/cloudwego/kitex/client"
 
 	//"github.com/docker/docker/client"
@@ -53,6 +54,7 @@ type Server struct {
 	//这里的brokers为了达到raft共识,k:其他
 	brokers map[string]*raft_operations.Client
 	aplych  chan Info
+	me      int
 }
 
 var ip_name string //加了这个
@@ -309,6 +311,7 @@ type Info struct {
 	cmdindex int64
 	//这里的k-broker名字，v-raft地址
 	brokers map[string]string
+	brok_me map[string]int
 	//这个是干什么的？？
 	me int
 	//update dup
@@ -392,6 +395,44 @@ func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
 	}
 	s.rmu.Unlock()
 	return topic.prepareSendHandle(in, &s.zkclient)
+}
+
+// 给当前 Server 启动/加入某个 partition 的 Raft 群组
+func (s *Server) AddRaftPartitionHandle(in Info) (ret string, err error) {
+	s.rmu.Lock()
+	nodes := make(map[int]string)
+	for k, v := range in.brok_me {
+		nodes[v] = k
+	}
+	index := 0
+	var peers []*raft_operations.Client
+	for index < len(in.brokers) {
+		bro_cli, ok := s.brokers[nodes[index]]
+		if !ok {
+			cli, err := raft_operations.NewClient(s.name, client.WithHostPorts(in.brokers[nodes[index]]))
+			if err != nil {
+				return ret, err
+			}
+			s.brokers[nodes[index]] = bro_cli
+			bro_cli = &cli
+		} else {
+
+		}
+		peers = append(peers, bro_cli)
+		index++
+	}
+	s.parts_rafts.AddPart_Raft(peers, s.me, in.topic, in.partition, s.aplych)
+	s.rmu.Unlock()
+	return ret, err
+}
+func (s *Server) CloseRaftPartitionHandle(in Info) (ret string, err error) {
+	s.rmu.Lock()
+	err = s.parts_rafts.DeletePart_raft(in.topic, in.partition)
+	s.rmu.Unlock()
+	if err != nil {
+		return err.Error(), err
+	}
+	return ret, err
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了

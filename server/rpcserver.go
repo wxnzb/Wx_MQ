@@ -5,6 +5,7 @@ import (
 	//"sync"
 
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -253,6 +254,50 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 	return &api.PrepareSendResponse{
 		Ret: true,
 		Err: "",
+	}, nil
+}
+
+// raft
+type BrokerS struct {
+	BroBrokers map[string]string `json:brobrokers`
+	RafBrokers map[string]string `json:rafbrokers`
+	Me_Brokers map[string]int    `json:mebrokers`
+}
+
+func (s *RPCServer) AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest) (r *api.AddRaftPartitionResponse, err error) {
+	var Brokers BrokerS
+	json.Unmarshal(req.Brokers, &Brokers)
+	ret, err := s.server.AddRaftPartitionHandle(Info{
+		topic:     req.TopicName,
+		partition: req.PartName,
+		brokers:   Brokers.RafBrokers,
+		brok_me:   Brokers.Me_Brokers,
+	})
+	if err != nil {
+		return &api.AddRaftPartitionResponse{
+			Ret: false,
+			Err: ret,
+		}, err
+	}
+	return &api.AddRaftPartitionResponse{
+		Ret: true,
+		Err: ret,
+	}, nil
+}
+func (s *RPCServer) CloseRaftPartition(ctx context.Context, req *api.CloseRaftPartitionRequest) (r *api.CloseRaftPartitionResponse, err error) {
+	ret, err := s.server.CloseRaftPartitionHandle(Info{
+		topic:     req.TopicName,
+		partition: req.PartName,
+	})
+	if err != nil {
+		return &api.CloseRaftPartitionResponse{
+			Ret: false,
+			Err: ret,
+		}, err
+	}
+	return &api.CloseRaftPartitionResponse{
+		Ret: true,
+		Err: ret,
 	}, nil
 }
 
