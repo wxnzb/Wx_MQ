@@ -737,6 +737,346 @@ var fieldIDToName_PrepareSendResponse = map[int16]string{
 	2: "err",
 }
 
+type AddRaftPartitionRequest struct {
+	TopicName string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
+	PartName  string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
+	Brokers   []byte `thrift:"brokers,3" frugal:"3,default,binary" json:"brokers"`
+}
+
+func NewAddRaftPartitionRequest() *AddRaftPartitionRequest {
+	return &AddRaftPartitionRequest{}
+}
+
+func (p *AddRaftPartitionRequest) InitDefault() {
+}
+
+func (p *AddRaftPartitionRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *AddRaftPartitionRequest) GetPartName() (v string) {
+	return p.PartName
+}
+
+func (p *AddRaftPartitionRequest) GetBrokers() (v []byte) {
+	return p.Brokers
+}
+func (p *AddRaftPartitionRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *AddRaftPartitionRequest) SetPartName(val string) {
+	p.PartName = val
+}
+func (p *AddRaftPartitionRequest) SetBrokers(val []byte) {
+	p.Brokers = val
+}
+
+func (p *AddRaftPartitionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AddRaftPartitionRequest(%+v)", *p)
+}
+
+var fieldIDToName_AddRaftPartitionRequest = map[int16]string{
+	1: "topicName",
+	2: "partName",
+	3: "brokers",
+}
+
+type AddRaftPartitionResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewAddRaftPartitionResponse() *AddRaftPartitionResponse {
+	return &AddRaftPartitionResponse{}
+}
+
+func (p *AddRaftPartitionResponse) InitDefault() {
+}
+
+func (p *AddRaftPartitionResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *AddRaftPartitionResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *AddRaftPartitionResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *AddRaftPartitionResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *AddRaftPartitionResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AddRaftPartitionResponse(%+v)", *p)
+}
+
+var fieldIDToName_AddRaftPartitionResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
+type CloseRaftPartitionRequest struct {
+	TopicName string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
+	PartName  string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
+}
+
+func NewCloseRaftPartitionRequest() *CloseRaftPartitionRequest {
+	return &CloseRaftPartitionRequest{}
+}
+
+func (p *CloseRaftPartitionRequest) InitDefault() {
+}
+
+func (p *CloseRaftPartitionRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *CloseRaftPartitionRequest) GetPartName() (v string) {
+	return p.PartName
+}
+func (p *CloseRaftPartitionRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *CloseRaftPartitionRequest) SetPartName(val string) {
+	p.PartName = val
+}
+
+func (p *CloseRaftPartitionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseRaftPartitionRequest(%+v)", *p)
+}
+
+var fieldIDToName_CloseRaftPartitionRequest = map[int16]string{
+	1: "topicName",
+	2: "partName",
+}
+
+type CloseRaftPartitionResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewCloseRaftPartitionResponse() *CloseRaftPartitionResponse {
+	return &CloseRaftPartitionResponse{}
+}
+
+func (p *CloseRaftPartitionResponse) InitDefault() {
+}
+
+func (p *CloseRaftPartitionResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *CloseRaftPartitionResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *CloseRaftPartitionResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *CloseRaftPartitionResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *CloseRaftPartitionResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseRaftPartitionResponse(%+v)", *p)
+}
+
+var fieldIDToName_CloseRaftPartitionResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
+type AddFetchPartitionRequest struct {
+	TopicName    string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
+	PartName     string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
+	Brokers      []byte `thrift:"brokers,3" frugal:"3,default,binary" json:"brokers"`
+	LeaderBroker string `thrift:"leaderBroker,4" frugal:"4,default,string" json:"leaderBroker"`
+	FileName     string `thrift:"fileName,5" frugal:"5,default,string" json:"fileName"`
+}
+
+func NewAddFetchPartitionRequest() *AddFetchPartitionRequest {
+	return &AddFetchPartitionRequest{}
+}
+
+func (p *AddFetchPartitionRequest) InitDefault() {
+}
+
+func (p *AddFetchPartitionRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *AddFetchPartitionRequest) GetPartName() (v string) {
+	return p.PartName
+}
+
+func (p *AddFetchPartitionRequest) GetBrokers() (v []byte) {
+	return p.Brokers
+}
+
+func (p *AddFetchPartitionRequest) GetLeaderBroker() (v string) {
+	return p.LeaderBroker
+}
+
+func (p *AddFetchPartitionRequest) GetFileName() (v string) {
+	return p.FileName
+}
+func (p *AddFetchPartitionRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *AddFetchPartitionRequest) SetPartName(val string) {
+	p.PartName = val
+}
+func (p *AddFetchPartitionRequest) SetBrokers(val []byte) {
+	p.Brokers = val
+}
+func (p *AddFetchPartitionRequest) SetLeaderBroker(val string) {
+	p.LeaderBroker = val
+}
+func (p *AddFetchPartitionRequest) SetFileName(val string) {
+	p.FileName = val
+}
+
+func (p *AddFetchPartitionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AddFetchPartitionRequest(%+v)", *p)
+}
+
+var fieldIDToName_AddFetchPartitionRequest = map[int16]string{
+	1: "topicName",
+	2: "partName",
+	3: "brokers",
+	4: "leaderBroker",
+	5: "fileName",
+}
+
+type AddFetchPartitionResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewAddFetchPartitionResponse() *AddFetchPartitionResponse {
+	return &AddFetchPartitionResponse{}
+}
+
+func (p *AddFetchPartitionResponse) InitDefault() {
+}
+
+func (p *AddFetchPartitionResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *AddFetchPartitionResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *AddFetchPartitionResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *AddFetchPartitionResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *AddFetchPartitionResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("AddFetchPartitionResponse(%+v)", *p)
+}
+
+var fieldIDToName_AddFetchPartitionResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
+type CloseFetchPartitionRequest struct {
+	TopicName string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
+	PartName  string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
+}
+
+func NewCloseFetchPartitionRequest() *CloseFetchPartitionRequest {
+	return &CloseFetchPartitionRequest{}
+}
+
+func (p *CloseFetchPartitionRequest) InitDefault() {
+}
+
+func (p *CloseFetchPartitionRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *CloseFetchPartitionRequest) GetPartName() (v string) {
+	return p.PartName
+}
+func (p *CloseFetchPartitionRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *CloseFetchPartitionRequest) SetPartName(val string) {
+	p.PartName = val
+}
+
+func (p *CloseFetchPartitionRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseFetchPartitionRequest(%+v)", *p)
+}
+
+var fieldIDToName_CloseFetchPartitionRequest = map[int16]string{
+	1: "topicName",
+	2: "partName",
+}
+
+type CloseFetchPartitionResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewCloseFetchPartitionResponse() *CloseFetchPartitionResponse {
+	return &CloseFetchPartitionResponse{}
+}
+
+func (p *CloseFetchPartitionResponse) InitDefault() {
+}
+
+func (p *CloseFetchPartitionResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *CloseFetchPartitionResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *CloseFetchPartitionResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *CloseFetchPartitionResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *CloseFetchPartitionResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CloseFetchPartitionResponse(%+v)", *p)
+}
+
+var fieldIDToName_CloseFetchPartitionResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
 type PubRequest struct {
 	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
 	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
@@ -1838,6 +2178,14 @@ type Server_Operations interface {
 	CloseAccept(ctx context.Context, req *CloseAcceptRequest) (r *CloseAcceptRequest, err error)
 
 	PrepareSend(ctx context.Context, req *PrepareSendRequest) (r *PrepareSendResponse, err error)
+
+	AddRaftPartition(ctx context.Context, req *AddRaftPartitionRequest) (r *AddRaftPartitionResponse, err error)
+
+	CloseRaftPartition(ctx context.Context, req *CloseRaftPartitionRequest) (r *CloseRaftPartitionResponse, err error)
+
+	AddFetchPartition(ctx context.Context, req *AddFetchPartitionRequest) (r *AddFetchPartitionResponse, err error)
+
+	CloseFetchPartition(ctx context.Context, req *CloseFetchPartitionRequest) (r *CloseFetchPartitionResponse, err error)
 }
 
 type Server_OperationsPushArgs struct {
@@ -2369,6 +2717,310 @@ func (p *Server_OperationsPrepareSendResult) String() string {
 }
 
 var fieldIDToName_Server_OperationsPrepareSendResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsAddRaftPartitionArgs struct {
+	Req *AddRaftPartitionRequest `thrift:"req,1" frugal:"1,default,AddRaftPartitionRequest" json:"req"`
+}
+
+func NewServer_OperationsAddRaftPartitionArgs() *Server_OperationsAddRaftPartitionArgs {
+	return &Server_OperationsAddRaftPartitionArgs{}
+}
+
+func (p *Server_OperationsAddRaftPartitionArgs) InitDefault() {
+}
+
+var Server_OperationsAddRaftPartitionArgs_Req_DEFAULT *AddRaftPartitionRequest
+
+func (p *Server_OperationsAddRaftPartitionArgs) GetReq() (v *AddRaftPartitionRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsAddRaftPartitionArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsAddRaftPartitionArgs) SetReq(val *AddRaftPartitionRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsAddRaftPartitionArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsAddRaftPartitionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsAddRaftPartitionArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsAddRaftPartitionArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsAddRaftPartitionResult struct {
+	Success *AddRaftPartitionResponse `thrift:"success,0,optional" frugal:"0,optional,AddRaftPartitionResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsAddRaftPartitionResult() *Server_OperationsAddRaftPartitionResult {
+	return &Server_OperationsAddRaftPartitionResult{}
+}
+
+func (p *Server_OperationsAddRaftPartitionResult) InitDefault() {
+}
+
+var Server_OperationsAddRaftPartitionResult_Success_DEFAULT *AddRaftPartitionResponse
+
+func (p *Server_OperationsAddRaftPartitionResult) GetSuccess() (v *AddRaftPartitionResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsAddRaftPartitionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsAddRaftPartitionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AddRaftPartitionResponse)
+}
+
+func (p *Server_OperationsAddRaftPartitionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsAddRaftPartitionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsAddRaftPartitionResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsAddRaftPartitionResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsCloseRaftPartitionArgs struct {
+	Req *CloseRaftPartitionRequest `thrift:"req,1" frugal:"1,default,CloseRaftPartitionRequest" json:"req"`
+}
+
+func NewServer_OperationsCloseRaftPartitionArgs() *Server_OperationsCloseRaftPartitionArgs {
+	return &Server_OperationsCloseRaftPartitionArgs{}
+}
+
+func (p *Server_OperationsCloseRaftPartitionArgs) InitDefault() {
+}
+
+var Server_OperationsCloseRaftPartitionArgs_Req_DEFAULT *CloseRaftPartitionRequest
+
+func (p *Server_OperationsCloseRaftPartitionArgs) GetReq() (v *CloseRaftPartitionRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsCloseRaftPartitionArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsCloseRaftPartitionArgs) SetReq(val *CloseRaftPartitionRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsCloseRaftPartitionArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsCloseRaftPartitionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseRaftPartitionArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseRaftPartitionArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsCloseRaftPartitionResult struct {
+	Success *CloseRaftPartitionResponse `thrift:"success,0,optional" frugal:"0,optional,CloseRaftPartitionResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsCloseRaftPartitionResult() *Server_OperationsCloseRaftPartitionResult {
+	return &Server_OperationsCloseRaftPartitionResult{}
+}
+
+func (p *Server_OperationsCloseRaftPartitionResult) InitDefault() {
+}
+
+var Server_OperationsCloseRaftPartitionResult_Success_DEFAULT *CloseRaftPartitionResponse
+
+func (p *Server_OperationsCloseRaftPartitionResult) GetSuccess() (v *CloseRaftPartitionResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsCloseRaftPartitionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsCloseRaftPartitionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*CloseRaftPartitionResponse)
+}
+
+func (p *Server_OperationsCloseRaftPartitionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsCloseRaftPartitionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseRaftPartitionResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseRaftPartitionResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsAddFetchPartitionArgs struct {
+	Req *AddFetchPartitionRequest `thrift:"req,1" frugal:"1,default,AddFetchPartitionRequest" json:"req"`
+}
+
+func NewServer_OperationsAddFetchPartitionArgs() *Server_OperationsAddFetchPartitionArgs {
+	return &Server_OperationsAddFetchPartitionArgs{}
+}
+
+func (p *Server_OperationsAddFetchPartitionArgs) InitDefault() {
+}
+
+var Server_OperationsAddFetchPartitionArgs_Req_DEFAULT *AddFetchPartitionRequest
+
+func (p *Server_OperationsAddFetchPartitionArgs) GetReq() (v *AddFetchPartitionRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsAddFetchPartitionArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsAddFetchPartitionArgs) SetReq(val *AddFetchPartitionRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsAddFetchPartitionArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsAddFetchPartitionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsAddFetchPartitionArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsAddFetchPartitionArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsAddFetchPartitionResult struct {
+	Success *AddFetchPartitionResponse `thrift:"success,0,optional" frugal:"0,optional,AddFetchPartitionResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsAddFetchPartitionResult() *Server_OperationsAddFetchPartitionResult {
+	return &Server_OperationsAddFetchPartitionResult{}
+}
+
+func (p *Server_OperationsAddFetchPartitionResult) InitDefault() {
+}
+
+var Server_OperationsAddFetchPartitionResult_Success_DEFAULT *AddFetchPartitionResponse
+
+func (p *Server_OperationsAddFetchPartitionResult) GetSuccess() (v *AddFetchPartitionResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsAddFetchPartitionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsAddFetchPartitionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*AddFetchPartitionResponse)
+}
+
+func (p *Server_OperationsAddFetchPartitionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsAddFetchPartitionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsAddFetchPartitionResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsAddFetchPartitionResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsCloseFetchPartitionArgs struct {
+	Req *CloseFetchPartitionRequest `thrift:"req,1" frugal:"1,default,CloseFetchPartitionRequest" json:"req"`
+}
+
+func NewServer_OperationsCloseFetchPartitionArgs() *Server_OperationsCloseFetchPartitionArgs {
+	return &Server_OperationsCloseFetchPartitionArgs{}
+}
+
+func (p *Server_OperationsCloseFetchPartitionArgs) InitDefault() {
+}
+
+var Server_OperationsCloseFetchPartitionArgs_Req_DEFAULT *CloseFetchPartitionRequest
+
+func (p *Server_OperationsCloseFetchPartitionArgs) GetReq() (v *CloseFetchPartitionRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsCloseFetchPartitionArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsCloseFetchPartitionArgs) SetReq(val *CloseFetchPartitionRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsCloseFetchPartitionArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsCloseFetchPartitionArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseFetchPartitionArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseFetchPartitionArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsCloseFetchPartitionResult struct {
+	Success *CloseFetchPartitionResponse `thrift:"success,0,optional" frugal:"0,optional,CloseFetchPartitionResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsCloseFetchPartitionResult() *Server_OperationsCloseFetchPartitionResult {
+	return &Server_OperationsCloseFetchPartitionResult{}
+}
+
+func (p *Server_OperationsCloseFetchPartitionResult) InitDefault() {
+}
+
+var Server_OperationsCloseFetchPartitionResult_Success_DEFAULT *CloseFetchPartitionResponse
+
+func (p *Server_OperationsCloseFetchPartitionResult) GetSuccess() (v *CloseFetchPartitionResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsCloseFetchPartitionResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsCloseFetchPartitionResult) SetSuccess(x interface{}) {
+	p.Success = x.(*CloseFetchPartitionResponse)
+}
+
+func (p *Server_OperationsCloseFetchPartitionResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsCloseFetchPartitionResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsCloseFetchPartitionResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsCloseFetchPartitionResult = map[int16]string{
 	0: "success",
 }
 

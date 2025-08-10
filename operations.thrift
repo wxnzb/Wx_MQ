@@ -89,7 +89,44 @@ struct PrepareSendRequest{
     4:i64 offset
     5:i8 option
 }
+//关于raft
 struct PrepareSendResponse{
+    1:bool ret
+    2:string err
+}
+struct AddRaftPartitionRequest{
+    1:string topicName
+    2:string partName
+    3:binary brokers
+}
+struct AddRaftPartitionResponse{
+    1:bool ret
+    2:string err
+}
+struct CloseRaftPartitionRequest{
+    1:string topicName
+    2:string partName
+}
+struct CloseRaftPartitionResponse{
+    1:bool ret
+    2:string err
+}
+struct AddFetchPartitionRequest{
+    1:string topicName
+    2:string partName
+    3:binary brokers
+    4:string leaderBroker
+    5:string fileName
+}
+struct AddFetchPartitionResponse{
+    1:bool ret
+    2:string err
+}
+struct CloseFetchPartitionRequest{
+    1:string topicName
+    2:string partName
+}
+struct CloseFetchPartitionResponse{
     1:bool ret
     2:string err
 }
@@ -110,8 +147,12 @@ service Server_Operations{
     PrepareAcceptResponse prepareAccept(1:PrepareAcceptRequest req)
     CloseAcceptRequest closeAccept(1:CloseAcceptRequest req)
     //2:通知接收方“我要从 offset 开始，发送某个文件的某部分了”，请确认你准备好了，或者已经收到了这部分
-    PrepareSendResponse prepareSend(1:PrepareSendRequest req)    
-
+    PrepareSendResponse prepareSend(1:PrepareSendRequest req)  
+    //raft
+    AddRaftPartitionResponse AddRaftPartition(1:AddRaftPartitionRequest req)
+    CloseRaftPartitionResponse CloseRaftPartition(1:CloseRaftPartitionRequest req)
+    AddFetchPartitionResponse AddFetchPartition(1:AddFetchPartitionRequest req)
+    CloseFetchPartitionResponse CloseFetchPartition(1:CloseFetchPartitionRequest req)
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。
 //PubRequest 是服务端→消费者客户端批量发送消息
