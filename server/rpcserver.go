@@ -184,8 +184,8 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 	return &api.InfoGetResponse{Ret: true}, nil
 }
 
-// //-----------------------新加bro-bro，主broker先是让他准备好接收，然后告诉从节点具体接收文件的位置
-// [Broker A]             [Broker B]
+// //-----------------------新加zkserver-bro，主broker先是让他准备好接收，然后告诉从节点具体接收文件的位置
+// [zkserver]             [Broker ]
 //    |                        |
 //    |--- prepareAccept ----->|   （通知准备同步一段数据）
 //    |                        |

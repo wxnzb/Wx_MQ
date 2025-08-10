@@ -188,7 +188,45 @@ func (t *Topic) closeAcceptHandle(in Info) (start, end int64, ret string, err er
 	}
 	return start, end, ret, err
 }
-func (t *Topic) prepareSendHandle(in Info, zkclient *zkserver_operations.Client)
+func (t *Topic) prepareSendHandle(in Info, zkclient *zkserver_operations.Client) (ret string, err error) {
+	sub_name := GetStringFromSub(in.topic, in.partition, in.option)
+	t.rmu.Lock()
+	//检查或创建partition
+	part, ok := t.Parts[in.partition]
+	if !ok {
+		part = NewPartition(t.Broker, t.Name, in.partition)
+		t.Parts[in.partition] = part
+	}
+	//检查文件是否存在
+	str, _ := os.Getwd()
+	str += "/" + t.Broker + "/" + in.topic + "/" + in.partition + "/" + in.file_name
+	file, ok := t.Files[str]
+	if !ok {
+		file_ptr, fd, Err, err := NewFile(str)
+		if err != nil {
+			return Err, err
+		}
+		fd.Close()
+		file = file_ptr
+		t.Files[str] = file
+	}
+	//检查或创建sub
+	sub, ok := t.SubList[sub_name]
+	if !ok {
+		sub = NewSubScription(in, sub_name, t.Parts, t.Files)
+		t.SubList[sub_name] = sub
+	}
+	t.rmu.Unlock()
+	//在sub中创建对应文件的config,等待startget
+	if in.option == TOPIC_NIL_PTP_PUSH {
+		ret, err = sub.AddPTPConfig(in, part, file, zkclient)
+	} else if in.option == TOPIC_KEY_PSB_PUSH {
+		sub.AddPSBConfig(in, in.partition, file, zkclient)
+	} else if in.option == TOPIC_NIL_PTP_PULL || in.option == TOPIC_KEY_PSB_PUSH {
+		sub.AddNode(in, file)
+	}
+	return ret, err
+}
 func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
 	sub_name := GetStringFromSub(pullRequest.topic, pullRequest.partition, pullRequest.option)
 	t.rmu.RLock()
@@ -228,14 +266,16 @@ type Partition struct {
 }
 
 // 创建一个新的分区
-func NewPartition(topic, partition string) *Partition {
+func NewPartition(broker, topic, partition string) *Partition {
 	part := &Partition{
-		rmu:   sync.RWMutex{},
-		key:   partition,
-		queue: make([]Message, 40),
+		rmu:    sync.RWMutex{},
+		key:    partition,
+		state:  CLOSE,
+		index:  0,
+		Broker: broker,
 	}
 	str, _ := os.Getwd()
-	str += "/" + ip_name + "/" + topic + "/" + partition
+	str += "/" + broker + "/" + topic + "/" + partition
 
 	return part
 }
@@ -401,13 +441,6 @@ type SubScription struct {
 	PTP_config         *Config
 	PSB_config         map[string]*PSBConfig_PUSH
 }
-type PSBConfig_PUSH struct {
-	rmu        sync.RWMutex
-	part_close chan *Part
-	file       *File
-	Cli        *client_operations.Client
-	part       *Part
-}
 
 // 创建一个新的SubScription,这里默认就是TOPIC_KEY_PSB形式
 func NewSubScription(in Info, name string, parts map[string]*Partition, files map[string]*File) *SubScription {
@@ -420,10 +453,48 @@ func NewSubScription(in Info, name string, parts map[string]*Partition, files ma
 		Files:      files,
 		PTP_config: nil,
 		PSB_config: make(map[string]*PSBConfig_PUSH),
+		nodes:      make(map[string]*Node),
 	}
 	group := NewGroup(in.topic, in.consumer)
 	subScription.groups = append(subScription.groups, group)
 	return subScription
+}
+
+// 当消费者需要开始消费时，ptp
+// 要是sub中该文件的config存在，就加入该config
+// 要是不存在，就创建一个并加入
+func (s *SubScription) AddPTPConfig(in Info, part *Partition, file *File, zkclient *zkserver_operations.Client) (ret string, err error) {
+	s.rmu.Lock()
+	if s.PTP_config == nil {
+		s.PTP_config = NewConfig(in.topic, 0, nil, nil)
+	}
+	err = s.PTP_config.AddPartition(in, part, file, zkclient)
+	s.rmu.Unlock()
+	if err != nil {
+		return ret, err
+	}
+	return ret, nil
+}
+func (s *SubScription) AddPSBConfig(in Info, part_name string, file *File, zkclient *zkserver_operations.Client) {
+	s.rmu.Lock()
+	_, ok := s.PSB_config[part_name+in.consumer]
+	if !ok {
+		config := NewPSBConfigPush(in, file, zkclient)
+		s.PSB_config[part_name+in.consumer] = config
+	} else {
+
+	}
+	s.rmu.Unlock()
+}
+func (s *SubScription) AddNode(in Info, file *File) {
+	str := in.topic + in.partition + in.consumer
+	s.rmu.Lock()
+	_, ok := s.nodes[str]
+	if !ok {
+		node := NewNode(in, file)
+		s.nodes[str] = node
+	}
+	s.rmu.Unlock()
 }
 
 // ---这个也不要了吗
@@ -683,38 +754,68 @@ func (c *Consistent) GetNodeFree(key string) string {
 // -------------------------------------------------------------
 // 提供一个线程安全的管理机制，管理消息传递系统中的分区和消费者的关系
 type Config struct {
-	rmu         sync.RWMutex
-	PartToCon   map[string][]string //part对应的消费者
-	con_nums    int
-	part_nums   int
+	rmu sync.RWMutex
+
+	con_nums  int
+	part_nums int
+
+	PartToCon map[string][]string //part对应的消费者
+
 	toconsumers map[string]*client_operations.Client //消费者对应的消费者客户端接口
 	partitions  map[string]*Partition
-	parts       map[string]*Part
 	//文件
 	files map[string]*File
-	//下面这还不理解干啥的
-	con_part   bool //是一消费者为节点还是以分区为节点
+
+	parts map[string]*Part //PTP的part
+
 	consistent *Consistent
+
+	part_close chan *Part
 }
 
-func NewConfig(topic_name string, partitions map[string]*Partition, part_nums int, files map[string]*File) *Config {
+func NewConfig(topic_name string, part_nums int, partitions map[string]*Partition, files map[string]*File) *Config {
 	con := &Config{
 		rmu:         sync.RWMutex{},
-		PartToCon:   make(map[string][]string),
 		con_nums:    0,
 		part_nums:   part_nums,
+		PartToCon:   make(map[string][]string),
 		toconsumers: make(map[string]*client_operations.Client),
 		partitions:  partitions,
 		parts:       make(map[string]*Part),
 		files:       files,
-		//true 表示消费者是 node，false 表示分区是 node
-		con_part:   true,
-		consistent: NewConsistent(),
+		consistent:  NewConsistent(),
+		part_close:  make(chan *Part),
 	}
-	for partition_name, _ := range partitions {
-		con.parts[partition_name] = NewPart(topic_name, partition_name, files[partition_name])
-	}
+	go con.GetCloseChan(con.part_close)
 	return con
+}
+func (c *Config) GetCloseChan(ch chan *Part) {
+	for close := range c.part_close {
+		c.DeletePart(close.partition_name, close.file)
+	}
+}
+
+// part消费完成，一处config中的Partition和Part
+func (c *Config) DeletePart(part string, file *File) {
+	c.rmu.Lock()
+	c.part_nums--
+	delete(c.partitions, part)
+	delete(c.files, file.filePath)
+	c.rmu.Unlock()
+	c.RebalancePtoC() //更新配置
+	c.UpdateParts()   //应用配置
+}
+func (c *Config) AddPartition(in Info, part *Partition, file *File, zkclient *zkserver_operations.Client) error {
+	c.rmu.Lock()
+	c.part_nums++
+	c.partitions[in.partition] = part
+	c.files[file.filePath] = file
+	c.parts[in.partition] = NewPart(in, file, zkclient)
+	c.parts[in.partition].Start(c.part_close)
+	c.rmu.Unlock()
+	c.RebalancePtoC() //更新配置
+	c.UpdateParts()   //应用配置
+	return nil
 }
 
 // 这里+-知识操作了config,最后要移到part里面去
@@ -841,90 +942,20 @@ func (c *Config) DeleteToconsumer(part, consumer string) {
 	c.UpdateParts()   //应用配置
 }
 
-// // -------------------------------------------------------------
-// type Consistent struct {
-// 	rmu              sync.RWMutex
-// 	hashSortNodes    []uint32          //排序的虚拟节点
-// 	circleNodes      map[uint32]string //虚拟节点对应的世纪节点
-// 	virtualNodeCount int               //虚拟节点数量
-// 	nodes            map[string]bool   //已绑定的世纪节点为true，这个还不太了解
-// }
+type PSBConfig_PUSH struct {
+	rmu        sync.RWMutex
+	part_close chan *Part
+	file       *File
+	Cli        *client_operations.Client
+	part       *Part
+}
 
-// func NewConsistent() *Consistent {
-// 	return &Consistent{
-// 		rmu:              sync.RWMutex{},
-// 		hashSortNodes:    make([]uint32, 0),
-// 		circleNodes:      make(map[uint32]string),
-// 		virtualNodeCount: VIRTUAL_10,
-// 		nodes:            make(map[string]bool),
-// 	}
-// }
-// func (c *Consistent) hashKey(key string) uint32 {
-// 	return crc32.ChecksumIEEE([]byte(key))
-// }
-// func (c *Consistent) Add(node string) error {
-// 	if node == "" {
-// 		return nil
-// 	}
-// 	c.rmu.Lock()
-// 	defer c.rmu.Unlock()
-// 	ok := c.nodes[node]
-// 	if ok {
-// 		return errors.New("node already exist")
-// 	}
-// 	c.nodes[node] = true
-// 	for i := 0; i < c.virtualNodeCount; i++ {
-// 		virtualnode := c.hashKey(node + strconv.Itoa(i))
-// 		c.circleNodes[virtualnode] = node
-// 		c.hashSortNodes = append(c.hashSortNodes, virtualnode)
-// 	}
-// 	sort.Slice(c.hashSortNodes, func(i, j int) bool {
-// 		return c.hashSortNodes[i] < c.hashSortNodes[j]
-// 	})
-// 	return nil
-// }
-// func (c *Consistent) Reduce(node string) error {
-// 	if node == "" {
-// 		return nil
-// 	}
-// 	c.rmu.Lock()
-// 	defer c.rmu.Unlock()
-// 	ok := c.nodes[node]
-// 	if !ok {
-// 		return errors.New("node not exist")
-// 	}
-// 	c.nodes[node] = false
-// 	for i := 0; i < c.virtualNodeCount; i++ {
-// 		virtualnode := c.hashKey(node + strconv.Itoa(i))
-// 		delete(c.circleNodes, virtualnode)
-// 		for j := 0; j < len(c.hashSortNodes); j++ {
-// 			if c.hashSortNodes[j] == virtualnode && j != len(c.hashSortNodes)-1 {
-// 				c.hashSortNodes = append(c.hashSortNodes[:j], c.hashSortNodes[j+1:]...)
-// 			} else if c.hashSortNodes[j] == virtualnode && j == len(c.hashSortNodes)-1 {
-// 				c.hashSortNodes = c.hashSortNodes[:j]
-// 			}
-// 		}
-// 	}
-// 	sort.Slice(c.hashSortNodes, func(i, j int) bool {
-// 		return c.hashSortNodes[i] < c.hashSortNodes[j]
-// 	})
-// 	return nil
-// }
-
-// // 一致性哈希环的顺时针查找最近节点
-// func (c *Consistent) GetNode(key string) string {
-// 	c.rmu.Lock()
-// 	defer c.rmu.Unlock()
-// 	hashKey := c.hashKey(key)
-// 	i := c.getposition(hashKey)
-// 	return c.circleNodes[c.hashSortNodes[i]]
-// }
-// func (c *Consistent) getposition(hashKey uint32) int {
-// 	i := sort.Search(len(c.hashSortNodes), func(i int) bool {
-// 		return c.hashSortNodes[i] >= hashKey
-// 	})
-// 	if i == len(c.hashSortNodes) {
-// 		return 0
-// 	}
-// 	return i
-// }
+func NewPSBConfigPush(in Info, file *File, zkclient *zkserver_operations.Client) *PSBConfig_PUSH {
+	ret := &PSBConfig_PUSH{
+		rmu:        sync.RWMutex{},
+		part_close: make(chan *Part),
+		file:       file,
+		part:       NewPart(in, file, zkclient),
+	}
+	return ret
+}

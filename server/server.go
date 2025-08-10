@@ -391,7 +391,7 @@ func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
 		s.topics[in.topic] = topic
 	}
 	s.rmu.Unlock()
-	return topic.PrePareSendHandle(in, &s.zkclient)
+	return topic.prepareSendHandle(in, &s.zkclient)
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了

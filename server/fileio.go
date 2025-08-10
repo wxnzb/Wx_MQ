@@ -40,11 +40,14 @@ func NewFile(filepath string) (file *File, fd *os.File, Err string, err error) {
 }
 
 // 打开一个已有的文件或者创建一个新的文件
-func (f *File) OpenFile() *os.File {
-	f.rmu.Lock()
-	defer f.rmu.Unlock()
-	file, _ := CreateFile(f.filePath)
-	return file
+func (f *File) OpenFileRead() *os.File {
+	f.rmu.RLock()
+	fd, err := os.OpenFile(f.filePath, os.O_RDWR, 0666)
+	f.rmu.RUnlock()
+	if err != nil {
+		return nil
+	}
+	return fd
 }
 
 // [NodeA|PayloadA][NodeB|PayloadB][NodeC|PayloadC]…
@@ -91,12 +94,12 @@ func (f *File) GetSize() int64 {
 func (f *File) WriteFile(file *os.File, node NodeData, msgs []Message) bool {
 	msgs_json, err := json.Marshal(msgs)
 	if err != nil {
-		DEBUG(dERROR, "%v turn json fail\n", msgs)
+		DEBUG(dError, "%v turn json fail\n", msgs)
 	}
 	node.Size = len(msgs_json)
 	node_json, err := json.Marshal(node)
 	if err != nil {
-		DEBUG(dERROR, "%v turn json fail\n", node)
+		DEBUG(dError, "%v turn json fail\n", node)
 	}
 	if f.node_size == 0 {
 		f.node_size = len(node_json)

@@ -236,20 +236,21 @@ type Part struct {
 	zkclient     *zkserver_operations.Client
 }
 
-func NewPart(partinfo Info_in, file *File) *Part {
+func NewPart(in Info, file *File, zkclient *zkserver_operations.Client) *Part {
 	return &Part{
 		rmu:            sync.RWMutex{},
-		topic_name:     partinfo.TopicName,
-		partition_name: partinfo.PartitionName,
-		option:         TOPIC_NIL_PTP,
+		topic_name:     in.topic,
+		partition_name: in.partition,
+		option:         in.option,
 		state:          DOWN,
 		file:           file,
 		to_consumers:   make(map[string]*client_operations.Client),
 		buffer_node:    make(map[int64]NodeData),
 		buffer_msgs:    make(map[int64][]Message),
-		consumer_ack:   make(chan ConsumerAck),
-		block_status:   make(map[int64]string),
-		lastIndex:      partinfo.Index,
+		//consumer_ack:   make(chan ConsumerAck),
+		block_status: make(map[int64]string),
+		lastIndex:    in.offset,
+		zkclient:     zkclient,
 	}
 
 }
@@ -271,9 +272,9 @@ func NewPart(partinfo Info_in, file *File) *Part {
 // 1：读取文件的消息存到part结构体的buffer_node和buffer_mags中
 // 2：开启一个携程接收消费者发送过来的ack
 // 3:开启携程向消费者发送消息
-func (p *Part) Start(close chan Part) {
+func (p *Part) Start(close chan *Part) {
 	//打开一个文件
-	p.fd = *p.file.OpenFile()
+	p.fd = *p.file.OpenFileRead()
 	//根据index找到偏移
 	//p.fileOffset=p.file.FindOffset(p.lastIndex)
 	var err error
@@ -385,7 +386,7 @@ func (p *Part) GetDone(close chan *Part) {
 				p.rmu.Unlock()
 			}
 		case <-time.After(time.Second * TOUT): //超时
-			close <- *p
+			close <- p
 			return
 		}
 	}
@@ -526,6 +527,17 @@ type Node struct {
 	start_index int64
 }
 
+func NewNode(in Info, file *File) *Node {
+	no := &Node{
+		topic_name:     in.topic,
+		partition_name: in.partition,
+		option:         in.option,
+		file:           file,
+	}
+	no.fd = *no.file.OpenFileRead()
+	no.offset = -1
+	return no
+}
 func (nod *Node) ReadMSGS(in Info) (MSGS, error) {
 	var err error
 	if nod.offset == -1 || nod.start_index != in.offset {
