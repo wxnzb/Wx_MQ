@@ -117,6 +117,7 @@ struct AddFetchPartitionRequest{
     3:binary brokers
     4:string leaderBroker
     5:string fileName
+    6:string hostPort
 }
 struct AddFetchPartitionResponse{
     1:bool ret

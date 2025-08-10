@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
+	"time"
 
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/raft_operations"
+	"Wx_MQ/kitex_gen/api/server_operations"
 	"Wx_MQ/kitex_gen/api/zkserver_operations"
 	"Wx_MQ/zookeeper"
 	"errors"
@@ -55,6 +57,9 @@ type Server struct {
 	brokers map[string]*raft_operations.Client
 	aplych  chan Info
 	me      int
+	//fetch
+	parts_fetch   map[string]string
+	brokers_fetch map[string]*server_operations.Client
 }
 
 var ip_name string //加了这个
@@ -309,11 +314,14 @@ type Info struct {
 	ack             int8
 	//cmdindex：幂等编号，防止重复提交
 	cmdindex int64
-	//这里的k-broker名字，v-raft地址
+	//raft:这里的k-broker名字，v-raft地址
 	brokers map[string]string
 	brok_me map[string]int
 	//这个是干什么的？？
 	me int
+	//fetch
+	LeaderBroker string
+	HostPort     string
 	//update dup
 	zkclient   *zkserver_operations.Client
 	BrokerName string
@@ -433,6 +441,56 @@ func (s *Server) CloseRaftPartitionHandle(in Info) (ret string, err error) {
 		return err.Error(), err
 	}
 	return ret, err
+}
+func (s *Server) AddFetchPartitionHandle(in Info) (ret string, err error) {
+	//检查该topic_partition是否准备好accept信息
+	ret, err = s.PrepareAcceptHandle(in)
+	if err != nil {
+		return ret, err
+	}
+	if in.LeaderBroker == s.name {
+		s.rmu.Lock()
+		defer s.rmu.Unlock()
+		topic, ok := s.topics[in.topic]
+		if !ok {
+			ret = "this topic is not this broker"
+			return ret, errors.New(ret)
+		}
+		for BrokerName := range in.brokers {
+			ret, err = topic.prepareSendHandle(Info{
+				topic:     in.topic,
+				partition: in.partition,
+				file_name: in.file_name,
+				consumer:  BrokerName,
+				option:    TOPIC_KEY_PSB_PULL,
+			}, &s.zkclient)
+			if err != nil {
+
+			}
+		}
+		return ret, err
+	} else {
+		time.Sleep(time.Microsecond * 100)
+		str := in.topic + in.partition + in.file_name
+		s.rmu.Lock()
+		broker, ok := s.brokers_fetch[in.LeaderBroker]
+		if !ok {
+			bro_ptr, err := server_operations.NewClient(s.name, client.WithHostPorts(in.HostPort))
+			if err != nil {
+				return err.Error(), err
+			}
+			s.brokers_fetch[str] = &bro_ptr
+			broker = &bro_ptr
+		}
+
+		topic, ok := s.topics[in.topic]
+		if !ok {
+			ret = "this topic is not this broker"
+			return ret, err
+		}
+		s.rmu.Unlock()
+		return s.FetchMsg(in, broker, topic)
+	}
 }
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了

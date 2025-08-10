@@ -904,6 +904,7 @@ type AddFetchPartitionRequest struct {
 	Brokers      []byte `thrift:"brokers,3" frugal:"3,default,binary" json:"brokers"`
 	LeaderBroker string `thrift:"leaderBroker,4" frugal:"4,default,string" json:"leaderBroker"`
 	FileName     string `thrift:"fileName,5" frugal:"5,default,string" json:"fileName"`
+	HostPort     string `thrift:"hostPort,6" frugal:"6,default,string" json:"hostPort"`
 }
 
 func NewAddFetchPartitionRequest() *AddFetchPartitionRequest {
@@ -932,6 +933,10 @@ func (p *AddFetchPartitionRequest) GetLeaderBroker() (v string) {
 func (p *AddFetchPartitionRequest) GetFileName() (v string) {
 	return p.FileName
 }
+
+func (p *AddFetchPartitionRequest) GetHostPort() (v string) {
+	return p.HostPort
+}
 func (p *AddFetchPartitionRequest) SetTopicName(val string) {
 	p.TopicName = val
 }
@@ -947,6 +952,9 @@ func (p *AddFetchPartitionRequest) SetLeaderBroker(val string) {
 func (p *AddFetchPartitionRequest) SetFileName(val string) {
 	p.FileName = val
 }
+func (p *AddFetchPartitionRequest) SetHostPort(val string) {
+	p.HostPort = val
+}
 
 func (p *AddFetchPartitionRequest) String() string {
 	if p == nil {
@@ -961,6 +969,7 @@ var fieldIDToName_AddFetchPartitionRequest = map[int16]string{
 	3: "brokers",
 	4: "leaderBroker",
 	5: "fileName",
+	6: "hostPort",
 }
 
 type AddFetchPartitionResponse struct {

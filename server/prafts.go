@@ -81,7 +81,7 @@ func (praft *parts_raft) make(name string, hostport string, appench chan Info) e
 	}
 	return nil
 }
-func (praft *parts_raft) DeleteRaft_raft(topicname, partitionname string) error {
+func (praft *parts_raft) DeletePart_raft(topicname, partitionname string) error {
 	str := topicname + partitionname
 	praft.rmu.Lock()
 	defer praft.rmu.Unlock()

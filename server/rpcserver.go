@@ -300,6 +300,31 @@ func (s *RPCServer) CloseRaftPartition(ctx context.Context, req *api.CloseRaftPa
 		Err: ret,
 	}, nil
 }
+func (s *Server) AddFetchPartition(ctx context.Context, req *api.AddFetchPartitionRequest) (r *api.AddFetchPartitionResponse, err error) {
+	var Brokers BrokerS
+	json.Unmarshal(req.Brokers, &Brokers)
+	ret, err := s.server.AddFetchPartitionHandle(Info{
+		topic:        req.TopicName,
+		partition:    req.PartName,
+		brokers:      Brokers.BroBrokers,
+		LeaderBroker: req.LeaderBroker,
+		HostPort:     req.HostPort,
+		file_name:    req.FileName,
+	})
+	if err != nil {
+		return &api.AddFetchPartitionResponse{
+			Ret: false,
+			Err: ret,
+		}, err
+	}
+	return &api.AddFetchPartitionResponse{
+		Ret: true,
+		Err: ret,
+	}, nil
+}
+func (s *Server) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest) (r *api.CloseFetchPartitionResponse, err error) {
+
+}
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // service ZKServer_Operations{
