@@ -492,7 +492,35 @@ func (s *Server) AddFetchPartitionHandle(in Info) (ret string, err error) {
 		return s.FetchMsg(in, broker, topic)
 	}
 }
-
+func(s *Server)FetchMsg(in Info,broker *server_operations.Client,topic *Topic)(ret string,err error){
+	//向zkserver请求向leader broker pull信息
+	//向leader broker发起pull请求
+	//获取本地当前文件end_index
+	File,fd:=topic.GetFile(in)
+	index:=File.GetIndex(fd)
+	index+=1
+	if err!=nil{
+		return err.Error(),err
+	}
+	if in.file_name!="Nowfile.txt"{
+		//当文件名不为nowfile时，创建partition,并向该File中写入内容
+		go func(){
+			Partition:=NewPartition(s.name,in.topic,in.partition)
+			Partition.StartGetMessage(File,fd,in)
+			ice:=0
+			for{
+				resp,err:=(*cli).Pull(context.Background(),&api.PullRequest{
+					ConsumerId:s.name,
+					Topic: in.topic,
+					Key:in.partition,
+					Offset:index,
+					Size:10,
+					Option: TOPIC_KEY_PSB_PULL,
+				})
+			}
+		}
+	}
+}
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了
 type SubResponse struct {
 	size  int

@@ -131,10 +131,23 @@ func (t *Topic) Rebalance() {
 func (t *Topic) RecoverConsumer(sub_name string, con *ToConsumer) {
 
 }
-func (t *Topic) GetFile(partition string) *File {
-	t.rmu.RLock()
-	defer t.rmu.RUnlock()
-	return t.Parts[partition].GetFile()
+func (t *Topic) GetFile(in Info) (File *File, Fd *os.File) {
+	t.rmu.Lock()
+	str, _ := os.Getwd()
+	str += "/" + t.Broker + "/" + in.topic + "/" + in.partition + "/" + in.file_name
+	file, ok := t.Files[str]
+	if !ok {
+		file, fd, _, err := NewFile(str)
+		if err != nil {
+			return nil, nil
+		}
+		Fd = fd
+		t.Files[str] = file
+	} else {
+		Fd = file.OpenFileRead()
+	}
+	t.rmu.Unlock()
+	return File, Fd
 }
 func (t *Topic) GetParts() map[string]*Partition {
 	t.rmu.RLock()
