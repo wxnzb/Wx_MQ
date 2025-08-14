@@ -374,8 +374,14 @@ func (zks *ZKServer) CreatePartitionHandle(part Info_in) Info_out {
 		Topic:    part.TopicName,
 		PTPIndex: int64(0),
 		Option:   -2,
+		Index:    int64(1),
 	}
 	err := zks.zk.RegisterNode(pNode)
+	if err != nil {
+		return Info_out{
+			Err: err,
+		}
+	}
 	err = zks.CreateNowBlock(part)
 	return Info_out{
 		Err: err,

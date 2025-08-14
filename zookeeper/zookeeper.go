@@ -47,6 +47,7 @@ type PartitionNode struct {
 	Topic    string `json:"topic"`
 	PTPIndex int64  `json:"ptpindex"`
 	Option   int8   `json:option`
+	Index    int64  `json:index`
 }
 type BlockNode struct {
 	Name         string `json:"name"`
