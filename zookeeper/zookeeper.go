@@ -35,8 +35,11 @@ func NewZK(info ZKInfo) *ZK {
 }
 
 type BrokerNode struct {
-	Name     string `json:"name"`
-	HostPort string `json:"hostport"`
+	Name         string `json:"name"`
+	BroHostPort  string `json:"brohostport"`
+	RaftHostPort string `json:"rafthostport"`
+	Me           int    `json:"me"`
+	Pnum         int    `json:"pnum"`
 }
 type TopicNode struct {
 	Name string `json:"name"`
@@ -48,6 +51,7 @@ type PartitionNode struct {
 	PTPIndex int64  `json:"ptpindex"`
 	Option   int8   `json:option`
 	Index    int64  `json:index`
+	DupNum   int8   `json:dupnum`
 }
 type BlockNode struct {
 	Name         string `json:"name"`
@@ -65,7 +69,7 @@ type DuplicateNode struct {
 	StartOffset int64  `json:"start_offset"`
 	EndOffset   int64  `json:"end_offset"`
 	BrokerName  string `json:"brokername"`
-	BlockNode   string `json:"blockname"`
+	BlockName   string `json:"blockname"`
 }
 
 // 在 Zookeeper 指定路径下创建一个永久节点，并且把给定的结构体内容（如 BlockNode、BrokerNode 等）转成 JSON 后写入该节点中。
@@ -158,10 +162,10 @@ func (z *ZK) GetBroker(topic, part string, offfset int64) ([]Part, error) {
 	var parts []Part
 	blocks, _, _ := z.Con.Children(path)
 	for _, block := range blocks {
-		blockInfo := z.GetBlockNode(path + "/" + part + "/" + block)
+		blockInfo, _ := z.GetBlockNode(path + "/" + part + "/" + block)
 		//找到消费者需要的offset的block
 		if blockInfo.StartOffset <= offfset && blockInfo.EndOffset >= offfset {
-			brokerInfo := z.GetBrokerNode(blockInfo.Name)
+			brokerInfo, _ := z.GetBrokerNode(blockInfo.Name)
 			parts = append(parts, Part{
 				topicName:     topic,
 				PartitionName: part,
@@ -209,7 +213,7 @@ func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, Blo
 	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
 	for {
 		NowBlock, _ := z.GetBlockNode(Now_block_path)
-		NowBroker := z.GetBrokerNode(NowBlock.LeaderBroker)
+		NowBroker, _ := z.GetBrokerNode(NowBlock.LeaderBroker)
 		ret := z.CheckBroker(z.BrokerRoot + NowBlock.LeaderBroker)
 		if ret {
 			return NowBroker, NowBlock
@@ -217,6 +221,23 @@ func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, Blo
 			time.Sleep(time.Second * 1)
 		}
 	}
+}
+func (z *ZK) UpdateBlockNode(bnode BlockNode) error {
+	path := z.TopicRoot + "/" + bnode.Topic + "/" + bnode.Partition + "/" + bnode.Name
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return err
+	}
+	data, err := json.Marshal(bnode)
+	if err != nil {
+		return err
+	}
+	_, sate, _ := z.Con.Get(path)
+	_, err = z.Con.Set(path, data, sate.Version)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // 检查broker是否在线
@@ -250,13 +271,17 @@ func (z *ZK) GetDuplicateNode(path string) (DuplicateNode, error) {
 	json.Unmarshal(data, &dupNode)
 	return dupNode, nil
 }
-func (z *ZK) GetBrokerNode(name string) BrokerNode {
+func (z *ZK) GetBrokerNode(name string) (BrokerNode, error) {
 	//这个为什么path和上面的不一样
-	name = z.BrokerRoot + "/" + name
+	path := z.BrokerRoot + "/" + name
 	var broNode BrokerNode
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return broNode, err
+	}
 	data, _, _ := z.Con.Get(name)
 	json.Unmarshal(data, &broNode)
-	return broNode
+	return broNode, nil
 }
 
 type StartGetInfo struct {
@@ -283,4 +308,12 @@ func (z *ZK) CreateState(brokerName string) error {
 		return err
 	}
 	return nil
+}
+func (z *ZK) GetPartBlockIndex(topicname, partname string) (int64, error) {
+	//str:=z.TopicRoot+"/"+topicname+"/Partitions/"+partname
+	node, err := z.GetPartitionNode(topicname, partname)
+	if err != nil {
+		return 0, err
+	}
+	return node.Index, nil
 }

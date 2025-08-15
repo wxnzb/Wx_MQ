@@ -259,9 +259,9 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 
 // raft
 type BrokerS struct {
-	BroBrokers map[string]string `json:brobrokers`
-	RafBrokers map[string]string `json:rafbrokers`
-	Me_Brokers map[string]int    `json:mebrokers`
+	BroBrokers  map[string]string `json:brobrokers`
+	RaftBrokers map[string]string `json:rafbrokers`
+	Me_Brokers  map[string]int    `json:mebrokers`
 }
 
 func (s *RPCServer) AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest) (r *api.AddRaftPartitionResponse, err error) {
@@ -270,7 +270,7 @@ func (s *RPCServer) AddRaftPartition(ctx context.Context, req *api.AddRaftPartit
 	ret, err := s.server.AddRaftPartitionHandle(Info{
 		topic:     req.TopicName,
 		partition: req.PartName,
-		brokers:   Brokers.RafBrokers,
+		brokers:   Brokers.RaftBrokers,
 		brok_me:   Brokers.Me_Brokers,
 	})
 	if err != nil {

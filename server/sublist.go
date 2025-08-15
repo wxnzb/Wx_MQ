@@ -712,16 +712,24 @@ func (c *Consistent) GetNode(key string) string {
 	defer c.rmu.Unlock()
 	hashKey := c.hashKey(key)
 	i := c.getposition(hashKey)
-	return c.circleNodes[c.hashSortNodes[i]]
+	con := c.circleNodes[c.hashSortNodes[i]]
+	c.ConH[con] = true
+	c.FreeNode--
+	return con
 }
 func (c *Consistent) getposition(hashKey uint32) int {
 	i := sort.Search(len(c.hashSortNodes), func(i int) bool {
 		return c.hashSortNodes[i] >= hashKey
 	})
 	if i == len(c.hashSortNodes) {
-		return 0
+		if i == len(c.hashSortNodes)-1 {
+			return 0
+		} else {
+			return 1
+		}
+	} else {
+		return len(c.hashSortNodes) - 1
 	}
-	return i
 }
 func (c *Consistent) SetFreeNode() {
 	c.rmu.Lock()

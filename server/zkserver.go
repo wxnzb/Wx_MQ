@@ -6,6 +6,8 @@ import (
 	"Wx_MQ/zookeeper"
 	"context"
 	"encoding/json"
+	"hash/crc32"
+	"sort"
 	"sync"
 
 	"Wx_MQ/client/clients"
@@ -24,6 +26,8 @@ type ZKServer struct {
 	info_partition map[string]zookeeper.PartitionNode
 	//连接各个brokers
 	brokers map[string]server_operations.Client
+
+	consistent *ConsistentBro
 }
 
 func NewZKServer(zkInfo zookeeper.ZKInfo) *ZKServer {
@@ -122,46 +126,169 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 
 }
 func (zks *ZKServer) ProSetPartStateHandle(info Info_in) Info_out {
-	node, _ := zks.zk.GetPartitionNode(info.TopicName, info.PartitionName)
+
+	node, err := zks.zk.GetPartitionNode(info.TopicName, info.PartitionName)
+	if err != nil {
+		return Info_out{
+			Err: err,
+		}
+	}
 	if info.Option != node.Option {
+		//其实我目前感觉这个函数完全没有必要
+		index, err := zks.zk.GetPartBlockIndex(info.TopicName, info.PartitionName)
+		if err != nil {
+			return Info_out{
+				Err: err,
+			}
+		}
 		//进行更新
 		zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
-			Topic:    info.TopicName,
-			Name:     info.PartitionName,
-			Option:   info.Option,
-			PTPIndex: info.Index,
+			Option: info.Option,
+			//这个是为了找到路径
+			Topic: info.TopicName,
+			Name:  info.PartitionName,
+			//我感觉下面这些都灭有变化呀，为什么要赋值？？？
+			Index:    index,
+			PTPIndex: node.PTPIndex,
+			DupNum:   node.DupNum,
 		})
 	}
-	var ret string
-	switch info.Option {
-	//说明他想变为raft
-	case -1:
-		//说明option没变
-		if node.Option == -1 {
-			ret = "HadRaft"
-		}
-		if node.Option == 0 || node.Option == 1 {
-			//说明状态由之前的fetch变为reft
-		}
-		//还有这个状态？？
-		if node.Option == -2 {
+	var Dups []zookeeper.DuplicateNode
+	var data_brokers []byte
+	//说明还未创建任何状态
+	if node.Option == -2 {
+		var ret string
+		switch info.Option {
+		//说明他想变为raft
+		case -1:
+			//说明option没变
 
-		}
-		//那么就说明他想变为fetch
-	default:
-		if node.Option == 0 || node.Option == 1 {
-			ret = "HadFetch"
-		}
-		if node.Option == -1 {
-			//说明状态由之前的raft变为fetch
-		}
-		if node.Option == -2 {
-
+			//先创建上三个副本再说
+			Dups, data_brokers = zks.GetDupsFromConsist(info)
+			err = zks.BecomLeader(Info_in{
+				TopicName:     info.TopicName,
+				PartitionName: info.PartitionName,
+				CliName:       Dups[0].BrokerName,
+			})
+			if err != nil {
+				return Info_out{
+					Err: err,
+				}
+			}
+			//向这些broker发送信息，启动raft
+			for _, dupnode := range Dups {
+				bro_cli, ok := zks.brokers[dupnode.BrokerName]
+				if !ok {
+					//
+				} else {
+					//开启raft集群
+					_, err := bro_cli.AddRaftPartition(context.Background(), &api.AddRaftPartitionRequest{
+						TopicName: info.TopicName,
+						PartName:  info.PartitionName,
+						Brokers:   data_brokers,
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+				}
+			}
+			//那么就说明他想变为fetch
+		default:
+			Dups, data_brokers = zks.GetDupsFromConsist(info)
+			LeaderBroker, err := zks.zk.GetBrokerNode(Dups[0].BrokerName)
+			if err != nil {
+				return Info_out{
+					Err: err,
+				}
+			}
+			for _, dupnode := range Dups {
+				bro_cli, ok := zks.brokers[dupnode.BrokerName]
+				if !ok {
+					//
+				} else {
+					_, err := bro_cli.AddFetchPartition(context.Background(), &api.AddFetchPartitionRequest{
+						TopicName:    info.TopicName,
+						PartName:     info.PartitionName,
+						Brokers:      data_brokers,
+						LeaderBroker: LeaderBroker.Name,
+						HostPort:     LeaderBroker.BroHostPort,
+						FileName:     "NowBlock.txt",
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+				}
+			}
+			return Info_out{
+				Ret: ret,
+			}
 		}
 	}
-	return Info_out{
-		Ret: ret,
+}
+func (zks *ZKServer) GetDupsFromConsist(info Info_in) (Dups []zookeeper.DuplicateNode, data_brokers []byte) {
+	str := info.TopicName + "/" + info.PartitionName
+	Bro_dups := zks.consistent.GetNode(str+"dup", 3)
+	Dups = append(Dups, zookeeper.DuplicateNode{
+		Name:        "dup_0",
+		Topic:       info.TopicName,
+		Partition:   info.PartitionName,
+		BrokerName:  Bro_dups[0],
+		StartOffset: int64(0),
+		BlockName:   "NowBlock",
+	})
+	Dups = append(Dups, zookeeper.DuplicateNode{
+		Name:        "dup_1",
+		Topic:       info.TopicName,
+		Partition:   info.PartitionName,
+		BrokerName:  Bro_dups[1],
+		StartOffset: int64(0),
+		BlockName:   "NowBlock",
+	})
+	Dups = append(Dups, zookeeper.DuplicateNode{
+		Name:        "dup_2",
+		Topic:       info.TopicName,
+		Partition:   info.PartitionName,
+		BrokerName:  Bro_dups[2],
+		StartOffset: int64(0),
+		BlockName:   "NowBlock",
+	})
+	for _, dup := range Dups {
+		err := zks.zk.RegisterNode(dup)
+		if err != nil {
+			//
+		}
 	}
+	var brokers BrokerS
+	brokers.BroBrokers = make(map[string]string)
+	brokers.RaftBrokers = make(map[string]string)
+	brokers.Me_Brokers = make(map[string]int)
+	for _, DupNode := range Dups {
+		BrokerNode, err := zks.zk.GetBrokerNode(DupNode.BrokerName)
+		if err != nil {
+			//
+		}
+		brokers.BroBrokers[BrokerNode.Name] = BrokerNode.BroHostPort
+		brokers.RaftBrokers[BrokerNode.Name] = BrokerNode.BroHostPort
+		brokers.Me_Brokers[BrokerNode.Name] = BrokerNode.Me
+	}
+	data_brokers, err := json.Marshal(brokers)
+	if err != nil {
+		//
+	}
+	return Dups, data_brokers
+}
+func (zks *ZKServer) BecomLeader(info Info_in) error {
+	now_block_path := zks.zk.TopicRoot + "/" + info.TopicName + "/" + "partitions" + "/" + info.PartitionName + "/" + "NowBlock"
+	NowBlock, err := zks.zk.GetBlockNode(now_block_path)
+	if err != nil {
+		//
+	}
+	NowBlock.LeaderBroker = info.CliName
+	return zks.zk.UpdateBlockNode(NowBlock)
 }
 func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err error) {
 	//检查该用户是否订阅了topic/part
@@ -409,4 +536,54 @@ func (zks *ZKServer) UpdateOffset(info Info_in) error {
 		PTPIndex: info.Index,
 	})
 	return err
+}
+
+type ConsistentBro struct {
+	rmu              sync.RWMutex
+	hashSortNodes    []uint32          //排序的虚拟节点
+	circleNodes      map[uint32]string //虚拟节点对应的世纪节点
+	virtualNodeCount int               //虚拟节点数量
+	nodes            map[string]bool   //已绑定的世纪节点为true，这个还不太了解
+	//consumer以负责一个partition则为true
+	BroH map[string]bool
+}
+
+func (c *ConsistentBro) GetNode(key string, num int) (dups []string) {
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	c.SetBroHFalse()
+	hashKey := c.hashKey(key)
+	for index := 0; index < num; index++ {
+		i := c.getposition(hashKey)
+		bro_name := c.circleNodes[c.hashSortNodes[i]]
+		c.BroH[bro_name] = true
+		dups = append(dups, bro_name)
+	}
+	return
+}
+func (c *ConsistentBro) SetBroHFalse() {
+	for k, _ := range c.BroH {
+		c.BroH[k] = false
+	}
+}
+func (c *ConsistentBro) hashKey(key string) uint32 {
+	return crc32.ChecksumIEEE([]byte(key))
+}
+func (c *ConsistentBro) getposition(hashKey uint32) (ret int) {
+	i := sort.Search(len(c.hashSortNodes), func(i int) bool {
+		return c.hashSortNodes[i] >= hashKey
+	})
+	if i < len(c.hashSortNodes) {
+		if i == len(c.hashSortNodes)-1 {
+			ret = 0
+		} else {
+			ret = i
+		}
+	} else {
+		ret = len(c.hashSortNodes) - 1
+	}
+	for c.BroH[c.circleNodes[c.hashSortNodes[ret]]] {
+		ret++
+	}
+	return
 }
