@@ -209,19 +209,39 @@ func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
 	}
 	return nil
 }
-func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode) {
+func (z *ZK) GetNowPartBrokerNode(topic_name, part_name string) (BrokerNode, BlockNode, int8, error) {
 	Now_block_path := z.TopicRoot + "/" + topic_name + "/Partitions/" + part_name + "/" + "NowBlock"
 	for {
-		NowBlock, _ := z.GetBlockNode(Now_block_path)
-		NowBroker, _ := z.GetBrokerNode(NowBlock.LeaderBroker)
+		NowBlock, err := z.GetBlockNode(Now_block_path)
+		if err != nil {
+			return BrokerNode{}, BlockNode{}, 0, err
+		}
+		NowBroker, err := z.GetBrokerNode(NowBlock.LeaderBroker)
+		if err != nil {
+			return BrokerNode{}, BlockNode{}, 0, err
+		}
 		ret := z.CheckBroker(z.BrokerRoot + NowBlock.LeaderBroker)
 		if ret {
-			return NowBroker, NowBlock
+			return NowBroker, NowBlock, 2, nil
 		} else {
 			time.Sleep(time.Second * 1)
 		}
 	}
 }
+func (z *ZK) GetDuplicateNodes(topic_name, part_name, block_name string) (nodes []DuplicateNode) {
+	BlockPath := z.TopicRoot + "/" + topic_name + "/" + part_name + "/" + block_name
+	Dups, _, _ := z.Con.Children(BlockPath)
+	for _, dup_name := range Dups {
+		DupNode, err := z.GetDuplicateNode(BlockPath + "/" + dup_name)
+		if err != nil {
+			//
+		} else {
+			nodes = append(nodes, DupNode)
+		}
+	}
+	return nodes
+}
+
 func (z *ZK) UpdateBlockNode(bnode BlockNode) error {
 	path := z.TopicRoot + "/" + bnode.Topic + "/" + bnode.Partition + "/" + bnode.Name
 	ok, _, err := z.Con.Exists(path)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"hash/crc32"
 	"sort"
+	"strconv"
 	"sync"
 
 	"Wx_MQ/client/clients"
@@ -155,9 +156,9 @@ func (zks *ZKServer) ProSetPartStateHandle(info Info_in) Info_out {
 	}
 	var Dups []zookeeper.DuplicateNode
 	var data_brokers []byte
+	var ret string
 	//说明还未创建任何状态
 	if node.Option == -2 {
-		var ret string
 		switch info.Option {
 		//说明他想变为raft
 		case -1:
@@ -228,6 +229,129 @@ func (zks *ZKServer) ProSetPartStateHandle(info Info_in) Info_out {
 			}
 		}
 	}
+	LeaderBroker, NowBlock, _, err := zks.zk.GetNowPartBrokerNode(info.TopicName, info.PartitionName)
+	if err != nil {
+		return Info_out{
+			Err: err,
+		}
+	}
+	Dups = zks.zk.GetDuplicateNodes(NowBlock.Topic, NowBlock.Partition, NowBlock.Name)
+	var brokers BrokerS
+	brokers.BroBrokers = make(map[string]string)
+	brokers.RaftBrokers = make(map[string]string)
+	for _, DupNode := range Dups {
+		BrokerNode, err := zks.zk.GetBrokerNode(DupNode.BrokerName)
+		if err != nil {
+			//
+		}
+		brokers.BroBrokers[DupNode.BrokerName] = BrokerNode.BroHostPort
+		brokers.RaftBrokers[DupNode.BrokerName] = BrokerNode.RaftHostPort
+	}
+	data_brokers, err = json.Marshal(brokers)
+	if err != nil {
+		return Info_out{
+			Err: err,
+		}
+	}
+	switch info.Option {
+	case -1:
+		if node.Option == -1 {
+			ret = "HadRaft"
+		}
+		if node.Option == 1 || node.Option == 0 {
+			for ice, dupnode := range Dups {
+				lastfilename := zks.CloseAcceptPartition(info.TopicName, info.PartitionName, dupnode.BrokerName, ice)
+				bro_cli, ok := zks.brokers[dupnode.BrokerName]
+				if !ok {
+					//
+				} else {
+					//关闭fetch机制
+					_, err := bro_cli.CloseFetchPartition(context.Background(), &api.CloseFetchPartitionRequest{
+						TopicName: info.TopicName,
+						PartName:  info.PartitionName,
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+					//重新准备接收文件
+					_, err = bro_cli.PrepareAccept(context.Background(), &api.PrepareAcceptRequest{
+						Topic_Name:     info.TopicName,
+						Partition_Name: info.PartitionName,
+						File_Name:      "NowBlock.txt",
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+					//开启raft集群
+					_, err = bro_cli.AddRaftPartition(context.Background(), &api.AddRaftPartitionRequest{
+						TopicName: info.TopicName,
+						PartName:  info.PartitionName,
+						Brokers:   data_brokers,
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+					//开启fetch机制
+					_, err = bro_cli.AddFetchPartition(context.Background(), &api.AddFetchPartitionRequest{
+						TopicName:    info.TopicName,
+						PartName:     info.PartitionName,
+						Brokers:      data_brokers,
+						LeaderBroker: LeaderBroker.Name,
+						HostPort:     LeaderBroker.BroHostPort,
+						FileName:     lastfilename,
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+				}
+			}
+		}
+	default:
+		if node.Option != -1 {
+			ret = "HadFetch"
+		} else {
+			for _, dupnode := range Dups {
+				bro_cli, ok := zks.brokers[dupnode.BrokerName]
+				if !ok {
+					//
+				} else {
+					_, err := bro_cli.CloseRaftPartition(context.Background(), &api.CloseRaftPartitionRequest{
+						TopicName: info.TopicName,
+						PartName:  info.PartitionName,
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+					_, err = bro_cli.AddFetchPartition(context.Background(), &api.AddFetchPartitionRequest{
+						TopicName:    info.TopicName,
+						PartName:     info.PartitionName,
+						Brokers:      data_brokers,
+						LeaderBroker: LeaderBroker.Name,
+						HostPort:     LeaderBroker.BroHostPort,
+						FileName:     "NowBlock.txt",
+					})
+					if err != nil {
+						return Info_out{
+							Err: err,
+						}
+					}
+				}
+			}
+		}
+	}
+	return Info_out{
+		Ret: ret,
+	}
 }
 func (zks *ZKServer) GetDupsFromConsist(info Info_in) (Dups []zookeeper.DuplicateNode, data_brokers []byte) {
 	str := info.TopicName + "/" + info.PartitionName
@@ -289,6 +413,41 @@ func (zks *ZKServer) BecomLeader(info Info_in) error {
 	}
 	NowBlock.LeaderBroker = info.CliName
 	return zks.zk.UpdateBlockNode(NowBlock)
+}
+func (zks *ZKServer) CloseAcceptPartition(topicname, partname, brokername string, ice int) string {
+	index, err := zks.zk.GetPartBlockIndex(topicname, partname)
+	if err != nil {
+		return err.Error()
+	}
+	NewBlockName := "Block_" + strconv.Itoa(int(index))
+	NewFileName := NewBlockName + "txt"
+	zks.rmu.Lock()
+	bro_cli, ok := zks.brokers[brokername]
+	if !ok {
+		//
+	} else {
+		resp, err := bro_cli.CloseAccept(context.Background(), &api.CloseAcceptRequest{
+			Topic_Name:     topicname,
+			Partition_Name: partname,
+			OldFile_Name:   "NoeBlock.txt",
+			NewFile_Name_:  NewFileName,
+		})
+		if err != nil && !resp.Ret {
+			//
+		} else {
+			str := zks.zk.TopicRoot + "/" + topicname + "/" + "Partitions" + "/" + partname + "/" + "NowBlock"
+			bnode, err := zks.zk.GetBlockNode(str)
+			if err != nil {
+				//
+			}
+			// if ice==0{
+			// 	zks.zk.RegisterNode(zoookeeper.BlockNode{
+			// 		TopicName:
+			// 	})
+			// }
+		}
+	}
+	return NewFileName
 }
 func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err error) {
 	//检查该用户是否订阅了topic/part
