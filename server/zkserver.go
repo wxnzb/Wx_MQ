@@ -519,23 +519,49 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 	//这两个的区别：
 	//ptp:他在指定topic里面的所有partition里面找这个partition对应PTP_INDEX-系统找到的正消费到的-的block
 	//psb:特定topic特定partition的特定index-consumer指定
-	if info.Option == 1 {
+	if info.Option == TOPIC_NIL_PTP_PULL || info.Option == TOPIC_NIL_PTP_PUSH {
 		Parts, err = zks.zk.GetBrokers(info.TopicName)
-	} else if info.Option == 3 {
+	} else if info.Option == TOPIC_KEY_PSB_PULL || info.Option == TOPIC_KEY_PSB_PUSH {
 		Parts, err = zks.zk.GetBroker(info.TopicName, info.PartitionName, info.Index)
 	}
 	if err != nil {
 		return nil, 0, err
 	}
 	var partkeys []clients.PartKey
+	partkeys = zks.SendPrepare(Parts, info)
+	//没太看懂这里
+	parts := clients.Parts{
+		Parts: partkeys,
+	}
+	data, err := json.Marshal(parts)
+	var nodes clients.Parts
+
+	json.Unmarshal(data, &nodes)
+
+	if err != nil {
+		//
+	}
+
+	//--------------------------------我想的是下面这个把上面哪个替换
+	//data, err := json.Marshal(partkeys)
+	return data, len(data), nil
+
+}
+func (zks *ZKServer) SendPrepare(Parts []zookeeper.Part, info Info_in) (partkeys []clients.PartKey) {
 	for _, part := range Parts {
+		if part.Err != OK {
+			partkeys = append(partkeys, clients.PartKey{
+				Err: part.Err,
+			})
+			continue
+		}
 		zks.rmu.RLock()
 		bro_cli, ok := zks.brokers[part.BrokerName]
 		zks.rmu.RUnlock()
 		if !ok {
-			bro_cli, err = server_operations.NewClient(zks.Name, client.WithHostPorts(part.BroHostPort))
+			bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(part.BroHostPort))
 			if err != nil {
-				return nil, 0, err
+				//
 			}
 			zks.rmu.Lock()
 			zks.brokers[part.BrokerName] = bro_cli
@@ -546,27 +572,26 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 			Partition_Name: info.PartitionName,
 			File_Name:      part.FileName,
 			Option:         info.Option,
+			Consumer:       info.CliName,
 		}
-		if info.Option == 1 {
+		if info.Option == TOPIC_NIL_PTP_PULL || info.Option == TOPIC_NIL_PTP_PUSH {
 			req.Offset = part.PTPIndex
-		} else if info.Option == 3 {
+		} else if info.Option == TOPIC_KEY_PSB_PULL || info.Option == TOPIC_KEY_PSB_PUSH {
 			req.Offset = info.Index
 		}
 		resp, err := bro_cli.PrepareSend(context.Background(), req)
 		if err != nil || !resp.Ret {
-			return nil, 0, err
+			//
 		}
 		part := clients.PartKey{
 			Name:       part.PartitionName,
 			BrokerName: part.BrokerName,
 			BrokerHP:   part.BroHostPort,
+			Err:        OK,
 		}
 		partkeys = append(partkeys, part)
 	}
-
-	data, err := json.Marshal(partkeys)
-	return data, len(data), nil
-
+	return partkeys
 }
 func (zks *ZKServer) SubHandle(sub Info_in) error {
 	// 在zookeeper上创建sub节点，要是节点已经存在，就加入group

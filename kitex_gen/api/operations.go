@@ -640,6 +640,7 @@ type PrepareSendRequest struct {
 	File_Name      string `thrift:"file_Name,3" frugal:"3,default,string" json:"file_Name"`
 	Offset         int64  `thrift:"offset,4" frugal:"4,default,i64" json:"offset"`
 	Option         int8   `thrift:"option,5" frugal:"5,default,i8" json:"option"`
+	Consumer       string `thrift:"consumer,6" frugal:"6,default,string" json:"consumer"`
 }
 
 func NewPrepareSendRequest() *PrepareSendRequest {
@@ -668,6 +669,10 @@ func (p *PrepareSendRequest) GetOffset() (v int64) {
 func (p *PrepareSendRequest) GetOption() (v int8) {
 	return p.Option
 }
+
+func (p *PrepareSendRequest) GetConsumer() (v string) {
+	return p.Consumer
+}
 func (p *PrepareSendRequest) SetTopic_Name(val string) {
 	p.Topic_Name = val
 }
@@ -683,6 +688,9 @@ func (p *PrepareSendRequest) SetOffset(val int64) {
 func (p *PrepareSendRequest) SetOption(val int8) {
 	p.Option = val
 }
+func (p *PrepareSendRequest) SetConsumer(val string) {
+	p.Consumer = val
+}
 
 func (p *PrepareSendRequest) String() string {
 	if p == nil {
@@ -697,6 +705,7 @@ var fieldIDToName_PrepareSendRequest = map[int16]string{
 	3: "file_Name",
 	4: "offset",
 	5: "option",
+	6: "consumer",
 }
 
 type PrepareSendResponse struct {

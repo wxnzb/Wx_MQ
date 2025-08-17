@@ -34,6 +34,9 @@ type Consumer struct {
 	zkBrokerCli zkserver_operations.Client
 	Brokers     map[string]server_operations.Client
 }
+type Parts struct {
+	PartKeys []PartKey `json:"partkeys`
+}
 
 func NewConsumer(zkBrokerIpport, name, port string) (*Consumer, error) {
 	c := &Consumer{

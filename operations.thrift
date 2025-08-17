@@ -88,6 +88,7 @@ struct PrepareSendRequest{
     3:string file_Name
     4:i64 offset
     5:i8 option
+    6:string consumer
 }
 //关于raft
 struct PrepareSendResponse{

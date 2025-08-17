@@ -115,6 +115,7 @@ type Part struct {
 	PartitionName string
 	BrokerName    string
 	BroHostPort   string
+	RaftHostPort  string
 	PTPIndex      int64 //名字解释：生产端写入某个 Topic/Partition 的偏移
 	FileName      string
 	Err           string
@@ -122,7 +123,7 @@ type Part struct {
 
 // 获取Topic下所有partition对应的消费到的block信息
 func (z *ZK) GetBrokers(Topic string) ([]Part, error) {
-	path := z.TopicRoot + "/" + Topic + "partition"
+	path := z.TopicRoot + "/" + Topic + "Partition"
 	exists, _, err := z.Con.Exists(path)
 	if !exists {
 		return nil, err
@@ -130,50 +131,108 @@ func (z *ZK) GetBrokers(Topic string) ([]Part, error) {
 	var parts []Part
 	partitions, _, _ := z.Con.Children(path)
 	for _, partition := range partitions {
-		//得到这个分区正在写入的位置和他所有的blocks
-		PTPIndex := z.GetPartitionPTPIndex(path + "/" + partition)
+		pNode, err := z.GetPartitionNode(Topic, partition)
+		if err != nil {
+			return nil, err
+		}
+		PTP_index := pNode.PTPIndex
+		var max_dup DuplicateNode
+		max_dup.EndOffset = 0
+
 		blocks, _, _ := z.Con.Children(path + "/" + partition)
 		for _, block := range blocks {
-			blockInfo := z.GetBlockNode(path + "/" + partition + "/" + block)
+			blockNode, _ := z.GetBlockNode(path + "/" + partition + "/" + block)
 			//那么就说明这个block是part正在写入的块
-			if blockInfo.StartOffset <= PTPIndex && blockInfo.EndOffset >= PTPIndex {
-				brokerInfo := z.GetBrokerNode(blockInfo.Name)
+			if blockNode.StartOffset <= PTP_index && blockNode.EndOffset >= PTP_index {
+				Duplicates, _, _ := z.Con.Children(path + "/" + partition + "/" + block)
+				for _, duplicate := range Duplicates {
+					duplicatenode, err := z.GetDuplicateNode(path + "/" + partition + "/" + block + "/" + duplicate)
+					if err != nil {
+						continue
+					}
+					if max_dup.EndOffset == 0 || max_dup.EndOffset <= duplicatenode.EndOffset {
+						if z.CheckBroker(duplicatenode.BrokerName) {
+							max_dup = duplicatenode
+						}
+					}
+				}
+				var ret string
+				if max_dup.EndOffset != 0 {
+					ret = "OK"
+				} else {
+					ret = "the broker not online"
+				}
+				brokerNode, err := z.GetBrokerNode(max_dup.BrokerName)
+				if err != nil {
+					continue
+				}
 				parts = append(parts, Part{
 					topicName:     Topic,
 					PartitionName: partition,
-					BrokerName:    brokerInfo.Name,
-					BroHostPort:   brokerInfo.Host + ":" + brokerInfo.Port,
-					PTPIndex:      PTPIndex,
-					FileName:      blockInfo.FileName,
+					BrokerName:    brokerNode.Name,
+					BroHostPort:   brokerNode.BroHostPort,
+					RaftHostPort:  brokerNode.RaftHostPort,
+					PTPIndex:      PTP_index,
+					FileName:      blockNode.FileName,
+					Err:           ret,
 				})
+				break
 			}
 		}
+
 	}
 	return parts, nil
 }
 
 // 获取Topic下特定partition对应的消费者需要的offset的block信息
-func (z *ZK) GetBroker(topic, part string, offfset int64) ([]Part, error) {
-	path := z.TopicRoot + "/" + topic + "/partitions/" + part
+func (z *ZK) GetBroker(topic, part string, offset int64) ([]Part, error) {
+	path := z.TopicRoot + "/" + topic + "Partition" + part
 	exists, _, err := z.Con.Exists(path)
 	if !exists {
 		return nil, err
 	}
 	var parts []Part
+	var max_dup DuplicateNode
+	max_dup.EndOffset = 0
 	blocks, _, _ := z.Con.Children(path)
 	for _, block := range blocks {
-		blockInfo, _ := z.GetBlockNode(path + "/" + part + "/" + block)
-		//找到消费者需要的offset的block
-		if blockInfo.StartOffset <= offfset && blockInfo.EndOffset >= offfset {
-			brokerInfo, _ := z.GetBrokerNode(blockInfo.Name)
+		blockNode, _ := z.GetBlockNode(path + "/" + block)
+		//那么就说明这个block是part正在写入的块
+		if blockNode.StartOffset <= offset && blockNode.EndOffset >= offset {
+			Duplicates, _, _ := z.Con.Children(path + "/" + block)
+			for _, duplicate := range Duplicates {
+				duplicatenode, err := z.GetDuplicateNode(path + "/" + block + "/" + duplicate)
+				if err != nil {
+					continue
+				}
+				if max_dup.EndOffset == 0 || max_dup.EndOffset <= duplicatenode.EndOffset {
+					if z.CheckBroker(duplicatenode.BrokerName) {
+						max_dup = duplicatenode
+					}
+				}
+			}
+			var ret string
+			if max_dup.EndOffset != 0 {
+				ret = "OK"
+			} else {
+				ret = "the broker not online"
+			}
+			brokerNode, err := z.GetBrokerNode(max_dup.BrokerName)
+			if err != nil {
+				continue
+			}
 			parts = append(parts, Part{
 				topicName:     topic,
 				PartitionName: part,
-				BrokerName:    brokerInfo.Name,
-				BroHostPort:   brokerInfo.Host + ":" + brokerInfo.Port,
-				FileName:      blockInfo.FileName,
+				BrokerName:    brokerNode.Name,
+				BroHostPort:   brokerNode.BroHostPort,
+				RaftHostPort:  brokerNode.RaftHostPort,
+				FileName:      blockNode.FileName,
+				Err:           ret,
 			})
+			break
 		}
+
 	}
 	return parts, nil
 }
