@@ -1,0 +1,23 @@
+### ProGetBroker(pro->zkserver)，参数：
+
+topic,partition
+
+内部调用ProgetBrokerHandle,参数 Info_in:
+
+topic,partition
+
+首先，调用zks的zk的GetPartNowBrokerNode,传入参数info的topic和part，这个函数获得这个分区现在的BlockNode，并通过BlockNode的LeaderBroker获得BrokerNode并返回，然后调用zks的zk的GetPartState函数，传入参数info的topic和part，这个函数主要通过构造str:=zk的TopicRoot+...+"/Partitions/"+partname,调用zk的Con的Get(str)得到PartitionNode,然后调用zks的zk的GetDuplicateNodes函数与，传入参数BlockNode的topic,part和block_name,然后得到他下面的[]zookeeper.DuplicateNodes,for循环遍历[]zookeeper的DuplicateNodes,初始化一个brokers(map[string]string),在for循环内部首先调用zks的zk的GetBrokerNode，传入参数DuplicateNode的BrokerName,这个函数主要通过构造path:=zk的TopicRoot+brokername,最终得到并返回BrokerNode,把DuplicateNode的BrokerName和BrokerNode的BroHoset对应加入之前创建的brokers中，然后json brokers存入data中，然后遍历brokers,在zks的brokers中找brokername对应的_cli,要是不存在，就调用server_operations的rpc的NewClient，将brokerHostPort出入创建cli_bro，并 存入zks的brokers中，然后调用bro_cli的PrePareAccept这个rpc函数，传入参数
+
+topic,part
+
+FileName:BlockNode的FileName
+
+然后在判断PartitionNode的option要是==-2,那么就没设置状态，要是不是，调用bro_cli的PrepareState函数，传入参数
+
+topic,partition
+
+State:PartitionNode.Option
+
+Brokers:data
+
+然后返回

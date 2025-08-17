@@ -98,31 +98,63 @@ func (zks *ZKServer) UpdateDupHandle(in Info_in) error {
 // }
 
 func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
-	broker, block := zks.zk.GetNowPartBrokerNode(req.TopicName, req.PartitionName)
+	broker, block, _, err := zks.zk.GetNowPartBrokerNode(req.TopicName, req.PartitionName)
+	PartitionNode, err := zks.zk.GetPartitionNode(req.TopicName, req.PartitionName)
+	if err != nil {
+		//
+	}
 	zks.rmu.RLock()
-	bro_cli, ok := zks.brokers[block.LeaderBroker]
-	zks.rmu.RUnlock()
-	if !ok {
-		bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(broker.HostPort))
+	Brokers := make(map[string]string)
+	var ret string
+	Dups := zks.zk.GetDuplicateNodes(block.Topic, block.Partition, block.Name)
+	for _, dupNode := range Dups {
+		BrokerNode, err := zks.zk.GetBrokerNode(dupNode.BrokerName)
 		if err != nil {
+			//
+		}
+		Brokers[dupNode.BrokerName] = BrokerNode.BroHostPort
+	}
+	data, err := json.Marshal(Brokers)
+	for brokername, brohostport := range Brokers {
+		zks.rmu.RLock()
+		bro_cli, ok := zks.brokers[brokername]
+		zks.rmu.RUnlock()
+		if !ok {
+			bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(brohostport))
+			if err != nil {
+				//
+			}
+			zks.rmu.Lock()
+			zks.brokers[brokername] = bro_cli
+			zks.rmu.Unlock()
+		}
+		resp, err := bro_cli.PrepareAccept(context.Background(), &api.PrepareAcceptRequest{
+			Topic_Name:     block.Topic,
+			Partition_Name: block.Partition,
+			File_Name:      block.FileName,
+		})
+		if err != nil || !resp.Ret {
 
 		}
-		zks.rmu.Lock()
-		zks.brokers[broker.Name] = bro_cli
-		zks.rmu.Unlock()
-	}
-	//给broker说明准备好接收消息
-	resp, err := bro_cli.PrepareAccept(context.Background(), &api.PrepareAcceptRequest{
-		Topic_Name:     req.TopicName,
-		Partition_Name: req.PartitionName,
-		File_Name:      block.FileName,
-	})
-	if err != nil || !resp.Ret {
-
+		if PartitionNode.Option == -2 {
+			ret = "Partition state is -2"
+		} else {
+			resp, err := bro_cli.PrepareState(context.Background(), &api.PrepareStateRequest{
+				TopicName:     block.Topic,
+				PartitionName: block.Partition,
+				State:         PartitionNode.Option,
+				Brokers:       data,
+			})
+			if err != nil || !resp.Ret {
+				//
+			}
+		}
 	}
 	return Info_out{
+		Err:           err,
 		broker_name:   broker.Name,
-		bro_host_port: broker.HostPort,
+		bro_host_port: broker.BroHostPort,
+		Ret:           ret,
 	}
 
 }
