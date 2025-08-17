@@ -404,7 +404,20 @@ func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
 	s.rmu.Unlock()
 	return topic.prepareSendHandle(in, &s.zkclient)
 }
-
+func(s *Server)PrepareStateHandle(in Info)(ret string, err error){
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	switch in.option{
+	case -1:
+		ok:=s.parts_rafts.CheckPartState(in.topic, in.partition)
+		if !ok{
+			ret="the raft not exits"
+			err=errors.New(ret)
+		}
+	default:
+	}
+	return ret,err
+}
 // 给当前 Server 启动/加入某个 partition 的 Raft 群组
 func (s *Server) AddRaftPartitionHandle(in Info) (ret string, err error) {
 	s.rmu.Lock()

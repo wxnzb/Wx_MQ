@@ -18,6 +18,7 @@ type Client interface {
 	PrepareAccept(ctx context.Context, req *api.PrepareAcceptRequest, callOptions ...callopt.Option) (r *api.PrepareAcceptResponse, err error)
 	CloseAccept(ctx context.Context, req *api.CloseAcceptRequest, callOptions ...callopt.Option) (r *api.CloseAcceptResponse, err error)
 	PrepareSend(ctx context.Context, req *api.PrepareSendRequest, callOptions ...callopt.Option) (r *api.PrepareSendResponse, err error)
+	PrepareState(ctx context.Context, req *api.PrepareStateRequest, callOptions ...callopt.Option) (r *api.PrepareStateResponse, err error)
 	AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest, callOptions ...callopt.Option) (r *api.AddRaftPartitionResponse, err error)
 	CloseRaftPartition(ctx context.Context, req *api.CloseRaftPartitionRequest, callOptions ...callopt.Option) (r *api.CloseRaftPartitionResponse, err error)
 	AddFetchPartition(ctx context.Context, req *api.AddFetchPartitionRequest, callOptions ...callopt.Option) (r *api.AddFetchPartitionResponse, err error)
@@ -86,6 +87,11 @@ func (p *kServer_OperationsClient) CloseAccept(ctx context.Context, req *api.Clo
 func (p *kServer_OperationsClient) PrepareSend(ctx context.Context, req *api.PrepareSendRequest, callOptions ...callopt.Option) (r *api.PrepareSendResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.PrepareSend(ctx, req)
+}
+
+func (p *kServer_OperationsClient) PrepareState(ctx context.Context, req *api.PrepareStateRequest, callOptions ...callopt.Option) (r *api.PrepareStateResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.PrepareState(ctx, req)
 }
 
 func (p *kServer_OperationsClient) AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest, callOptions ...callopt.Option) (r *api.AddRaftPartitionResponse, err error) {

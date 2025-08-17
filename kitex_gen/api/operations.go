@@ -737,6 +737,100 @@ var fieldIDToName_PrepareSendResponse = map[int16]string{
 	2: "err",
 }
 
+type PrepareStateRequest struct {
+	TopicName string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
+	PartName  string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
+	State     int8   `thrift:"state,3" frugal:"3,default,i8" json:"state"`
+	Brokers   []byte `thrift:"brokers,4" frugal:"4,default,binary" json:"brokers"`
+}
+
+func NewPrepareStateRequest() *PrepareStateRequest {
+	return &PrepareStateRequest{}
+}
+
+func (p *PrepareStateRequest) InitDefault() {
+}
+
+func (p *PrepareStateRequest) GetTopicName() (v string) {
+	return p.TopicName
+}
+
+func (p *PrepareStateRequest) GetPartName() (v string) {
+	return p.PartName
+}
+
+func (p *PrepareStateRequest) GetState() (v int8) {
+	return p.State
+}
+
+func (p *PrepareStateRequest) GetBrokers() (v []byte) {
+	return p.Brokers
+}
+func (p *PrepareStateRequest) SetTopicName(val string) {
+	p.TopicName = val
+}
+func (p *PrepareStateRequest) SetPartName(val string) {
+	p.PartName = val
+}
+func (p *PrepareStateRequest) SetState(val int8) {
+	p.State = val
+}
+func (p *PrepareStateRequest) SetBrokers(val []byte) {
+	p.Brokers = val
+}
+
+func (p *PrepareStateRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PrepareStateRequest(%+v)", *p)
+}
+
+var fieldIDToName_PrepareStateRequest = map[int16]string{
+	1: "topicName",
+	2: "partName",
+	3: "state",
+	4: "brokers",
+}
+
+type PrepareStateResponse struct {
+	Ret bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	Err string `thrift:"err,2" frugal:"2,default,string" json:"err"`
+}
+
+func NewPrepareStateResponse() *PrepareStateResponse {
+	return &PrepareStateResponse{}
+}
+
+func (p *PrepareStateResponse) InitDefault() {
+}
+
+func (p *PrepareStateResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *PrepareStateResponse) GetErr() (v string) {
+	return p.Err
+}
+func (p *PrepareStateResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *PrepareStateResponse) SetErr(val string) {
+	p.Err = val
+}
+
+func (p *PrepareStateResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PrepareStateResponse(%+v)", *p)
+}
+
+var fieldIDToName_PrepareStateResponse = map[int16]string{
+	1: "ret",
+	2: "err",
+}
+
 type AddRaftPartitionRequest struct {
 	TopicName string `thrift:"topicName,1" frugal:"1,default,string" json:"topicName"`
 	PartName  string `thrift:"partName,2" frugal:"2,default,string" json:"partName"`
@@ -2188,6 +2282,8 @@ type Server_Operations interface {
 
 	PrepareSend(ctx context.Context, req *PrepareSendRequest) (r *PrepareSendResponse, err error)
 
+	PrepareState(ctx context.Context, req *PrepareStateRequest) (r *PrepareStateResponse, err error)
+
 	AddRaftPartition(ctx context.Context, req *AddRaftPartitionRequest) (r *AddRaftPartitionResponse, err error)
 
 	CloseRaftPartition(ctx context.Context, req *CloseRaftPartitionRequest) (r *CloseRaftPartitionResponse, err error)
@@ -2726,6 +2822,82 @@ func (p *Server_OperationsPrepareSendResult) String() string {
 }
 
 var fieldIDToName_Server_OperationsPrepareSendResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsPrepareStateArgs struct {
+	Req *PrepareStateRequest `thrift:"req,1" frugal:"1,default,PrepareStateRequest" json:"req"`
+}
+
+func NewServer_OperationsPrepareStateArgs() *Server_OperationsPrepareStateArgs {
+	return &Server_OperationsPrepareStateArgs{}
+}
+
+func (p *Server_OperationsPrepareStateArgs) InitDefault() {
+}
+
+var Server_OperationsPrepareStateArgs_Req_DEFAULT *PrepareStateRequest
+
+func (p *Server_OperationsPrepareStateArgs) GetReq() (v *PrepareStateRequest) {
+	if !p.IsSetReq() {
+		return Server_OperationsPrepareStateArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsPrepareStateArgs) SetReq(val *PrepareStateRequest) {
+	p.Req = val
+}
+
+func (p *Server_OperationsPrepareStateArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsPrepareStateArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsPrepareStateArgs(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsPrepareStateArgs = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsPrepareStateResult struct {
+	Success *PrepareStateResponse `thrift:"success,0,optional" frugal:"0,optional,PrepareStateResponse" json:"success,omitempty"`
+}
+
+func NewServer_OperationsPrepareStateResult() *Server_OperationsPrepareStateResult {
+	return &Server_OperationsPrepareStateResult{}
+}
+
+func (p *Server_OperationsPrepareStateResult) InitDefault() {
+}
+
+var Server_OperationsPrepareStateResult_Success_DEFAULT *PrepareStateResponse
+
+func (p *Server_OperationsPrepareStateResult) GetSuccess() (v *PrepareStateResponse) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsPrepareStateResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsPrepareStateResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PrepareStateResponse)
+}
+
+func (p *Server_OperationsPrepareStateResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsPrepareStateResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsPrepareStateResult(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsPrepareStateResult = map[int16]string{
 	0: "success",
 }
 

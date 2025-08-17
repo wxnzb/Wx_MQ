@@ -62,6 +62,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"prepareState": kitex.NewMethodInfo(
+		prepareStateHandler,
+		newServer_OperationsPrepareStateArgs,
+		newServer_OperationsPrepareStateResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"AddRaftPartition": kitex.NewMethodInfo(
 		addRaftPartitionHandler,
 		newServer_OperationsAddRaftPartitionArgs,
@@ -282,6 +289,24 @@ func newServer_OperationsPrepareSendResult() interface{} {
 	return api.NewServer_OperationsPrepareSendResult()
 }
 
+func prepareStateHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Server_OperationsPrepareStateArgs)
+	realResult := result.(*api.Server_OperationsPrepareStateResult)
+	success, err := handler.(api.Server_Operations).PrepareState(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newServer_OperationsPrepareStateArgs() interface{} {
+	return api.NewServer_OperationsPrepareStateArgs()
+}
+
+func newServer_OperationsPrepareStateResult() interface{} {
+	return api.NewServer_OperationsPrepareStateResult()
+}
+
 func addRaftPartitionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*api.Server_OperationsAddRaftPartitionArgs)
 	realResult := result.(*api.Server_OperationsAddRaftPartitionResult)
@@ -429,6 +454,16 @@ func (p *kClient) PrepareSend(ctx context.Context, req *api.PrepareSendRequest) 
 	_args.Req = req
 	var _result api.Server_OperationsPrepareSendResult
 	if err = p.c.Call(ctx, "prepareSend", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) PrepareState(ctx context.Context, req *api.PrepareStateRequest) (r *api.PrepareStateResponse, err error) {
+	var _args api.Server_OperationsPrepareStateArgs
+	_args.Req = req
+	var _result api.Server_OperationsPrepareStateResult
+	if err = p.c.Call(ctx, "prepareState", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

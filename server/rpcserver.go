@@ -256,6 +256,26 @@ func (s *RPCServer) PrepareSend(ctx context.Context, req *api.PrepareSendRequest
 		Err: "",
 	}, nil
 }
+func (s *RPCServer) PrepareState(ctx context.Context, req *api.PrepareStateRequest) (r *api.PrepareStateResponse, err error) {
+	var Brokers BrokerS
+	json.Unmarshal(req.Brokers, &Brokers)
+	ret, err := s.server.PrepareStateHandle(Info{
+		topic:     req.TopicName,
+		partition: req.PartName,
+		brokers:   Brokers.BroBrokers,
+		option:    req.State,
+	})
+	if err != nil {
+		return &api.PrepareStateResponse{
+			Ret: false,
+			Err: ret,
+		}, err
+	}
+	return &api.PrepareStateResponse{
+		Ret: true,
+		Err: ret,
+	}, nil
+}
 
 // raft
 type BrokerS struct {
