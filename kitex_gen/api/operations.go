@@ -2184,7 +2184,7 @@ type Server_Operations interface {
 
 	PrepareAccept(ctx context.Context, req *PrepareAcceptRequest) (r *PrepareAcceptResponse, err error)
 
-	CloseAccept(ctx context.Context, req *CloseAcceptRequest) (r *CloseAcceptRequest, err error)
+	CloseAccept(ctx context.Context, req *CloseAcceptRequest) (r *CloseAcceptResponse, err error)
 
 	PrepareSend(ctx context.Context, req *PrepareSendRequest) (r *PrepareSendResponse, err error)
 
@@ -2616,7 +2616,7 @@ var fieldIDToName_Server_OperationsCloseAcceptArgs = map[int16]string{
 }
 
 type Server_OperationsCloseAcceptResult struct {
-	Success *CloseAcceptRequest `thrift:"success,0,optional" frugal:"0,optional,CloseAcceptRequest" json:"success,omitempty"`
+	Success *CloseAcceptResponse `thrift:"success,0,optional" frugal:"0,optional,CloseAcceptResponse" json:"success,omitempty"`
 }
 
 func NewServer_OperationsCloseAcceptResult() *Server_OperationsCloseAcceptResult {
@@ -2626,16 +2626,16 @@ func NewServer_OperationsCloseAcceptResult() *Server_OperationsCloseAcceptResult
 func (p *Server_OperationsCloseAcceptResult) InitDefault() {
 }
 
-var Server_OperationsCloseAcceptResult_Success_DEFAULT *CloseAcceptRequest
+var Server_OperationsCloseAcceptResult_Success_DEFAULT *CloseAcceptResponse
 
-func (p *Server_OperationsCloseAcceptResult) GetSuccess() (v *CloseAcceptRequest) {
+func (p *Server_OperationsCloseAcceptResult) GetSuccess() (v *CloseAcceptResponse) {
 	if !p.IsSetSuccess() {
 		return Server_OperationsCloseAcceptResult_Success_DEFAULT
 	}
 	return p.Success
 }
 func (p *Server_OperationsCloseAcceptResult) SetSuccess(x interface{}) {
-	p.Success = x.(*CloseAcceptRequest)
+	p.Success = x.(*CloseAcceptResponse)
 }
 
 func (p *Server_OperationsCloseAcceptResult) IsSetSuccess() bool {

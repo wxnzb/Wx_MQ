@@ -414,7 +414,7 @@ func (p *kClient) PrepareAccept(ctx context.Context, req *api.PrepareAcceptReque
 	return _result.GetSuccess(), nil
 }
 
-func (p *kClient) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest) (r *api.CloseAcceptRequest, err error) {
+func (p *kClient) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest) (r *api.CloseAcceptResponse, err error) {
 	var _args api.Server_OperationsCloseAcceptArgs
 	_args.Req = req
 	var _result api.Server_OperationsCloseAcceptResult

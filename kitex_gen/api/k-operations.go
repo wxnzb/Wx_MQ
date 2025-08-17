@@ -9703,7 +9703,7 @@ SkipFieldError:
 
 func (p *Server_OperationsCloseAcceptResult) FastReadField0(buf []byte) (int, error) {
 	offset := 0
-	_field := NewCloseAcceptRequest()
+	_field := NewCloseAcceptResponse()
 	if l, err := _field.FastRead(buf[offset:]); err != nil {
 		return offset, err
 	} else {

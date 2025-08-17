@@ -146,7 +146,7 @@ service Server_Operations{
     //上面这些是消费者和客户端根broker交流，下面的是broker和broker之间的交流
     //1:通知目标 Broker：准备接收某文件
     PrepareAcceptResponse prepareAccept(1:PrepareAcceptRequest req)
-    CloseAcceptRequest closeAccept(1:CloseAcceptRequest req)
+    CloseAcceptResponse closeAccept(1:CloseAcceptRequest req)
     //2:通知接收方“我要从 offset 开始，发送某个文件的某部分了”，请确认你准备好了，或者已经收到了这部分
     PrepareSendResponse prepareSend(1:PrepareSendRequest req)  
     //raft

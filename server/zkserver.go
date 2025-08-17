@@ -440,13 +440,39 @@ func (zks *ZKServer) CloseAcceptPartition(topicname, partname, brokername string
 			if err != nil {
 				//
 			}
-			// if ice==0{
-			// 	zks.zk.RegisterNode(zoookeeper.BlockNode{
-			// 		TopicName:
-			// 	})
-			// }
+			if ice == 0 {
+				//创造新节点
+				zks.zk.RegisterNode(zookeeper.BlockNode{
+					Name:         NewBlockName,
+					Topic:        topicname,
+					Partition:    partname,
+					FileName:     NewFileName,
+					StartOffset:  resp.Startindex,
+					EndOffset:    resp.Endindex,
+					LeaderBroker: bnode.LeaderBroker,
+				})
+				//更新原NowBlock节点信息
+				zks.zk.UpdateBlockNode(zookeeper.BlockNode{
+					Name:         NewBlockName,
+					Topic:        topicname,
+					Partition:    partname,
+					FileName:     NewFileName,
+					StartOffset:  resp.Startindex,
+					EndOffset:    resp.Endindex,
+					LeaderBroker: bnode.LeaderBroker,
+				})
+			}
+			//创建该节点下的各个Dup节点
+			DupPath := zks.zk.TopicRoot + "/" + topicname + "/" + "Partitions" + "/" + partname + "/" + "NowBlock" + "/" + brokername
+			DupNode, err := zks.zk.GetDuplicateNode(DupPath)
+			if err != nil {
+				//
+			}
+			DupNode.BlockName = NewBlockName
+			zks.zk.RegisterNode(DupNode)
 		}
 	}
+	zks.rmu.RUnlock()
 	return NewFileName
 }
 func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err error) {

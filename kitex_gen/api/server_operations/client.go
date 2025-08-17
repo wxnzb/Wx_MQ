@@ -16,7 +16,7 @@ type Client interface {
 	Info(ctx context.Context, req *api.InfoRequest, callOptions ...callopt.Option) (r *api.InfoResponse, err error)
 	StarttoGet(ctx context.Context, req *api.InfoGetRequest, callOptions ...callopt.Option) (r *api.InfoGetResponse, err error)
 	PrepareAccept(ctx context.Context, req *api.PrepareAcceptRequest, callOptions ...callopt.Option) (r *api.PrepareAcceptResponse, err error)
-	CloseAccept(ctx context.Context, req *api.CloseAcceptRequest, callOptions ...callopt.Option) (r *api.CloseAcceptRequest, err error)
+	CloseAccept(ctx context.Context, req *api.CloseAcceptRequest, callOptions ...callopt.Option) (r *api.CloseAcceptResponse, err error)
 	PrepareSend(ctx context.Context, req *api.PrepareSendRequest, callOptions ...callopt.Option) (r *api.PrepareSendResponse, err error)
 	AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest, callOptions ...callopt.Option) (r *api.AddRaftPartitionResponse, err error)
 	CloseRaftPartition(ctx context.Context, req *api.CloseRaftPartitionRequest, callOptions ...callopt.Option) (r *api.CloseRaftPartitionResponse, err error)
@@ -78,7 +78,7 @@ func (p *kServer_OperationsClient) PrepareAccept(ctx context.Context, req *api.P
 	return p.kClient.PrepareAccept(ctx, req)
 }
 
-func (p *kServer_OperationsClient) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest, callOptions ...callopt.Option) (r *api.CloseAcceptRequest, err error) {
+func (p *kServer_OperationsClient) CloseAccept(ctx context.Context, req *api.CloseAcceptRequest, callOptions ...callopt.Option) (r *api.CloseAcceptResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.CloseAccept(ctx, req)
 }
