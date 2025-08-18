@@ -2352,6 +2352,100 @@ var fieldIDToName_BecomeLeaderResponse = map[int16]string{
 	1: "ret",
 }
 
+type GetNewLeaderRequest struct {
+	Topic     string `thrift:"topic,1" frugal:"1,default,string" json:"topic"`
+	Part      string `thrift:"part,2" frugal:"2,default,string" json:"part"`
+	BlockName string `thrift:"blockName,3" frugal:"3,default,string" json:"blockName"`
+}
+
+func NewGetNewLeaderRequest() *GetNewLeaderRequest {
+	return &GetNewLeaderRequest{}
+}
+
+func (p *GetNewLeaderRequest) InitDefault() {
+}
+
+func (p *GetNewLeaderRequest) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *GetNewLeaderRequest) GetPart() (v string) {
+	return p.Part
+}
+
+func (p *GetNewLeaderRequest) GetBlockName() (v string) {
+	return p.BlockName
+}
+func (p *GetNewLeaderRequest) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *GetNewLeaderRequest) SetPart(val string) {
+	p.Part = val
+}
+func (p *GetNewLeaderRequest) SetBlockName(val string) {
+	p.BlockName = val
+}
+
+func (p *GetNewLeaderRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetNewLeaderRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetNewLeaderRequest = map[int16]string{
+	1: "topic",
+	2: "part",
+	3: "blockName",
+}
+
+type GetNewLeaderResponse struct {
+	Ret          bool   `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+	LeaderBroker string `thrift:"leaderBroker,2" frugal:"2,default,string" json:"leaderBroker"`
+	HostPort     string `thrift:"hostPort,3" frugal:"3,default,string" json:"hostPort"`
+}
+
+func NewGetNewLeaderResponse() *GetNewLeaderResponse {
+	return &GetNewLeaderResponse{}
+}
+
+func (p *GetNewLeaderResponse) InitDefault() {
+}
+
+func (p *GetNewLeaderResponse) GetRet() (v bool) {
+	return p.Ret
+}
+
+func (p *GetNewLeaderResponse) GetLeaderBroker() (v string) {
+	return p.LeaderBroker
+}
+
+func (p *GetNewLeaderResponse) GetHostPort() (v string) {
+	return p.HostPort
+}
+func (p *GetNewLeaderResponse) SetRet(val bool) {
+	p.Ret = val
+}
+func (p *GetNewLeaderResponse) SetLeaderBroker(val string) {
+	p.LeaderBroker = val
+}
+func (p *GetNewLeaderResponse) SetHostPort(val string) {
+	p.HostPort = val
+}
+
+func (p *GetNewLeaderResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetNewLeaderResponse(%+v)", *p)
+}
+
+var fieldIDToName_GetNewLeaderResponse = map[int16]string{
+	1: "ret",
+	2: "leaderBroker",
+	3: "hostPort",
+}
+
 type Server_Operations interface {
 	Push(ctx context.Context, req *PushRequest) (r *PushResponse, err error)
 
@@ -3472,6 +3566,8 @@ type ZKServer_Operations interface {
 	CreatePartition(ctx context.Context, req *CreatePartitionRequest) (r *CreatePartitionResponse, err error)
 
 	BecomeLeader(ctx context.Context, req *BecomeLeaderRequest) (r *BecomeLeaderResponse, err error)
+
+	GetNewLeader(ctx context.Context, req *GetNewLeaderRequest) (r *GetNewLeaderResponse, err error)
 }
 
 type ZKServer_OperationsProGetBroArgs struct {
@@ -4383,5 +4479,81 @@ func (p *ZKServer_OperationsBecomeLeaderResult) String() string {
 }
 
 var fieldIDToName_ZKServer_OperationsBecomeLeaderResult = map[int16]string{
+	0: "success",
+}
+
+type ZKServer_OperationsGetNewLeaderArgs struct {
+	Req *GetNewLeaderRequest `thrift:"req,1" frugal:"1,default,GetNewLeaderRequest" json:"req"`
+}
+
+func NewZKServer_OperationsGetNewLeaderArgs() *ZKServer_OperationsGetNewLeaderArgs {
+	return &ZKServer_OperationsGetNewLeaderArgs{}
+}
+
+func (p *ZKServer_OperationsGetNewLeaderArgs) InitDefault() {
+}
+
+var ZKServer_OperationsGetNewLeaderArgs_Req_DEFAULT *GetNewLeaderRequest
+
+func (p *ZKServer_OperationsGetNewLeaderArgs) GetReq() (v *GetNewLeaderRequest) {
+	if !p.IsSetReq() {
+		return ZKServer_OperationsGetNewLeaderArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *ZKServer_OperationsGetNewLeaderArgs) SetReq(val *GetNewLeaderRequest) {
+	p.Req = val
+}
+
+func (p *ZKServer_OperationsGetNewLeaderArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ZKServer_OperationsGetNewLeaderArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsGetNewLeaderArgs(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsGetNewLeaderArgs = map[int16]string{
+	1: "req",
+}
+
+type ZKServer_OperationsGetNewLeaderResult struct {
+	Success *GetNewLeaderResponse `thrift:"success,0,optional" frugal:"0,optional,GetNewLeaderResponse" json:"success,omitempty"`
+}
+
+func NewZKServer_OperationsGetNewLeaderResult() *ZKServer_OperationsGetNewLeaderResult {
+	return &ZKServer_OperationsGetNewLeaderResult{}
+}
+
+func (p *ZKServer_OperationsGetNewLeaderResult) InitDefault() {
+}
+
+var ZKServer_OperationsGetNewLeaderResult_Success_DEFAULT *GetNewLeaderResponse
+
+func (p *ZKServer_OperationsGetNewLeaderResult) GetSuccess() (v *GetNewLeaderResponse) {
+	if !p.IsSetSuccess() {
+		return ZKServer_OperationsGetNewLeaderResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *ZKServer_OperationsGetNewLeaderResult) SetSuccess(x interface{}) {
+	p.Success = x.(*GetNewLeaderResponse)
+}
+
+func (p *ZKServer_OperationsGetNewLeaderResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ZKServer_OperationsGetNewLeaderResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ZKServer_OperationsGetNewLeaderResult(%+v)", *p)
+}
+
+var fieldIDToName_ZKServer_OperationsGetNewLeaderResult = map[int16]string{
 	0: "success",
 }

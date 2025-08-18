@@ -1,0 +1,19 @@
+### GetNewLeader(producer/consumer->zkserver)，传入参数
+
+topic,part
+
+brokername
+
+内部调用RPCserver的zkserver的GetNewLeaderHandle函数，传入参数Info_in:
+
+topic,part
+
+blockname
+
+首先构造block_path:=zkserver的zk的TopicRoot+...+Info_in的topic,part,brokername，然后调用zkserver的zk的GetBlockNode，传入参数block_path得到BlockNode,然后调用zkserver的zk的CheckBroker,传入参数BlockNode.LeaderBroker,看这个块的leader是否在先，要是在先，调用zkserver的zk的GetBrokerNode，传入参数BlockNode,LeaderBroker,得到laeder的BrokerNode,要是没在线，调用zkserver的zk的GetDuplicateNodes,传入参数Info_in的topic,part和blockname获得Dups([]DuplicatesNode)，遍历Dups,在for循环中，调用zkserver的zk的CheckBroker函数，传入参数DuplicateNode的BrokerName,看他是否在线，要是在线，那么将这个DuplicateNode的EndOffset和BrokerName加入到有这两个成员的结构体，然后调用sort.SliceStable按照DuplicateNode的EndOffset进行排序，然后遍历有那两个成员的结构体数组，在for循环里，调用zkserevr的zk的GetBrokerNode，传入参数结构体中的BrokerName得到BrokerNode,然后继续调用zkserver的zk的CheckBroker,传入参数，zkerver的zk的BrokerRoot+"/"+BrokerName,最后返回Info_out:
+
+broker_name
+
+brohost_host_port
+
+这个就是找到block的副本中EndOffset大的而且在线的返回ok拉

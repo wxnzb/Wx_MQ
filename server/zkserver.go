@@ -700,6 +700,56 @@ func (zks *ZKServer) CreateTopicHandle(topic Info_in) Info_out {
 		Err: err,
 	}
 }
+func (zks *ZKServer) GetNewLeaderHandle(info Info_in) (Info_out, error) {
+	block_path := zks.zk.TopicRoot + "/" + info.TopicName + "/" + info.PartitionName + info.BlockName
+	BlockNode, err := zks.zk.GetBlockNode(block_path)
+	if err != nil {
+		//
+	}
+	var LeaderBroker zookeeper.BrokerNode
+	ret := zks.zk.CheckBroker(BlockNode.LeaderBroker)
+	if ret {
+		LeaderBroker, err = zks.zk.GetBrokerNode(BlockNode.LeaderBroker)
+		if err != nil {
+			//
+		}
+	} else {
+		var array []struct {
+			EndIndex   int64
+			BrokerName string
+		}
+		Dups := zks.zk.GetDuplicateNodes(info.TopicName, info.PartitionName, info.BlockName)
+		for _, dup := range Dups {
+			ret = zks.zk.CheckBroker(dup.BrokerName)
+			if ret {
+				array = append(array, struct {
+					EndIndex   int64
+					BrokerName string
+				}{
+					EndIndex:   dup.EndOffset,
+					BrokerName: dup.BrokerName,
+				})
+			}
+		}
+		sort.SliceStable(array, func(i, j int) bool {
+			return array[i].EndIndex < array[j].EndIndex
+		})
+		for _, arr := range array {
+			LeaderBroker, err = zks.zk.GetBrokerNode(arr.BrokerName)
+			if err != nil {
+				//
+			}
+			ret := zks.zk.CheckBroker(zks.zk.BrokerRoot + "/" + arr.BrokerName)
+			if ret {
+				break
+			}
+		}
+	}
+	return Info_out{
+		broker_name:   LeaderBroker.Name,
+		bro_host_port: LeaderBroker.BroHostPort,
+	}, nil
+}
 func (zks *ZKServer) CreatePartitionHandle(part Info_in) Info_out {
 	pNode := zookeeper.PartitionNode{
 		Name:     part.PartitionName,

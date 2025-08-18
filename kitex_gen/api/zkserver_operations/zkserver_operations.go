@@ -97,6 +97,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"GetNewLeader": kitex.NewMethodInfo(
+		getNewLeaderHandler,
+		newZKServer_OperationsGetNewLeaderArgs,
+		newZKServer_OperationsGetNewLeaderResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -379,6 +386,24 @@ func newZKServer_OperationsBecomeLeaderResult() interface{} {
 	return api.NewZKServer_OperationsBecomeLeaderResult()
 }
 
+func getNewLeaderHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsGetNewLeaderArgs)
+	realResult := result.(*api.ZKServer_OperationsGetNewLeaderResult)
+	success, err := handler.(api.ZKServer_Operations).GetNewLeader(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsGetNewLeaderArgs() interface{} {
+	return api.NewZKServer_OperationsGetNewLeaderArgs()
+}
+
+func newZKServer_OperationsGetNewLeaderResult() interface{} {
+	return api.NewZKServer_OperationsGetNewLeaderResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -504,6 +529,16 @@ func (p *kClient) BecomeLeader(ctx context.Context, req *api.BecomeLeaderRequest
 	_args.Req = req
 	var _result api.ZKServer_OperationsBecomeLeaderResult
 	if err = p.c.Call(ctx, "BecomeLeader", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetNewLeader(ctx context.Context, req *api.GetNewLeaderRequest) (r *api.GetNewLeaderResponse, err error) {
+	var _args api.ZKServer_OperationsGetNewLeaderArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsGetNewLeaderResult
+	if err = p.c.Call(ctx, "GetNewLeader", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil
