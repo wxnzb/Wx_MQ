@@ -90,6 +90,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"BecomeLeader": kitex.NewMethodInfo(
+		becomeLeaderHandler,
+		newZKServer_OperationsBecomeLeaderArgs,
+		newZKServer_OperationsBecomeLeaderResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -354,6 +361,24 @@ func newZKServer_OperationsCreatePartitionResult() interface{} {
 	return api.NewZKServer_OperationsCreatePartitionResult()
 }
 
+func becomeLeaderHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.ZKServer_OperationsBecomeLeaderArgs)
+	realResult := result.(*api.ZKServer_OperationsBecomeLeaderResult)
+	success, err := handler.(api.ZKServer_Operations).BecomeLeader(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newZKServer_OperationsBecomeLeaderArgs() interface{} {
+	return api.NewZKServer_OperationsBecomeLeaderArgs()
+}
+
+func newZKServer_OperationsBecomeLeaderResult() interface{} {
+	return api.NewZKServer_OperationsBecomeLeaderResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -469,6 +494,16 @@ func (p *kClient) CreatePartition(ctx context.Context, req *api.CreatePartitionR
 	_args.Req = req
 	var _result api.ZKServer_OperationsCreatePartitionResult
 	if err = p.c.Call(ctx, "CreatePartition", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) BecomeLeader(ctx context.Context, req *api.BecomeLeaderRequest) (r *api.BecomeLeaderResponse, err error) {
+	var _args api.ZKServer_OperationsBecomeLeaderArgs
+	_args.Req = req
+	var _result api.ZKServer_OperationsBecomeLeaderResult
+	if err = p.c.Call(ctx, "BecomeLeader", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

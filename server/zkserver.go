@@ -547,52 +547,6 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 	return data, len(data), nil
 
 }
-func (zks *ZKServer) SendPrepare(Parts []zookeeper.Part, info Info_in) (partkeys []clients.PartKey) {
-	for _, part := range Parts {
-		if part.Err != OK {
-			partkeys = append(partkeys, clients.PartKey{
-				Err: part.Err,
-			})
-			continue
-		}
-		zks.rmu.RLock()
-		bro_cli, ok := zks.brokers[part.BrokerName]
-		zks.rmu.RUnlock()
-		if !ok {
-			bro_cli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(part.BroHostPort))
-			if err != nil {
-				//
-			}
-			zks.rmu.Lock()
-			zks.brokers[part.BrokerName] = bro_cli
-			zks.rmu.Unlock()
-		}
-		req := &api.PrepareSendRequest{
-			Topic_Name:     info.TopicName,
-			Partition_Name: info.PartitionName,
-			File_Name:      part.FileName,
-			Option:         info.Option,
-			Consumer:       info.CliName,
-		}
-		if info.Option == TOPIC_NIL_PTP_PULL || info.Option == TOPIC_NIL_PTP_PUSH {
-			req.Offset = part.PTPIndex
-		} else if info.Option == TOPIC_KEY_PSB_PULL || info.Option == TOPIC_KEY_PSB_PUSH {
-			req.Offset = info.Index
-		}
-		resp, err := bro_cli.PrepareSend(context.Background(), req)
-		if err != nil || !resp.Ret {
-			//
-		}
-		part := clients.PartKey{
-			Name:       part.PartitionName,
-			BrokerName: part.BrokerName,
-			BrokerHP:   part.BroHostPort,
-			Err:        OK,
-		}
-		partkeys = append(partkeys, part)
-	}
-	return partkeys
-}
 func (zks *ZKServer) SubHandle(sub Info_in) error {
 	// 在zookeeper上创建sub节点，要是节点已经存在，就加入group
 	return nil
@@ -727,6 +681,15 @@ func (zks *ZKServer) SendPrepare(Parts []zookeeper.Part, info Info_in) (partkeys
 		})
 	}
 	return partkeys
+}
+func (zks *ZKServer) BecomeLeaderHandle(info Info_in) error {
+	now_block_path := zks.zk.TopicRoot + "/" + info.TopicName + "/" + info.PartitionName + "/nowBlock"
+	NowBlock, err := zks.zk.GetBlockNode(now_block_path)
+	if err != nil {
+		//
+	}
+	NowBlock.LeaderBroker = info.CliName
+	return zks.zk.UpdateBlockNode(NowBlock)
 }
 func (zks *ZKServer) CreateTopicHandle(topic Info_in) Info_out {
 	tNode := zookeeper.TopicNode{

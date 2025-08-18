@@ -609,3 +609,18 @@ func (s *RPCServer) ConStartGetBro(ctx context.Context, req *api.ConStartGetBroR
 		Parts: parts,
 	}, nil
 }
+func (s *RPCServer) BecomeLeader(ctx context.Context, req *api.BecomeLeaderRequest) (r *api.BecomeLeaderResponse, err error) {
+	err = s.zkServer.BecomeLeaderHandle(Info_in{
+		TopicName:     req.Topic,
+		PartitionName: req.Part,
+		CliName:       req.Broker,
+	})
+	if err != nil {
+		return &api.BecomeLeaderResponse{
+			Ret: false,
+		}, err
+	}
+	return &api.BecomeLeaderResponse{
+		Ret: true,
+	}, nil
+}

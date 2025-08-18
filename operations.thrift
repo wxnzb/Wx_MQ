@@ -308,6 +308,14 @@ struct CreatePartitionResponse{
     1:bool ret
     2:string err
 }
+struct BecomeLeaderRequest{
+    1:string topic
+    2:string part
+    3:string broker
+}
+struct BecomeLeaderResponse{
+    1:bool ret
+}
 service ZKServer_Operations{
     //producer
     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
@@ -326,7 +334,8 @@ service ZKServer_Operations{
     //------------------
     CreateTopicResponse CreateTopic(1:CreateTopicRequest req)
     CreatePartitionResponse CreatePartition(1:CreatePartitionRequest req)
-
+    //broker设置成新的leader
+    BecomeLeaderResponse BecomeLeader(1:BecomeLeaderRequest req)
 }
 
 

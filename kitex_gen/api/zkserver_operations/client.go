@@ -22,6 +22,7 @@ type Client interface {
 	ConStartGetBro(ctx context.Context, req *api.ConStartGetBroRequest, callOptions ...callopt.Option) (r *api.ConStartGetBroResponse, err error)
 	CreateTopic(ctx context.Context, req *api.CreateTopicRequest, callOptions ...callopt.Option) (r *api.CreateTopicResponse, err error)
 	CreatePartition(ctx context.Context, req *api.CreatePartitionRequest, callOptions ...callopt.Option) (r *api.CreatePartitionResponse, err error)
+	BecomeLeader(ctx context.Context, req *api.BecomeLeaderRequest, callOptions ...callopt.Option) (r *api.BecomeLeaderResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -106,4 +107,9 @@ func (p *kZKServer_OperationsClient) CreateTopic(ctx context.Context, req *api.C
 func (p *kZKServer_OperationsClient) CreatePartition(ctx context.Context, req *api.CreatePartitionRequest, callOptions ...callopt.Option) (r *api.CreatePartitionResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.CreatePartition(ctx, req)
+}
+
+func (p *kZKServer_OperationsClient) BecomeLeader(ctx context.Context, req *api.BecomeLeaderRequest, callOptions ...callopt.Option) (r *api.BecomeLeaderResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.BecomeLeader(ctx, req)
 }
