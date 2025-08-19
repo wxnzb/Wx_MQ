@@ -6,6 +6,7 @@ import (
 	"Wx_MQ/zookeeper"
 	"context"
 	"encoding/json"
+	"errors"
 	"hash/crc32"
 	"sort"
 	"strconv"
@@ -561,6 +562,8 @@ func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
 	zks.rmu.Lock()
 	zks.brokers[broname] = brocli
 	zks.rmu.Unlock()
+	//加入consistent中进行负载均衡
+	zks.consistent.Add(broname, 1)
 	return nil
 }
 
@@ -841,4 +844,25 @@ func (c *ConsistentBro) getposition(hashKey uint32) (ret int) {
 		ret++
 	}
 	return
+}
+func (c *ConsistentBro) Add(node string, power int) error {
+	if node == "" {
+		return nil
+	}
+	c.rmu.Lock()
+	defer c.rmu.Unlock()
+	ok := c.nodes[node]
+	if ok {
+		return errors.New("node already exist")
+	}
+	c.nodes[node] = true
+	for i := 0; i < c.virtualNodeCount*power; i++ {
+		virtualnode := c.hashKey(node + strconv.Itoa(i))
+		c.circleNodes[virtualnode] = node
+		c.hashSortNodes = append(c.hashSortNodes, virtualnode)
+	}
+	sort.Slice(c.hashSortNodes, func(i, j int) bool {
+		return c.hashSortNodes[i] < c.hashSortNodes[j]
+	})
+	return nil
 }

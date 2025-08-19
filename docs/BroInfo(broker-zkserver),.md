@@ -1,0 +1,16 @@
+### BroInfo(broker->zkserver),
+
+这个函数主要是broker连接到zkserver后立即发送info信息让zkserver连接到broker
+
+### 内部调用BroInfoHandle,传入参数
+
+brokername
+
+brokerhostport
+
+他首先调用server_operations的NewClient函数，传入参数zkserver的name和brokerhostport,创建了bro_cli,这个就可以是那个broker服务端的客户端，然后将bropkername和bro-cli的对应关系加入到zkserver的brokers中，最后调用zkserver的consistent的Add函数，传入参数是brokername和1
+
+分支：*ConsistentBro的Add函数，传入参数 :brokername和1
+
+首先在*ConsistentBro的nodes中找是否已经有brokername,要是有直接返回就行，要是没有，就将 *ConsistentBro的nods中的brokername和true加入nodes中，然后遍历 *ConsistentBro中的VirtualNodeCount *上面的1,在for循环中，首先调用 *ConsistentBro的hash函数，传入参数是brokername+str的i生成一个hash值，将他和brokername的对应关系存入 *ConsistentBro的circle中，然后将这个hash值加入到 *ConsistentBro的hashSortedNodes中，并根据大小进行排序然后返回
+
