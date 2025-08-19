@@ -257,6 +257,11 @@ func (z *ZK) GetPartitionNode(topic, part string) (PartitionNode, error) {
 // 这个更新的时候只需要变化的成员还是结构体整个都要写上
 func (z *ZK) UpdatePartitionNode(pnode PartitionNode) error {
 	path := z.TopicRoot + "/" + pnode.Topic + "/" + "Partitions/" + pnode.Name
+	//我确实想不明白在这里为什么还要在进行判断
+	ok, _, err := z.Con.Exists(path)
+	if !ok {
+		return err
+	}
 	data, err := json.Marshal(pnode)
 	if err != nil {
 		return err

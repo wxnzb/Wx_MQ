@@ -624,3 +624,20 @@ func (s *RPCServer) BecomeLeader(ctx context.Context, req *api.BecomeLeaderReque
 		Ret: true,
 	}, nil
 }
+func (s *RPCServer) GetNewLeader(ctx context.Context, req *api.GetNewLeaderRequest) (r *api.GetNewLeaderResponse, err error) {
+	info, err := s.zkServer.GetNewLeaderHandle(Info_in{
+		TopicName:     req.Topic,
+		PartitionName: req.Part,
+		BlockName:     req.BlockName,
+	})
+	if err != nil {
+		return &api.GetNewLeaderResponse{
+			Ret: false,
+		}, err
+	}
+	return &api.GetNewLeaderResponse{
+		Ret:          true,
+		LeaderBroker: info.broker_name,
+		HostPort:     info.bro_host_port,
+	}, nil
+}
