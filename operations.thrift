@@ -8,13 +8,11 @@ struct PushRequest{
     3:string key
 
     4:binary message
-    //虾米在哪这两个会用到吗
-    5:i64 StartIndex
-    6:i64 EndIndex
-    7:i8 Size
+    
+    5:i8 Size
 
-    8:i8 Ack
-    9:i64 Comindex
+    6:i8 Ack
+    7:i64 Comindex
 }
 //推送消息是否成功
 struct PushResponse{
@@ -55,7 +53,7 @@ struct InfoGetRequest{
 			2:string  topic_Name 
 			3:string  partition_Name 
 			4:i64     offset 
-            5:i8     option
+            5:i8      option
 		}
 struct InfoGetResponse{
     1:bool ret

@@ -787,8 +787,13 @@ func (zks *ZKServer) CreateNowBlock(block Info_in) error {
 }
 
 // 自己感觉这里是可以简化的
-func (zks *ZKServer) UpdateOffset(info Info_in) error {
-	err := zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
+func (zks *ZKServer) UpdateOffsetHandle(info Info_in) error {
+	//先判断这个partitionNode是否存在
+	_, err := zks.zk.GetPartitionNode(info.TopicName, info.PartitionName)
+	if err != nil {
+		return err
+	}
+	err = zks.zk.UpdatePartitionNode(zookeeper.PartitionNode{
 		Name:     info.PartitionName,
 		Topic:    info.TopicName,
 		PTPIndex: info.Index,

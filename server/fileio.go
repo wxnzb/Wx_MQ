@@ -1,10 +1,12 @@
 package server
 
 import (
+	"Wx_MQ/logger"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -55,21 +57,33 @@ func (f *File) OpenFileRead() *os.File {
 func (f *File) FindOffset(fd *os.File, index int64) (int64, error) {
 	node_data := make([]byte, NODE_SIZE)
 	offset := int64(0) //从文件头开始扫描
-	var node NodeData
 	for {
+		logger.DEBUG(logger.DLog, "the file name is %v\n", f.filePath)
 		f.rmu.RLock()
 		//ReadAt 直接按 offset 读取 NODE_SIZE 字节到 node_data
 		size, err := fd.ReadAt(node_data, offset)
 		f.rmu.RUnlock()
-		//这里为什么size会不等于NODE_SIZE呢
+		//错误处理
+		if err != nil {
+			if err == io.EOF {
+				logger.DEBUG(logger.DLog, "Reached EOF without finding index %d\n", index)
+				return index, io.EOF
+			}
+			logger.DEBUG(logger.DLog2, "Read error: %v", err)
+			return -1, fmt.Errorf("read error: %w", err)
+		}
+		//这里为什么size会不等于NODE_SIZE呢:如果文件在写入过程中被中断（程序 crash / 系统断电），最后一个 node 可能只写了一部分
 
 		if size != NODE_SIZE {
+			logger.DEBUG(logger.DLog2, "Incomplete read: got %d bytes,expected %d\n", size, NODE_SIZE)
 			return int64(-1), errors.New("read node size is not NODE_SIZE")
 		}
-		if err == io.EOF {
-			return index, errors.New("blockoffset is out of range")
+		//二进制解析
+		var node NodeData
+		if err := binary.Read(bytes.NewReader(node_data), binary.BigEndian, &node); err != nil {
+			logger.DEBUG(logger.DLog2, "Binary read error:%v", err)
+			return -1, fmt.Errorf("binary read error: %w", err)
 		}
-		json.Unmarshal(node_data, &node)
 		//说明现在index还在后面
 		if node.End_index < index {
 			offset += int64(NODE_SIZE + node.Size) //继续从下一个node开始读
@@ -91,28 +105,30 @@ func (f *File) GetSize() int64 {
 
 // 向文件中写消息
 // 这里的node是目录索引,msgs是批量的消息
-func (f *File) WriteFile(file *os.File, node NodeData, msgs []Message) bool {
-	msgs_json, err := json.Marshal(msgs)
+func (f *File) WriteFile(file *os.File, node NodeData, msgs_data []byte) bool {
+	node_data := &bytes.Buffer{}
+	//将node以打断二进制写入buffer临时存储
+	err := binary.Write(node_data, binary.BigEndian, &node)
 	if err != nil {
-		DEBUG(dError, "%v turn json fail\n", msgs)
-	}
-	node.Size = len(msgs_json)
-	node_json, err := json.Marshal(node)
-	if err != nil {
-		DEBUG(dError, "%v turn json fail\n", node)
-	}
-	if f.node_size == 0 {
-		f.node_size = len(node_json)
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
+		logger.DEBUG(logger.DError, "%v turn bytes fail\n", node)
+		return false
 	}
 	//写进文件
 	f.rmu.Lock()
-	file.Write(node_json)
-	file.Write(msgs_json)
+	if f.node_size == 0 {
+		f.node_size = len(node_data.Bytes())
+	}
+	_, err = file.Write(node_data.Bytes())
+	_, err = file.Write(msgs_data)
+
 	f.rmu.Unlock()
+
 	if err != nil {
 		return false
+	} else {
+		return true
 	}
-	return true
 }
 
 // 读取文件的消息

@@ -4,8 +4,11 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"Wx_MQ/kitex_gen/api/zkserver_operations"
+	"Wx_MQ/logger"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"os"
 	"sort"
@@ -65,16 +68,20 @@ func (t *Topic) AddPartition(partName string) {
 
 // PushRequest，这里添加将消息写入分区
 func (t *Topic) AddMessage(req Info) error {
+	t.rmu.RLock()
 	part, ok := t.Parts[req.partition]
+	t.rmu.RUnlock()
 	if !ok {
-		DEBUG(dError, "no this partition")
+		logger.DEBUG(logger.DError, "not find this part in add message\n")
 		//要是没有这个分区，就要创建一个新的分区
-		part = NewPartition(req.topic, req.partition)
+		part = NewPartition(t.Broker, req.topic, req.partition)
+		t.rmu.Lock()
 		t.Parts[req.partition] = part
+		t.rmu.Unlock()
 	}
-	part.rmu.Lock()
+	logger.DEBUG(logger.DLog, "topic(%v) use partition(%v) addMessage\n", t.Name, req.partition)
 	part.AddMessage(req)
-	part.rmu.Unlock()
+
 	return nil
 }
 
@@ -241,10 +248,14 @@ func (t *Topic) prepareSendHandle(in Info, zkclient *zkserver_operations.Client)
 	return ret, err
 }
 func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
+	logger.DEBUG(logger.DLog, "the info %v\n", pullRequest)
 	sub_name := GetStringFromSub(pullRequest.topic, pullRequest.partition, pullRequest.option)
 	t.rmu.RLock()
 	sub, ok := t.SubList[sub_name]
+	t.rmu.RUnlock()
 	if !ok {
+		str := fmt.Sprintf("%v this topic(%v) don't have sub(%v) the sublist is %v for %v\n", t.Broker, t.Name, sub_name, t.subList, in.consumer)
+		logger.DEBUG(logger.DError, "%v\n", str)
 		return MSGS{}, errors.New("no this sub")
 	}
 	return sub.PullMessage(pullRequest)
@@ -257,7 +268,9 @@ func (t *Topic) StartToGetHandle(sub_name string, in Info, consumer_to_broker *c
 	defer t.rmu.RUnlock()
 	sub, ok := t.SubList[sub_name]
 	if !ok {
-		return errors.New("no this sub")
+		ret := "this topic not have this subscription"
+		logger.DEBUG(logger.DLog, "%v\n", ret)
+		return errors.New(ret)
 	}
 	sub.AddConsumerInConfig(in, consumer_to_broker)
 	return nil
@@ -332,7 +345,8 @@ func (p *Partition) CloseAcceptMessage(in Info) (start, end int64, ret string, e
 func (p *Partition) AddMessage(req Info) (ret string, err error) {
 	p.rmu.Lock()
 	if p.state == DOWN {
-		ret = "this part close"
+		ret = "this part has closed"
+		logger.DEBUG(logger.DLog, "%v\n", ret)
 		return ret, errors.New(ret)
 	}
 	p.index++
@@ -344,34 +358,40 @@ func (p *Partition) AddMessage(req Info) (ret string, err error) {
 		Size:           req.size,
 	}
 	p.queue = append(p.queue, msg)
+	logger.DEBUG(logger.DLog, "part_name(%v) add message %v index is %v size is %v\n", p.key, msg, p.index, p.index-p.start_index)
 	//达到一定大小后写入磁盘
 	if p.index-p.start_index >= VIRTUAL_10 {
-		var msgs []Message
-		for i := 0; i < VIRTUAL_10; i++ {
-			msgs = append(msgs, p.queue[i])
-		}
-		node := NodeData{
-			Start_index: p.start_index,
-			End_index:   p.start_index + VIRTUAL_10 - 1,
-		}
-		//这里用for是重试机制，只要 WriteFile() 写失败（返回 false），就不断重试，并打印错误日志，直到写成功为止
-		for !p.file.WriteFile(p.fd, node, msgs) {
-			//DEBUG(dERROR, "write to %v fail\n", p.file_name)
-		}
-		p.start_index = p.start_index + VIRTUAL_10 + 1
-		p.queue = p.queue[VIRTUAL_10:]
+		p.flushToDisk()
 	}
 	p.rmu.Unlock()
 	//你要知道zkerver管一切，因此这个partition变化必须上传给zkserver
-	(*req.zkclient).UpdateDup(context.Background(), &api.UpdateDupRequest{
-		Topic: req.topic,
-		Part:  req.partition,
-		//但是这个是啥时候传进去的？？，还有下面的file_name,真是奇怪？？？
-		BrokerName: req.BrokerName,
-		BlockName:  GetBlockName(req.file_name),
-		EndIndex:   p.index,
-	})
+	if req.zkclient != nil {
+		(*req.zkclient).UpdateDup(context.Background(), &api.UpdateDupRequest{
+			Topic: req.topic,
+			Part:  req.partition,
+			//但是这个是啥时候传进去的？？，还有下面的file_name,真是奇怪？？？
+			BrokerName: req.BrokerName,
+			BlockName:  GetBlockName(req.file_name),
+			EndIndex:   p.index,
+		})
+	}
 	return ret, err
+}
+func (p *Partition) flushToDisk() {
+	if len(p.queue) == 0 {
+		return
+	}
+	node := NodeData{
+		Start_index: p.start_index,
+		End_index:   p.index,
+		Size:        len(p.queue), //这个肯定是 VIRTUAL_10
+	}
+	msgs_data, _ := json.Marshal(p.queue)
+	for !p.file.WriteFile(p.fd, node, msgs_data) {
+		logger.DEBUG(logger.DError, "write to %v faile\n", p.file_name)
+	}
+	p.start_index = p.index + 1
+	p.queue = p.queue[:0]
 }
 
 // 在新创建了一个分区之后，要做的是，发布消息给所有分区的消费者，但是现在还没有消费者呀，好奇怪？？？？
@@ -603,6 +623,7 @@ func (sub *SubScription) GetConfig() *Config {
 func (sub *SubScription) AddConsumerInConfig(req Info, tocon *client_operations.Client) {
 	sub.rmu.Lock()
 	defer sub.rmu.Unlock()
+	//这才是关键,上面的判断早了
 	switch req.option {
 	case TOPIC_NIL_PTP_PUSH:
 		{
@@ -611,14 +632,22 @@ func (sub *SubScription) AddConsumerInConfig(req Info, tocon *client_operations.
 	case TOPIC_KEY_PSB_PUSH:
 		config, ok := sub.PSB_config[req.partition+req.consumer_ipname]
 		if !ok {
-			DEBUG(dError, "this PSBconfig PUSH is not been\n")
+			logger.DEBUG(logger.DError, "this PSBConfig PUSH id not been\n")
 		}
 		config.Start(req, tocon)
 	}
 }
 
 func (pc *PSBConfig_PUSH) Start(req Info, tocon *client_operations.Client) {
-
+	pc.rmu.Lock()
+	pc.Cli = tocon
+	var names []string
+	clis := make(map[string]*client_operations.Client)
+	names = append(names, req.consumer_ipname)
+	clis[req.consumer_ipname] = tocon
+	pc.part.UpdateCons(names, clis)
+	pc.part.Start(pc.part_close)
+	pc.rmu.Unlock()
 }
 func (sub *SubScription) PullMessage(pullRequest Info) (MSGS, error) {
 	node_name := pullRequest.topic + pullRequest.partition + pullRequest.consumer
@@ -626,6 +655,7 @@ func (sub *SubScription) PullMessage(pullRequest Info) (MSGS, error) {
 	node, ok := sub.nodes[node_name]
 	sub.rmu.RUnlock()
 	if !ok {
+		logger.DEBUG(logger.DError, "this sub has not have this node(%v)\n", node_name)
 		return MSGS{}, errors.New("this sub no have node")
 	}
 	return node.ReadMSGS(pullRequest)
@@ -842,14 +872,13 @@ func (c *Config) AddPartition(in Info, part *Partition, file *File, zkclient *zk
 // 这里+-知识操作了config,最后要移到part里面去
 func (c *Config) AddToconsumer(part string, consumer string, toconsumer *client_operations.Client) {
 	c.rmu.Lock()
-	defer c.rmu.Unlock()
-	//c.part_toconsumers[part] = append(c.part_toconsumers[part], consumer)
 	c.toconsumers[consumer] = toconsumer
 	c.con_nums++
 	err := c.consistent.Add(consumer, 1)
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
+	c.rmu.Unlock()
 	c.RebalancePtoC() //更新配置
 	c.UpdateParts()   //应用配置
 }

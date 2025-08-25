@@ -11,6 +11,7 @@ import (
 
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/server_operations"
+	"Wx_MQ/logger"
 
 	"Wx_MQ/zookeeper"
 
@@ -20,18 +21,16 @@ import (
 )
 
 type RPCServer struct {
-	name string
-	//这里用指针更好？？？
-	srv_cli *server.Server
-	srv_bro *server.Server
-	////下面这两个分别对应上面那两个
+	name     string
+	srv_cli  *server.Server
+	srv_bro  *server.Server
 	server   *Server
 	zkServer *ZKServer
 	zkInfo   zookeeper.ZKInfo
 }
 
 func NewRpcServer(zk_info zookeeper.ZKInfo) RPCServer {
-	LOGinit()
+	logger.LOGinit()
 	return RPCServer{
 		zkInfo: zk_info,
 	}
@@ -51,9 +50,9 @@ func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error
 		//面向客户端的服务端
 		srv_cli := server_operations.NewServer(s, opts_cli...)
 		s.srv_cli = &srv_cli
+		logger.DEBUG(logger.DLog, "%v the raft %v start rpcserver for clients\n", opt.Name, opt.Me)
 		go func() {
 			err := srv_cli.Run()
-			//DEBUG(dLOG, "broker start rpcserver")
 			if err != nil {
 				fmt.Println(err.Error())
 			}
@@ -65,11 +64,11 @@ func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error
 		//面向broker的服务端
 		srv_bro := zkserver_operations.NewServer(s, opts_bro...)
 		s.srv_bro = &srv_bro
+		logger.DEBUG(logger.DLog, "ZkServer start rpcserver for brokers\n")
 		go func() {
 			err := srv_bro.Run()
-			//DEBUG(dLOG, "broker start rpcserver")
 			if err != nil {
-				fmt.Println(err.Error())
+				logger.DEBUG(logger.DError, "start zkbroker failed"+err.Error())
 			}
 		}()
 	}
@@ -84,23 +83,8 @@ func (s *RPCServer) Stop() {
 	}
 }
 
-//	service Server_Operations{
-//	    //producer
-//	    PushResponse push(1:PushRequest req)
-//	    //consumer
-//	    PullResponse pull(1:PullRequest req)
-//	    infoResponse info(1:infoRequest req)
-//	    InfoGetResponse StarttoGet(1:InfoGetRequest req)
-//	    //上面这些是消费者和客户端根broker交流，下面的是broker和broker之间的交流
-//	    //1:通知目标 Broker：准备接收某文件
-//	    PrepareAcceptResponse prepareAccept(1:PrepareAcceptRequest req)
-//	    //2:通知接收方“我要从 offset 开始，发送某个文件的某部分了”，请确认你准备好了，或者已经收到了这部分
-//	    PrepareSendResponse prepareSend(1:PrepareSendRequest req)
-//	}
-//
 // 生产者	向 Broker 投递一条消息
 func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.PushResponse, err error) {
-	fmt.Println(req)
 	ret, err := s.server.PushHandle(Info{
 		producer: req.ProducerId,
 		//-----------------
@@ -116,7 +100,7 @@ func (s *RPCServer) Push(ctx context.Context, req *api.PushRequest) (r *api.Push
 		cmdindex: req.Comindex,
 	})
 	if err == nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
 	return &api.PushResponse{
 		Ret: false,
@@ -141,7 +125,7 @@ func (s *RPCServer) Pull(ctx context.Context, req *api.PullRequest) (r *api.Pull
 		if err == io.EOF && ret.size == 0 {
 			Err = "file EOF"
 		} else {
-			DEBUG(dError, "pull err")
+			logger.DEBUG(logger.DError, "%v\n", err.Error())
 		}
 		return &api.PullResponse{
 			Ret: false,
@@ -170,7 +154,7 @@ func (s *RPCServer) Info(ctx context.Context, req *api.InfoRequest) (r *api.Info
 	}, nil
 }
 
-// 消费者	指示开始消费某个分区的消息，从某个 offset 开始
+// consumer->broker server	指示开始消费某个分区的消息，从某个 offset 开始
 func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
 
 	err = s.server.StartGet(Info{
@@ -178,6 +162,7 @@ func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r 
 		partition:       req.Partition_Name,
 		consumer_ipname: req.Consumer_Name,
 		offset:          req.Offset,
+		option:          req.Option,
 	})
 	if err != nil {
 		return &api.InfoGetResponse{Ret: false}, err
@@ -346,58 +331,6 @@ func (s *Server) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPar
 
 }
 
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// service ZKServer_Operations{
-//     //producer
-//     ProGetBroResponse ProGetBro(1:ProGetBroRequest req)
-//     ProSetPartStateResponse ProSetPart(1:ProSetPartStateRequest req)
-//     //consumer
-//     ConGetBroResponse ConGetBro(1:ConGetBroRequest req)
-//     SubResponse sub(1:SubRequest req)
-//     ConStartGetBro(ctx context.Context, req *ConStartGetBroRequest) (r *ConStartGetBroResponse, err error)
-//      //broker
-//     BroInfoResponse  BroInfo(1:BroInfoRequest req)
-//     BroGetAssignResponse BroGetssign(1:BroGetAssignRequest req)
-//     UpdateOffset(ctx context.Context, req *UpdateOffsetRequest) (r *UpdateOffsetResponse, err error)
-//     //------------------
-//     CreateTopicResponse CreateTopic(1:CreateTopicRequest req)
-//     CreatePartitionResponse CreatePartition(1:CreatePartitionRequest req)
-
-// }
-//
-//	struct ProGetBroRequest{
-//	    1:string topic_name
-//	    2:string partition_name
-//	}
-//
-//	struct ProGetBroResponse{
-//	    1:bool ret
-//	    2:string bro_host_port
-//	}
-//
-// //消费者想消费某个 topic 的某个 partition，于是去询问哪个 broker 负责它。
-//
-//	struct ConGetBroRequest{
-//	    1:string topic_name
-//	    2:string partition_name
-//	    3:i8 option
-//	}
-//
-//	struct ConGetBroResponse{
-//	    1:bool ret
-//	    2:i64 size
-//	    3:binary bros
-//	    4:binary parts
-//	}
-// type Info_in struct {
-// 	TopicName     string
-// 	PartitionName string
-// 	Option        int8
-// }
-// type Info_out struct {
-// 	Err error
-// }
-
 func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r *api.ProGetBroResponse, err error) {
 	info_out := s.zkServer.ProGetBroHandle(Info_in{
 		TopicName:     req.TopicName,
@@ -474,7 +407,7 @@ func (s *RPCServer) Sub(ctx context.Context, req *api.SubRequest) (*api.SubRespo
 
 // broker---->zkserver
 func (s *RPCServer) UpdateOffset(ctx context.Context, req *api.UpdateOffsetRequest) (r *api.UpdateOffsetResponse, err error) {
-	err = s.zkServer.UpdateOffset(Info_in{
+	err = s.zkServer.UpdateOffsetHandle(Info_in{
 		TopicName:     req.Topic,
 		PartitionName: req.Part,
 		Index:         req.Offset,
@@ -560,35 +493,6 @@ func (s *RPCServer) CreatePartition(ctx context.Context, req *api.CreatePartitio
 	}, nil
 }
 
-// // 消费者	指示开始消费某个分区的消息，从某个 offset 开始
-// func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) {
-
-//		err = s.server.StartGet(Info{
-//			topic:           req.Topic_Name,
-//			partition:       req.Partition_Name,
-//			consumer_ipname: req.Cli_Name,
-//			offset:          req.Offset,
-//		})
-//		if err != nil {
-//			return &api.InfoGetResponse{Ret: false}, err
-//		}
-//		return &api.InfoGetResponse{Ret: true}, nil
-//	}
-//
-//	struct ConStartGetBroRequest{
-//	    1:string topic
-//	    2:string part
-//	    3:i64 offset
-//	    4:i8 option
-//	    5:string cli_name
-//	}
-//
-//	struct ConStartGetBroResponse{
-//	    1:bool ret
-//	    2:i64 size
-//	    3:binary parts
-//	}
-//
 // 感觉这个和上面func (s *RPCServer) StarttoGet(ctx context.Context, req *api.InfoGetRequest) (r *api.InfoGetResponse, err error) 这个很像
 func (s *RPCServer) ConStartGetBro(ctx context.Context, req *api.ConStartGetBroRequest) (r *api.ConStartGetBroResponse, err error) {
 	parts, size, err := s.zkServer.ConStartGetBroHandle(Info_in{

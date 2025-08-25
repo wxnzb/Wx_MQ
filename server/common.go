@@ -98,6 +98,7 @@ func CheckChangeCon(old map[string]*client_operations.Client, new []string) (red
 type Options struct {
 	Tag              string
 	Name             string
+	Me               int
 	ZKServerHostPort string
 	BrokerHostPort   string
 	RaftHostPort     string

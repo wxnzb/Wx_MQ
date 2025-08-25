@@ -12,11 +12,9 @@ type PushRequest struct {
 	Topic      string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
 	Key        string `thrift:"key,3" frugal:"3,default,string" json:"key"`
 	Message    []byte `thrift:"message,4" frugal:"4,default,binary" json:"message"`
-	StartIndex int64  `thrift:"StartIndex,5" frugal:"5,default,i64" json:"StartIndex"`
-	EndIndex   int64  `thrift:"EndIndex,6" frugal:"6,default,i64" json:"EndIndex"`
-	Size       int8   `thrift:"Size,7" frugal:"7,default,i8" json:"Size"`
-	Ack        int8   `thrift:"Ack,8" frugal:"8,default,i8" json:"Ack"`
-	Comindex   int64  `thrift:"Comindex,9" frugal:"9,default,i64" json:"Comindex"`
+	Size       int8   `thrift:"Size,5" frugal:"5,default,i8" json:"Size"`
+	Ack        int8   `thrift:"Ack,6" frugal:"6,default,i8" json:"Ack"`
+	Comindex   int64  `thrift:"Comindex,7" frugal:"7,default,i64" json:"Comindex"`
 }
 
 func NewPushRequest() *PushRequest {
@@ -42,14 +40,6 @@ func (p *PushRequest) GetMessage() (v []byte) {
 	return p.Message
 }
 
-func (p *PushRequest) GetStartIndex() (v int64) {
-	return p.StartIndex
-}
-
-func (p *PushRequest) GetEndIndex() (v int64) {
-	return p.EndIndex
-}
-
 func (p *PushRequest) GetSize() (v int8) {
 	return p.Size
 }
@@ -73,12 +63,6 @@ func (p *PushRequest) SetKey(val string) {
 func (p *PushRequest) SetMessage(val []byte) {
 	p.Message = val
 }
-func (p *PushRequest) SetStartIndex(val int64) {
-	p.StartIndex = val
-}
-func (p *PushRequest) SetEndIndex(val int64) {
-	p.EndIndex = val
-}
 func (p *PushRequest) SetSize(val int8) {
 	p.Size = val
 }
@@ -101,11 +85,9 @@ var fieldIDToName_PushRequest = map[int16]string{
 	2: "topic",
 	3: "key",
 	4: "message",
-	5: "StartIndex",
-	6: "EndIndex",
-	7: "Size",
-	8: "Ack",
-	9: "Comindex",
+	5: "Size",
+	6: "Ack",
+	7: "Comindex",
 }
 
 type PushResponse struct {

@@ -214,7 +214,7 @@ func (s *Server) RecoverConsumer(consumer *ToConsumer) {
 
 // 服务器将消息存在topic里面
 func (s *Server) PushHandle(push Info) (ret string, err error) {
-	DEBUG(dLog, "get Message form producer\n")
+	logger.DEBUG(logger.DLog, "get Message from producer\n")
 	s.rmu.RLock()
 	topic, ok := s.topics[push.topic]
 	broker_part_raft := s.parts_rafts
@@ -222,7 +222,7 @@ func (s *Server) PushHandle(push Info) (ret string, err error) {
 
 	if !ok {
 		ret = "this topic is not in this broker"
-		DEBUG(dError, "Topic %v,is not in this broker", push.topic)
+		logger.DEBUG(logger.DError, "Topic %v,is not in this broker", in.topicName)
 		return ret, errors.New(ret)
 	}
 
@@ -237,7 +237,7 @@ func (s *Server) PushHandle(push Info) (ret string, err error) {
 		go topic.AddMessage(push)
 	}
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 		return err.Error(), err
 	}
 	return ret, nil
@@ -254,8 +254,9 @@ type MSGS struct {
 }
 
 func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
+	logger.DEBUG(logger.DLog, "%v get pull request the in.op(%v) TOP_PTP_PULL(%v)\n", s.Name, in.option, TOPIC_NIL_PTP_PULL)
 	if pullRequest.option == TOPIC_NIL_PTP_PULL {
-		//更新消费者偏移量并写入zookeeper记录消费者上次读取的位置
+		//更新消费者偏移量并写入zookeeper记录消费者这次读取的位置,也就是要从哪里开始拉取
 		s.zkclient.UpdateOffset(context.Background(), &api.UpdateOffsetRequest{
 			Topic:  pullRequest.topic,
 			Part:   pullRequest.partition,
@@ -266,6 +267,7 @@ func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 	topic, ok := s.topics[pullRequest.topic]
 	s.rmu.RUnlock()
 	if !ok {
+		logger.DEBUG(logger.DError, "this topic is not in this broker")
 		return MSGS{}, errors.New("topic not exist")
 	}
 	return topic.PullMessage(pullRequest)
@@ -273,6 +275,7 @@ func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 
 // 处理消费者的连接请求,将消费者添加到这个broker里面
 func (s *Server) InfoHandle(ip_port string) (err error) {
+	logger.DEBUG(logger.DLog, "get consumer's ip_port %v\n", ipport)
 	s.rmu.Lock()
 	consumer, ok := s.consumers[ip_port]
 	if !ok {
@@ -283,21 +286,12 @@ func (s *Server) InfoHandle(ip_port string) (err error) {
 		s.consumers[ip_port] = consumer
 	}
 	go s.CheckConsumer(consumer)
-	//go s.RecoverConsumer(consumer)
 	s.rmu.Unlock()
+	logger.DEBUG(logger.DLog, "return resp to consumer\n")
 	return nil
 }
 
 // 4
-// name       string //broker name
-// 	topic_name string
-// 	part_name  string
-// 	file_name  string
-// 	option     int8
-// 	offset     int64
-
-// producer string
-// consumer string
 type Info struct {
 	name            string
 	topic           string
@@ -337,6 +331,7 @@ func (s *Server) StartGet(req Info) (err error) {
 
 		PSB：不需要负载均衡
 	*/
+	//事实感觉分类完全多此一举,没必要啊,都是一模一样的代码
 	switch req.option {
 	//负载均衡
 	case TOPIC_NIL_PTP_PUSH:
@@ -354,7 +349,8 @@ func (s *Server) StartGet(req Info) (err error) {
 			s.rmu.RLock()
 			defer s.rmu.RUnlock()
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
-			DEBUG(dLog, "%s\n", sub_name)
+			logger.DEBUG(logger.DLog, "consumer(%v) start to get topic(%v) partition(%v) offset(%v) in sub(%v)\n", in.consumer, in.topicName, in.partName, in.offset, sub_name)
+			return s.topics[req.topic].StartToGetHandle(sub_name, req, s.consumers[req.consumer_ipname].GetToConsumer())
 		}
 	default:
 		err = errors.New("option error")

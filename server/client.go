@@ -13,9 +13,13 @@ import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/client_operations"
 	"Wx_MQ/kitex_gen/api/zkserver_operations"
+	"Wx_MQ/logger"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -48,9 +52,10 @@ type ToConsumer struct {
 func NewToConsumer(ip_port string) (*ToConsumer, error) {
 	client, err := client_operations.NewClient("clients", client2.WithHostPorts(ip_port))
 	if err != nil {
-		DEBUG(dError, "NewClient err:%v", err)
+		logger.DEBUG(logger.DError, "connect client failed\n")
 		return nil, err
 	}
+	logger.DEBUG(logger.DLog, "connect consumer server successful\n")
 	return &ToConsumer{
 		rmu:      sync.RWMutex{},
 		name:     ip_port,
@@ -59,18 +64,6 @@ func NewToConsumer(ip_port string) (*ToConsumer, error) {
 		consumer: client,
 	}, nil
 }
-
-//这个也没了？？？
-// // 服务器作为消费者客户端向消费者推送消息
-// func (con *ToConsumer) Pub(msg string) bool {
-// 	resp, err := con.consumer.Pub(context.Background(), &api.PubRequest{
-// 		Msg: msg,
-// 	})
-// 	if err != nil || resp.Ret == false {
-// 		return false
-// 	}
-// 	return true
-// }
 
 // 服务器作为消费者客户端一直给消费者发送Pong看是否在线，直到他下线
 func (con *ToConsumer) CheckConsumer() bool {
@@ -281,13 +274,13 @@ func (p *Part) Start(close chan *Part) {
 	//这里得到的是这一块消息的偏移，他无法得到这一批消息的偏移，但是先在感觉这句根本就没有用上阿，为什么要放在这里？？
 	p.blockOffset, err = p.file.FindOffset(&p.fd, p.lastIndex)
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
 	//开始从磁盘读取5个快放在buffer中
 	for i := 0; i < BUFF_NUM; i++ {
 		err = p.AddBlock()
 		if err != nil {
-			DEBUG(dError, err.Error())
+			logger.DEBUG(logger.DError, "%v\n", err.Error())
 		}
 	}
 	//开启一个携程接收消费者发送过来的ack
@@ -299,7 +292,7 @@ func (p *Part) Start(close chan *Part) {
 		p.state = ALIVE
 	} else {
 		p.rmu.Unlock()
-		DEBUG(dError, "the part start already is alive\n")
+		logger.DEBUG(logger.DError, "the part is ALIVE in before this start\n")
 		return
 	}
 	for name, toConsumer := range p.to_consumers {
@@ -505,12 +498,13 @@ func (p *Part) UpdateCons(confPartToCons []string, confCons map[string]*client_o
 	p.rmu.Lock()
 	defer p.rmu.Unlock()
 	reduce, add := CheckChangeCon(p.to_consumers, confPartToCons)
-	for _, r := range reduce {
-		delete(p.to_consumers, r)
+	for _, name := range reduce {
+		delete(p.to_consumers, name)
 	}
-	for _, a := range add {
-		p.to_consumers[a] = confCons[a]
-		p.SendOneBlock(a, confCons[a])
+	for _, name := range add {
+		p.to_consumers[name] = confCons[name]
+		//开启携程,发送消息
+		go p.SendOneBlock(name, confCons[name])
 	}
 }
 
@@ -538,8 +532,14 @@ func NewNode(in Info, file *File) *Node {
 	no.offset = -1
 	return no
 }
+
+// 这样读取数据有两个问题:
+// 2:假设每个node中的消息有5条,现在我第一个对这,但是size也就是我向度的消息数量16条,在读到5条时,nums < int(in.size)还不满足,那么会多读4条消息
+//
+//1:node(0) 1  2  3 4 5,但是我从3开始读,因为他不是node的偏移,他会通过find函数找到0,那么就会读到这个之前的消息
 func (nod *Node) ReadMSGS(in Info) (MSGS, error) {
 	var err error
+	//这里判断nod.start_index != in.offset,因为start_index是上一次消费者消费时node的开始,比较,要是不一样就通过find函数找到对应的in.offset的node偏移
 	if nod.offset == -1 || nod.start_index != in.offset {
 		nod.offset, err = nod.file.FindOffset(&nod.fd, in.offset)
 		if err != nil {
@@ -558,15 +558,56 @@ func (nod *Node) ReadMSGS(in Info) (MSGS, error) {
 			}
 		}
 		if nums == 0 {
-			msgs.start_index = node.Start_index
+			msgs.start_index = node.Start_index //start_index是这个开始node起始偏移量,假设你以工读了三个node里面的消息,他的这个还是第一个读的node的偏移
 		}
-		nums += int(node.Size)
+		nums += int(node.Size) //nums代表几条消息
 		nod.offset += int64(NODE_SIZE) + int64(node.Size)
 		msgs.size = int8(nums)
 		msgs.array = append(msgs.array, msg...)
 		msgs.end_index = node.End_index
 	}
+	return msgs, nil
 }
 func (f *File) ReadBytes(file *os.File, offset int64) (NodeData, []byte, error) {
-
+	f.rmu.RLock()
+	defer f.rmu.RUnlock()
+	//读取节点元数据
+	node_data := make([]byte, NODE_SIZE)
+	size, err := file.ReadAt(node_data, offset)
+	if err != nil {
+		if err == io.EOF {
+			logger.DEBUG(logger.DLeader, "EOF reached while reading node metadata at offset %d", offset)
+			return NodeData{}, nil, fmt.Errorf("node metadata EOF at offset %d", offset)
+		}
+		logger.DEBUG(logger.DLeader, "Read error: %v", err)
+		return NodeData{}, nil, fmt.Errorf("failed to read node metadata: %w", err)
+	}
+	if size != NODE_SIZE {
+		logger.DEBUG(logger.DLog2, "Incomplete read: got %d bytes,expected %d\n", size, NODE_SIZE)
+		return NodeData{}, nil, fmt.Errorf("incomplete node read: expected %d bytes, got %d", NODE_SIZE, size)
+	}
+	//解析节点元数据
+	var node NodeData
+	if err := binary.Read(bytes.NewReader(node_data), binary.LittleEndian, &node); err != nil {
+		logger.DEBUG(logger.DLog2, "Failed to parse node metadata: %v", err)
+		return NodeData{}, nil, fmt.Errorf("failed to parse node metadata: %w", err)
+	}
+	//读取节点数据
+	msg_data := make([]byte, node.Size)
+	offset += int64(f.node_size)
+	size, err = file.ReadAt(msg_data, offset)
+	//检查节点数据读取结果
+	if err != nil {
+		if err == io.EOF {
+			logger.DEBUG(logger.DLeader, "EOF reached while reading node data at offset %d", offset+int64(NODE_SIZE))
+			return node, nil, fmt.Errorf("node data EOF at offset %d", offset+int64(NODE_SIZE))
+		}
+		logger.DEBUG(logger.DLeader, "Read error: %v", err)
+		return NodeData{}, nil, fmt.Errorf("failed to read node data: %w", err)
+	}
+	if size != node.Size {
+		logger.DEBUG(logger.DLeader, "Incomplete read: got %d bytes,expected %d\n", size, node.Size)
+		return node, nil, fmt.Errorf("incomplete node data read: expected %d bytes, got %d", node.Size, size)
+	}
+	return node, msg_data, nil
 }

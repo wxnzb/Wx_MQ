@@ -3,6 +3,7 @@ package server
 import (
 	api "Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/raft_operations"
+	"Wx_MQ/logger"
 	"context"
 	"errors"
 	"net"
@@ -153,36 +154,44 @@ const (
 // Raft 分区组 praft接收到来自客户端的 Append 请求，尝试将 in.message 写入分区 in.topic_name/in.part_name，返回结果字符串和错误
 func (praft *parts_raft) Append(in Info) (ret string, err error) {
 	str := in.topic + in.partition
+	logger.DEBUG_RAFT(logger.DLeader, "S%d <-- C%v putappend message(%v) topic_partition(%v)\n", praft.me, in.producer, in.cmdindex, str)
 	praft.rmu.Lock()
+
 	//找到broker下的这个特定的raft实例并判断这个实例是否是leader
 	_, isLeader := praft.parts[str].GetState()
 	if !isLeader {
-		DEBUG(dLog, "S%d this is not leader\n", praft.me)
+		logger.DEBUG_RAFT(logger.DLog, "raft %d is not the leader", p.me)
+		praft.rmu.Unlock()
+		time.Sleep(200 * time.Millisecond)
 		return ErrWrongLeader, nil
 	}
 	//检查快照是否已恢复,没恢复说明还没准备好,applyindex = 状态机应用的最新日志索引
 	if praft.applyindex[str] == 0 {
-		DEBUG(dLog, "S%d the snap noot applied applyindex is %v\n", praft.me, praft.applyindex[str])
+		logger.DEBUG_RAFT(logger.DLog, "%d the snap not applied applyindex is %v\n", praft.me, praft.applyindex[str])
 		praft.rmu.Unlock()
 		time.Sleep(200 * time.Millisecond)
 		return ErrTimeOut, nil
 	}
-	//先检查有这个结构吗？
+	//先检查是否进行初始化
 	_, ok := praft.CDM[str]
 	if !ok {
+		logger.DEBUG_RAFT(logger.DLog, "%d make CDM Tpart(%v)", praft.me, str)
 		praft.CDM[str] = make(map[string]int64)
 	}
 	_, ok = praft.CSM[str]
 	if !ok {
+		logger.DEBUG_RAFT(logger.DLog, "%d make CSM Tpart(%v)", p.me, str)
 		praft.CSM[str] = make(map[string]int64)
 	}
 	//幂等性检查（CDM）
 	in1, okk1 := praft.CDM[str][in.producer]
 	//当前请求的 cmdindex == 每个生产者的最后一次提交的命令索引，说明这条命令已经成功应用过
 	if okk1 && in1 == in.cmdindex {
+		logger.DEBUG_RAFT(logger.DInfo, "%d p.CDM[%v][%v](%v) in.cmdindex(%v)\n", praft.me, str, in.producer, praft.CDM[str][in.producer], in.cmdindex)
 		praft.rmu.Unlock()
 		return OK, nil
 	} else if !okk1 {
+		logger.DEBUG_RAFT(logger.DLog, "%d add CDM[%v][%v](%v)\n", praft.me, str, in.producer, 0)
 		praft.CDM[str][in.producer] = 0
 	}
 	praft.rmu.Unlock()
@@ -200,15 +209,16 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 	}
 	//如果该请求（来自producer）还没有提交到 Raft，就调用 Start() 提交；如果已经提交过，就不重复提交
 	praft.rmu.Lock()
-	DEBUG(dLog, "S%d lock 285\n", praft.me)
+	logger.DEBUG_RAFT(logger.DLog, "%d lock 285\n", praft.me)
 	in2, okk2 := praft.CSM[str][in.producer]
 	if !okk2 {
 		praft.CSM[str][in.producer] = 0
 	}
 	//这里要判断leader
 	//即使已经提交（cmdindex 和 CSM 相等），但还要确保你是 leader，否则你不能承认自己已经处理了这条命令
-	var index int
 	praft.rmu.Unlock()
+	logger.DEBUG_RAFT(logger.DInfo, "%d p.CSM[%v][%v](%v) in.cmdIndex(%v)\n", praft.me, str, in.producer, praft.CSM[str][in.producer], in.cmdindex)
+	var index int
 	//这里等于为什么不像上面一样返回：记录生产者最后一次提交的命令（但未必应用），上面那个不仅提交而且已经应用(apply)
 	if in2 == in.cmdindex {
 		_, isLeader = praft.parts[str].GetState()
@@ -220,7 +230,6 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 		return ErrWrongLeader, nil
 	} else {
 		praft.rmu.Lock()
-		DEBUG(dLog, "S%D lock 312\n", praft.me)
 		lastindex, ok := praft.CSM[str][in.producer]
 		if !ok {
 			praft.CSM[str][in.producer] = 0
@@ -235,14 +244,14 @@ func (praft *parts_raft) Append(in Info) (ret string, err error) {
 				if index == out.index {
 					return OK, nil
 				} else {
-					DEBUG(dLog, "S%d index!=out.index pytappend %d != %d\n", praft.me, index, out.index)
+					logger.DEBUG_RAFT(logger.DLog, "%d cmd index %d != out.index %d\n", praft.me, index, out.index)
 				}
 			case <-time.After(TOUT * time.Microsecond):
 				_, isLeader = praft.parts[str].GetState()
 				ret := ErrTimeOut
 				praft.rmu.Lock()
-				DEBUG(dLog, "S%d lock 332\n", praft.me)
-				DEBUG(dLeader, "S%d time out\n", praft.me)
+				logger.DEBUG_RAFT(logger.DLog, "%d lock 332\n", p.me)
+				logger.DEBUG_RAFT(logger.DLeader, "%d time out\n", p.me)
 				if !isLeader {
 					ret = ErrWrongLeader
 					praft.CSM[str][in.producer] = lastindex
