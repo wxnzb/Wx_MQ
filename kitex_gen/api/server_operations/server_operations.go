@@ -97,6 +97,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"sub2": kitex.NewMethodInfo(
+		sub2Handler,
+		newServer_OperationsSub2Args,
+		newServer_OperationsSub2Result,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -379,6 +386,24 @@ func newServer_OperationsCloseFetchPartitionResult() interface{} {
 	return api.NewServer_OperationsCloseFetchPartitionResult()
 }
 
+func sub2Handler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Server_OperationsSub2Args)
+	realResult := result.(*api.Server_OperationsSub2Result)
+	success, err := handler.(api.Server_Operations).Sub2(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newServer_OperationsSub2Args() interface{} {
+	return api.NewServer_OperationsSub2Args()
+}
+
+func newServer_OperationsSub2Result() interface{} {
+	return api.NewServer_OperationsSub2Result()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -504,6 +529,16 @@ func (p *kClient) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPa
 	_args.Req = req
 	var _result api.Server_OperationsCloseFetchPartitionResult
 	if err = p.c.Call(ctx, "CloseFetchPartition", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Sub2(ctx context.Context, req *api.Sub2Request) (r *api.Sub2Response, err error) {
+	var _args api.Server_OperationsSub2Args
+	_args.Req = req
+	var _result api.Server_OperationsSub2Result
+	if err = p.c.Call(ctx, "sub2", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

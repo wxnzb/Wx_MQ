@@ -62,7 +62,7 @@ type Server struct {
 	brokers_fetch map[string]*server_operations.Client
 }
 
-var ip_name string //加了这个
+var ip_name string //加了这个,这个应该broker的ipport
 // 其实感觉挺奇怪的，这里为什么不直接把这个放到make里面呢？？？？
 func NewServer(zkInfo zookeeper.ZKInfo) *Server {
 	return &Server{
@@ -539,13 +539,13 @@ type SubResponse struct {
 // 现在完全看不到是在那里调用了他
 // 订阅这个动作无论是加入还是取消都与topic结构体和Consumer结构体有关，他们两个都要操作
 // 通过Sub结构体来订阅消息
-func (s *Server) SubHandle(in Info) (err error) {
+func (s *Server) Sub2Handle(in Info) (err error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	DEBUG(dLog, "get sub information")
 	//这里还得先判断一下这个topic有没有
 	topic, ok := s.topics[in.topic]
 	if !ok {
+		topic=NewTopic(in.topic)
 		return errors.New("topic not exist")
 	}
 	sub, err := topic.AddScription(in)

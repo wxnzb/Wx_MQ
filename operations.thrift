@@ -140,6 +140,15 @@ struct CloseFetchPartitionResponse{
     1:bool ret
     2:string err
 }
+struct Sub2Request{
+    1:string consumer
+    2:string topic
+    3:string key
+    4:i8 option
+}
+struct Sub2Response{
+    1:bool ret
+}
 //服务器接口
 //在thrift中service相当于给operation_server定义了一个接口
 // push	处理生产者发来的推送消息
@@ -164,6 +173,8 @@ service Server_Operations{
     CloseRaftPartitionResponse CloseRaftPartition(1:CloseRaftPartitionRequest req)
     AddFetchPartitionResponse AddFetchPartition(1:AddFetchPartitionRequest req)
     CloseFetchPartitionResponse CloseFetchPartition(1:CloseFetchPartitionRequest req)
+
+    Sub2Response sub2(1:Sub2Request req)
 }
 //PushRequest 是客户端→服务端，用于写入消息到队列。
 //PubRequest 是服务端→消费者客户端批量发送消息
@@ -229,7 +240,7 @@ struct ConGetBroResponse{
 struct SubRequest{
     1:string consumer
     2:string topic
-    3:string key//这里为什么要用key，感觉用分区就行了
+    3:string key
     4:i8 option
 }
 struct SubResponse{

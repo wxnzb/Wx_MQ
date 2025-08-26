@@ -3,6 +3,7 @@ package server
 import (
 	"Wx_MQ/kitex_gen/api"
 	"Wx_MQ/kitex_gen/api/server_operations"
+	"Wx_MQ/logger"
 	"Wx_MQ/zookeeper"
 	"context"
 	"encoding/json"
@@ -548,8 +549,38 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 	return data, len(data), nil
 
 }
+
+// 这个主要是创建节点
 func (zks *ZKServer) SubHandle(sub Info_in) error {
 	// 在zookeeper上创建sub节点，要是节点已经存在，就加入group
+	_, err := zks.zk.GetPartitionNode(sub.TopicName, sub.PartitionName)
+	if err != nil {
+		logger.DEBUG(logger.DError, "the topic-partition(%v-%v) does not exist\n", sub.TopicName, sub.PartitionName)
+		return errors.New("the topic-partition does not exist")
+	}
+	path := "/NowBlock"
+	dups, _, _ := zks.zk.Con.Children(path)
+	for _, dup := range dups {
+		dupNode, _ := zks.zk.GetDuplicateNode(path + "/" + dup)
+		bro_cli, ok := zks.brokers[dupNode.BrokerName]
+		if !ok {
+			brokerNode, _ := zks.zk.GetBrokerNode(dupNode.BrokerName)
+			bro_cli, err = server_operations.NewClient(zks.Name, client.WithHostPorts(brokerNode.BroHostPort))
+			if err != nil {
+				logger.DEBUG(logger.DError, "broker(%v) host_port(%v) can't connect %v", brokerNode.Name, brokerNode.BroHostPort, err.Error())
+			}
+			zks.rmu.Lock()
+			zks.brokers[dupNode.BrokerName] = bro_cli
+			zks.rmu.Unlock()
+		}
+		//resp,err:=bro_cli.Sub()
+	}
+	err = zks.zk.RegisterNode(zookeeper.SubscriptionNode{
+		Name:          sub.CliName,
+		TopicName:     sub.TopicName,
+		PartitionName: sub.PartitionName,
+		Option:        sub.Option,
+	})
 	return nil
 }
 

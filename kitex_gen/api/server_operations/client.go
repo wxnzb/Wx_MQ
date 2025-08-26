@@ -23,6 +23,7 @@ type Client interface {
 	CloseRaftPartition(ctx context.Context, req *api.CloseRaftPartitionRequest, callOptions ...callopt.Option) (r *api.CloseRaftPartitionResponse, err error)
 	AddFetchPartition(ctx context.Context, req *api.AddFetchPartitionRequest, callOptions ...callopt.Option) (r *api.AddFetchPartitionResponse, err error)
 	CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest, callOptions ...callopt.Option) (r *api.CloseFetchPartitionResponse, err error)
+	Sub2(ctx context.Context, req *api.Sub2Request, callOptions ...callopt.Option) (r *api.Sub2Response, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -112,4 +113,9 @@ func (p *kServer_OperationsClient) AddFetchPartition(ctx context.Context, req *a
 func (p *kServer_OperationsClient) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest, callOptions ...callopt.Option) (r *api.CloseFetchPartitionResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.CloseFetchPartition(ctx, req)
+}
+
+func (p *kServer_OperationsClient) Sub2(ctx context.Context, req *api.Sub2Request, callOptions ...callopt.Option) (r *api.Sub2Response, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Sub2(ctx, req)
 }

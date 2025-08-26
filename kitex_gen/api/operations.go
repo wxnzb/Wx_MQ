@@ -1171,6 +1171,91 @@ var fieldIDToName_CloseFetchPartitionResponse = map[int16]string{
 	2: "err",
 }
 
+type Sub2Request struct {
+	Consumer string `thrift:"consumer,1" frugal:"1,default,string" json:"consumer"`
+	Topic    string `thrift:"topic,2" frugal:"2,default,string" json:"topic"`
+	Key      string `thrift:"key,3" frugal:"3,default,string" json:"key"`
+	Option   int8   `thrift:"option,4" frugal:"4,default,i8" json:"option"`
+}
+
+func NewSub2Request() *Sub2Request {
+	return &Sub2Request{}
+}
+
+func (p *Sub2Request) InitDefault() {
+}
+
+func (p *Sub2Request) GetConsumer() (v string) {
+	return p.Consumer
+}
+
+func (p *Sub2Request) GetTopic() (v string) {
+	return p.Topic
+}
+
+func (p *Sub2Request) GetKey() (v string) {
+	return p.Key
+}
+
+func (p *Sub2Request) GetOption() (v int8) {
+	return p.Option
+}
+func (p *Sub2Request) SetConsumer(val string) {
+	p.Consumer = val
+}
+func (p *Sub2Request) SetTopic(val string) {
+	p.Topic = val
+}
+func (p *Sub2Request) SetKey(val string) {
+	p.Key = val
+}
+func (p *Sub2Request) SetOption(val int8) {
+	p.Option = val
+}
+
+func (p *Sub2Request) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Sub2Request(%+v)", *p)
+}
+
+var fieldIDToName_Sub2Request = map[int16]string{
+	1: "consumer",
+	2: "topic",
+	3: "key",
+	4: "option",
+}
+
+type Sub2Response struct {
+	Ret bool `thrift:"ret,1" frugal:"1,default,bool" json:"ret"`
+}
+
+func NewSub2Response() *Sub2Response {
+	return &Sub2Response{}
+}
+
+func (p *Sub2Response) InitDefault() {
+}
+
+func (p *Sub2Response) GetRet() (v bool) {
+	return p.Ret
+}
+func (p *Sub2Response) SetRet(val bool) {
+	p.Ret = val
+}
+
+func (p *Sub2Response) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Sub2Response(%+v)", *p)
+}
+
+var fieldIDToName_Sub2Response = map[int16]string{
+	1: "ret",
+}
+
 type PubRequest struct {
 	TopicName     string `thrift:"topic_name,1" frugal:"1,default,string" json:"topic_name"`
 	PartitionName string `thrift:"partition_name,2" frugal:"2,default,string" json:"partition_name"`
@@ -2452,6 +2537,8 @@ type Server_Operations interface {
 	AddFetchPartition(ctx context.Context, req *AddFetchPartitionRequest) (r *AddFetchPartitionResponse, err error)
 
 	CloseFetchPartition(ctx context.Context, req *CloseFetchPartitionRequest) (r *CloseFetchPartitionResponse, err error)
+
+	Sub2(ctx context.Context, req *Sub2Request) (r *Sub2Response, err error)
 }
 
 type Server_OperationsPushArgs struct {
@@ -3363,6 +3450,82 @@ func (p *Server_OperationsCloseFetchPartitionResult) String() string {
 }
 
 var fieldIDToName_Server_OperationsCloseFetchPartitionResult = map[int16]string{
+	0: "success",
+}
+
+type Server_OperationsSub2Args struct {
+	Req *Sub2Request `thrift:"req,1" frugal:"1,default,Sub2Request" json:"req"`
+}
+
+func NewServer_OperationsSub2Args() *Server_OperationsSub2Args {
+	return &Server_OperationsSub2Args{}
+}
+
+func (p *Server_OperationsSub2Args) InitDefault() {
+}
+
+var Server_OperationsSub2Args_Req_DEFAULT *Sub2Request
+
+func (p *Server_OperationsSub2Args) GetReq() (v *Sub2Request) {
+	if !p.IsSetReq() {
+		return Server_OperationsSub2Args_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Server_OperationsSub2Args) SetReq(val *Sub2Request) {
+	p.Req = val
+}
+
+func (p *Server_OperationsSub2Args) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Server_OperationsSub2Args) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsSub2Args(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsSub2Args = map[int16]string{
+	1: "req",
+}
+
+type Server_OperationsSub2Result struct {
+	Success *Sub2Response `thrift:"success,0,optional" frugal:"0,optional,Sub2Response" json:"success,omitempty"`
+}
+
+func NewServer_OperationsSub2Result() *Server_OperationsSub2Result {
+	return &Server_OperationsSub2Result{}
+}
+
+func (p *Server_OperationsSub2Result) InitDefault() {
+}
+
+var Server_OperationsSub2Result_Success_DEFAULT *Sub2Response
+
+func (p *Server_OperationsSub2Result) GetSuccess() (v *Sub2Response) {
+	if !p.IsSetSuccess() {
+		return Server_OperationsSub2Result_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Server_OperationsSub2Result) SetSuccess(x interface{}) {
+	p.Success = x.(*Sub2Response)
+}
+
+func (p *Server_OperationsSub2Result) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Server_OperationsSub2Result) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Server_OperationsSub2Result(%+v)", *p)
+}
+
+var fieldIDToName_Server_OperationsSub2Result = map[int16]string{
 	0: "success",
 }
 

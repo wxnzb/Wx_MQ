@@ -305,7 +305,7 @@ func (s *RPCServer) CloseRaftPartition(ctx context.Context, req *api.CloseRaftPa
 		Err: ret,
 	}, nil
 }
-func (s *Server) AddFetchPartition(ctx context.Context, req *api.AddFetchPartitionRequest) (r *api.AddFetchPartitionResponse, err error) {
+func (s *RPCServer) AddFetchPartition(ctx context.Context, req *api.AddFetchPartitionRequest) (r *api.AddFetchPartitionResponse, err error) {
 	var Brokers BrokerS
 	json.Unmarshal(req.Brokers, &Brokers)
 	ret, err := s.server.AddFetchPartitionHandle(Info{
@@ -327,10 +327,25 @@ func (s *Server) AddFetchPartition(ctx context.Context, req *api.AddFetchPartiti
 		Err: ret,
 	}, nil
 }
-func (s *Server) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest) (r *api.CloseFetchPartitionResponse, err error) {
+func (s *RPCServer) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest) (r *api.CloseFetchPartitionResponse, err error) {
 
 }
-
+func (s *RPCServer) Sub2(ctx context.Context, req *api.Sub2Request) (*api.Sub2Response, error) {
+	err := s.server.Sub2Handle(Info{
+		consumer:  req.Consumer,
+		topic:     req.Topic,
+		partition: req.Key,
+		option:    req.Option,
+	})
+	if err != nil {
+		return &api.Sub2Response{
+			Ret: false,
+		}, err
+	}
+	return &api.Sub2Response{
+		Ret: true,
+	}, nil
+}
 func (s *RPCServer) ProGetBro(ctx context.Context, req *api.ProGetBroRequest) (r *api.ProGetBroResponse, err error) {
 	info_out := s.zkServer.ProGetBroHandle(Info_in{
 		TopicName:     req.TopicName,

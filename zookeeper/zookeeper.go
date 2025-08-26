@@ -53,6 +53,14 @@ type PartitionNode struct {
 	Index    int64  `json:index`
 	DupNum   int8   `json:dupnum`
 }
+type SubscriptionNode struct {
+	Name          string `json:"name"`
+	TopicName     string `json:"topicname"`
+	PartitionName string `json:"partitionname"`
+	Option        int8 `json:"option"`
+	//这个还没有用到
+	Groups []byte `json:groups`
+}
 type BlockNode struct {
 	Name         string `json:"name"`
 	Topic        string `json:"topic"`
@@ -78,7 +86,9 @@ func (z *ZK) RegisterNode(node interface{}) (err error) {
 	var bronode BrokerNode
 	var tNode TopicNode
 	var pNode PartitionNode
+	var sNode SubscriptionNode
 	var bloNode BlockNode
+	var dNode DuplicateNode
 	//reflect.TypeOf(node) 反射的作用是获取 node 的类型信息
 	i := reflect.TypeOf(node)
 	var data []byte
@@ -95,11 +105,18 @@ func (z *ZK) RegisterNode(node interface{}) (err error) {
 		pNode = node.(PartitionNode)
 		path = z.TopicRoot + "/" + pNode.Topic + pNode.Name
 		data, err = json.Marshal(pNode)
+	case "SubscriptionNode":
+		sNode = node.(SubscriptionNode)
+		path = z.TopicRoot + "/" + sNode.TopicName + sNode.Name
+		data, err = json.Marshal(sNode)
 	case "BlockNode":
 		bloNode = node.(BlockNode)
 		path = z.TopicRoot + "/" + bloNode.Topic + "/" + bloNode.Partition + "/" + bloNode.Name
 		data, err = json.Marshal(bloNode)
-	}
+	case "DuplicateNode":
+		dNode = node.(DuplicateNode)
+		path = z.TopicRoot + "/" + dNode.Topic + "/" + dNode.Partition + "/" + dNode.Name
+		data, err = json.Marshal(dNode)
 	if err != nil {
 		return err
 	}

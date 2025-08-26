@@ -1,0 +1,17 @@
+Sub(Consumer->broker server),参数:
+
+consumer
+
+topic,part
+
+option
+
+内部调用SubHandle函数,传入参数:Info_in,把上面的给他传进去
+
+首先构造path:=zookeeper的Zkserver的zk的TopicRoot+...+Info_in的part,然后调用zkserver的zk的GetPartitionNode,将path穿入来判断这个分区节点是否存在,然后给path+="NowBlock",然后调用zkserver的zk的Con的children函数得到dups,传入参数path,然后for循环遍历dups,调用GetDupNode,传入参数path+dup,得到DuplicaNode,然后在zkserver的Brokers中通过DuplicaNodeNode的BrokerName找到bro_cli,要是没有,就调用zkserver的zk的GetBrokerNode,传入参数是zookeeper的BrokerRoot+BrokerName得到brokerNode,目的是得到他的HostPort来创建bro_cli,然后将brokerNode的Name和bro_cli这个对应关系存入zkserver的Brokers中,然后调用bro_cli的rpc的Sub2函数,最后在调用zkserver的zk的RegisterNode,将SubscriptionNode传入:
+
+Name
+
+topic,part
+
+Subtype:Info_in的option

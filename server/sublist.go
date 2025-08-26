@@ -40,23 +40,23 @@ type Topic struct {
 }
 
 // 创建一个新的topic,这里push里面必须要有topic和key
-func NewTopic(topicName string) *Topic {
+func NewTopic(brokerName, topicName string) *Topic {
 	t := &Topic{
 		rmu:     sync.RWMutex{},
 		Parts:   make(map[string]*Partition),
 		SubList: make(map[string]*SubScription),
 		Files:   make(map[string]*File),
 		Name:    topicName,
+		Broker:  brokerName,
 	}
 	str, _ := os.Getwd()
-	str += "/" + ip_name + "/" + topicName
-	CreateDir(str)
-	//这个自会进行判断
-	// if push.key != "" {
-	// 	part, file := NewPartition(push)
-	// 	t.Parts[push.key] = part
-	// 	t.Files[push.key] = file
-	// }
+	//str += "/" + ip_name + "/" + topicName
+	str += "/" + brokerName + "/" + topicName
+	err := CreateDir(str)
+	if err != nil {
+		logger.DEBUG(logger.DError, "create list failed %v\n", err.Error())
+		return nil
+	}
 	return t
 }
 func (t *Topic) AddPartition(partName string) {
@@ -537,12 +537,12 @@ func (sub *SubScription) AddConsumer(in Info) {
 	defer sub.rmu.Unlock()
 	switch in.option {
 	//点对点订阅，全部放在一个消费者组里面
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
 			sub.groups[0].AddConsumer(in.consumer)
 		}
 	//按key发布的订阅，创建新的消费者组
-	case TOPIC_KEY_PSB:
+	case TOPIC_KEY_PSB_PUSH:
 		{
 			group := NewGroup(in.topic, in.consumer)
 			sub.groups = append(sub.groups, group)
