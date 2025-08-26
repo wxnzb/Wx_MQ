@@ -328,7 +328,9 @@ func (s *RPCServer) AddFetchPartition(ctx context.Context, req *api.AddFetchPart
 	}, nil
 }
 func (s *RPCServer) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest) (r *api.CloseFetchPartitionResponse, err error) {
-
+	return &api.CloseFetchPartitionResponse{
+		Ret: true,
+	}, nil
 }
 func (s *RPCServer) Sub2(ctx context.Context, req *api.Sub2Request) (*api.Sub2Response, error) {
 	err := s.server.Sub2Handle(Info{
@@ -461,7 +463,7 @@ func (s *RPCServer) UpdateDup(ctx context.Context, req *api.UpdateDupRequest) (r
 func (s *RPCServer) BroInfo(ctx context.Context, req *api.BroInfoRequest) (r *api.BroInfoResponse, err error) {
 	err = s.zkServer.BroInfoHandle(req.BroName, req.BroHostPort)
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 		return &api.BroInfoResponse{
 			Ret: false,
 		}, err

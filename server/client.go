@@ -83,12 +83,12 @@ func (con *ToConsumer) CheckConsumer() bool {
 }
 
 // 查看这个消费者是否订阅了这个sub
-func (con *ToConsumer) CheckSubscription(sub_name string) bool {
-	con.rmu.RLock()
-	defer con.rmu.RUnlock()
-	_, ok := con.subList[sub_name] //由此可知：SubScription这个结构体中一定要有他自己的名字才能连接起来
-	return ok
-}
+// func (con *ToConsumer) CheckSubscription(sub_name string) bool {
+// 	con.rmu.RLock()
+// 	defer con.rmu.RUnlock()
+// 	_, ok := con.subList[sub_name] //由此可知：SubScription这个结构体中一定要有他自己的名字才能连接起来
+// 	return ok
+// }
 
 // 消费者订阅消息
 func (con *ToConsumer) AddScription(sub *SubScription) {
@@ -111,24 +111,24 @@ func (con *ToConsumer) GetToConsumer() *client_operations.Client {
 	return &con.consumer //这里为什么不直接将ToConsumer操作消费者的接口写成指针形式呢？？？
 }
 
-// 获取消费者状态
-func (con *ToConsumer) GetState() string {
-	con.rmu.RLock()
-	defer con.rmu.Unlock()
-	return con.state
-}
+// // 获取消费者状态
+// func (con *ToConsumer) GetState() string {
+// 	con.rmu.RLock()
+// 	defer con.rmu.Unlock()
+// 	return con.state
+// }
 
-// 获取消费者订阅的Sub
-func (con *ToConsumer) GetSub(sub_name string) *SubScription {
-	con.rmu.RLock()
-	defer con.rmu.RUnlock()
-	//先这样做吧，这里应该先判断一下她存在不？？
-	ok := con.CheckSubscription(sub_name)
-	if !ok {
-		DEBUG(dError, "no such sub:%s", sub_name)
-	}
-	return con.subList[sub_name]
-}
+// // 获取消费者订阅的Sub
+// func (con *ToConsumer) GetSub(sub_name string) *SubScription {
+// 	con.rmu.RLock()
+// 	defer con.rmu.RUnlock()
+// 	//先这样做吧，这里应该先判断一下她存在不？？
+// 	ok := con.CheckSubscription(sub_name)
+// 	if !ok {
+// 		DEBUG(dError, "no such sub:%s", sub_name)
+// 	}
+// 	return con.subList[sub_name]
+// }
 
 // --------------------------------------------------------------------------------
 // 这是消费组，一个消费组可以消费多个topic
@@ -187,20 +187,20 @@ func (g *Group) DownConsumer(consumer_name string) error {
 	return nil
 }
 
-// 要是消费者重新向服务端发送消息证明他还活着，恢复消费者
-func (g *Group) RecoverConsumer(consumer_name string) error {
-	g.rmu.Lock()
-	defer g.rmu.Unlock()
-	alive, ok := g.consumers[consumer_name]
-	if !ok {
-		return errors.New("no such consumer")
-	}
-	if alive {
-		return errors.New("consumer 本来就是 alive的")
-	}
-	g.consumers[consumer_name] = true
-	return nil
-}
+// // 要是消费者重新向服务端发送消息证明他还活着，恢复消费者
+// func (g *Group) RecoverConsumer(consumer_name string) error {
+// 	g.rmu.Lock()
+// 	defer g.rmu.Unlock()
+// 	alive, ok := g.consumers[consumer_name]
+// 	if !ok {
+// 		return errors.New("no such consumer")
+// 	}
+// 	if alive {
+// 		return errors.New("consumer 本来就是 alive的")
+// 	}
+// 	g.consumers[consumer_name] = true
+// 	return nil
+// }
 
 // -------------------------------------------------------------------
 // 一个block包含一个node和多个messages多批消息，每批消息都有自己的index]
@@ -337,7 +337,7 @@ func (p *Part) GetDone(close chan *Part) {
 				num++
 				err := p.AddBlock()
 				if err != nil {
-					DEBUG(dError, err.Error())
+					logger.DEBUG(logger.DError, "%v\n", err.Error())
 				}
 				if p.file.filePath != p.partition_name+"NowBlock.txt" && err == errors.New("read All file,don't find this index") {
 					p.state = DOWN

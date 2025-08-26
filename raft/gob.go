@@ -7,8 +7,6 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
-
-	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 type LabEncoder struct {
@@ -83,7 +81,7 @@ func checkDefault(v interface{}) {
 	if v == nil {
 		return
 	}
-	return checkDefault1(reflect.ValueOf(v), 1, "")
+	checkDefault1(reflect.ValueOf(v), 1, "")
 }
 
 // 递归检查value是不是默认值，要是不是，就加1
@@ -101,7 +99,7 @@ func checkDefault1(v reflect.Value, depth int, name string) {
 			if name1 != "" {
 				name1 = name + name1
 			}
-			checkDefault1(value.Field(i), depth+1, name1)
+			checkDefault1(v.Field(i), depth+1, name1)
 		}
 		return
 	case reflect.Ptr:
@@ -121,7 +119,7 @@ func checkDefault1(v reflect.Value, depth int, name string) {
 }
 func Register(v interface{}) {
 	checkValue(v)
-	return gob.Register(v)
+	gob.Register(v)
 }
 
 func RegisterName(name string, v interface{}) {

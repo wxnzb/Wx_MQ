@@ -167,7 +167,7 @@ func (t *Topic) prepareAcceptHandle(in Info) (ret string, err error) {
 
 	part, ok := t.Parts[in.partition]
 	if !ok {
-		part = NewPartition(in.topic, in.partition)
+		part = NewPartition(t.Broker, in.topic, in.partition)
 		t.Parts[in.partition] = part
 	}
 	//设置partition值噢部分file的fd,start_index等信息
@@ -181,9 +181,9 @@ func (t *Topic) prepareAcceptHandle(in Info) (ret string, err error) {
 	t.rmu.Unlock()
 	ret = part.StartGetMessage(file, fd, in)
 	if ret == OK {
-
+		logger.DEBUG(logger.DLog, "topic(%v)_partition(%v) Start success\n", in.topic, in.partition)
 	} else {
-
+		logger.DEBUG(logger.DLog, "topic(%v)_partition(%v) Had Started\n", in.topic, in.partition)
 	}
 	return ret, nil
 }
@@ -317,7 +317,7 @@ func (p *Partition) StartGetMessage(file *File, fd *os.File, in Info) string {
 		p.file = file
 		p.fd = fd
 		p.index = file.GetIndex(fd)
-		p.start_index = p.index
+		p.start_index = p.index //所以这个为什么要等于上面那个
 		ret = OK
 	}
 	return ret
@@ -515,7 +515,7 @@ func (s *SubScription) AddPSBConfig(in Info, part_name string, file *File, zkcli
 		config := NewPSBConfigPush(in, file, zkclient)
 		s.PSB_config[part_name+in.consumer] = config
 	} else {
-
+		logger.DEBUG(logger.DLog, "This PSB has Start\n")
 	}
 	s.rmu.Unlock()
 }

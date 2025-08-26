@@ -60,4 +60,5 @@ func (p *Persister) Copy() *Persister {
 	defer p.rmu.RUnlock()
 	s.raftState = p.raftState
 	s.snapShot = p.snapShot
+	return s
 }
