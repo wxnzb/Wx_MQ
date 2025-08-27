@@ -668,6 +668,20 @@ func (s *Server) FetchMsg(in Info, broker *server_operations.Client, topic *Topi
 	}
 	return ret, err
 }
+func (s *Server) CloseFetchPartitionHandle(in Info) (ret string, err error) {
+	str := in.topic + in.partition + in.file_name
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	_, ok := s.parts_fetch[str]
+	if !ok {
+		ret := "this topic-partition is not in this brpoker"
+		logger.DEBUG(logger.DError, "this topic(%v)-partition(%v) is not in this brpoker\n", in.topic_name, in.part_name)
+		return ret, errors.New(ret)
+	} else {
+		delete(s.parts_fetch, str)
+		return ret, err
+	}
+}
 
 // 感觉暂时不需要这个了,因为现在把他变到zkserver了
 type SubResponse struct {

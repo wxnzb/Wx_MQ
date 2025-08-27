@@ -328,8 +328,19 @@ func (s *RPCServer) AddFetchPartition(ctx context.Context, req *api.AddFetchPart
 	}, nil
 }
 func (s *RPCServer) CloseFetchPartition(ctx context.Context, req *api.CloseFetchPartitionRequest) (r *api.CloseFetchPartitionResponse, err error) {
+	ret, err := s.server.CloseRaftPartitionHandle(Info{
+		topic:     req.TopicName,
+		partition: req.PartName,
+	})
+	if err != nil {
+		return &api.CloseFetchPartitionResponse{
+			Ret: false,
+			Err: ret,
+		}, err
+	}
 	return &api.CloseFetchPartitionResponse{
 		Ret: true,
+		Err: ret,
 	}, nil
 }
 func (s *RPCServer) Sub2(ctx context.Context, req *api.Sub2Request) (*api.Sub2Response, error) {
