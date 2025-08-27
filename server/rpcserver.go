@@ -272,6 +272,8 @@ type BrokerS struct {
 func (s *RPCServer) AddRaftPartition(ctx context.Context, req *api.AddRaftPartitionRequest) (r *api.AddRaftPartitionResponse, err error) {
 	var Brokers BrokerS
 	json.Unmarshal(req.Brokers, &Brokers)
+	logger.DEBUG(logger.DLog, "the brokers in rpc is %v\n", req.Brokers)
+	logger.DEBUG(logger.DLog, "Unmarshal brokers is %v\n", Brokers.RaftBrokers)
 	ret, err := s.server.AddRaftPartitionHandle(Info{
 		topic:     req.TopicName,
 		partition: req.PartName,

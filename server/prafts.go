@@ -270,7 +270,7 @@ func (praft *parts_raft) AddPart_Raft(peers []*raft_operations.Client, me int, t
 	_, ok := praft.parts[str]
 	if !ok {
 		per := &raft.Persister{}
-		part_raft := raft.Make(peers, me, per, aplych, topic, part)
+		part_raft := raft.Make(peers, me, per, praft.applyCh, topic, part)
 		praft.parts[str] = part_raft
 	}
 	praft.rmu.Unlock()

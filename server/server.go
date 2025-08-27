@@ -418,6 +418,7 @@ func (s *Server) PrepareStateHandle(in Info) (ret string, err error) {
 
 // 给当前 Server 启动/加入某个 partition 的 Raft 群组
 func (s *Server) AddRaftPartitionHandle(in Info) (ret string, err error) {
+	logger.DEBUG(logger.DLog, "the raft brokers is %v\n", in.brokers)
 	s.rmu.Lock()
 	nodes := make(map[int]string)
 	for k, v := range in.brok_me {
@@ -426,8 +427,10 @@ func (s *Server) AddRaftPartitionHandle(in Info) (ret string, err error) {
 	index := 0
 	var peers []*raft_operations.Client
 	for index < len(in.brokers) {
+		logger.DEBUG(logger.DLog, "%v index (%v)  Me(%v)   k(%v) == Name(%v)\n", s.name, index, index, nodes[index], s.name)
 		bro_cli, ok := s.brokers[nodes[index]]
 		if !ok {
+			logger.DEBUG(logger.DError, "%v new raft client fail err %v\n", s.name, err.Error())
 			cli, err := raft_operations.NewClient(s.name, client.WithHostPorts(in.brokers[nodes[index]]))
 			if err != nil {
 				return ret, err
@@ -435,13 +438,15 @@ func (s *Server) AddRaftPartitionHandle(in Info) (ret string, err error) {
 			s.brokers[nodes[index]] = bro_cli
 			bro_cli = &cli
 		} else {
-
+			logger.DEBUG(logger.DLog, "%v had client to broker %v\n", s.name, nodes[index])
 		}
 		peers = append(peers, bro_cli)
 		index++
 	}
+	logger.DEBUG(logger.DLog, "the Broker %v raft Me %v\n", s.name, s.me)
 	s.parts_rafts.AddPart_Raft(peers, s.me, in.topic, in.partition, s.aplych)
 	s.rmu.Unlock()
+	logger.DEBUG(logger.DLog, "the %v add over\n", s.name)
 	return ret, err
 }
 func (s *Server) CloseRaftPartitionHandle(in Info) (ret string, err error) {
