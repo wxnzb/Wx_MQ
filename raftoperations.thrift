@@ -52,8 +52,15 @@ struct SnapShotArgs{
 struct SnapShotReply{
     1:i8 Term
 }
+struct PingPongArgs{
+    1:bool ping
+}
+struct PingPongReply{
+    1:bool pong
+}
 service Raft_Operations{
     ResponseVoteReply RequestVote(1:RequestVoteArgs args),
     AppendEntriesReply AppendEntries(1:AppendEntriesArgs args),
     SnapShotReply SnapShot(1:SnapShotArgs args)
+    PingPongReply pingpong(1:PingPongArgs req)
 }

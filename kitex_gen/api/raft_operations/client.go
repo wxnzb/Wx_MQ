@@ -14,6 +14,7 @@ type Client interface {
 	RequestVote(ctx context.Context, args_ *api.RequestVoteArgs_, callOptions ...callopt.Option) (r *api.ResponseVoteReply, err error)
 	AppendEntries(ctx context.Context, args_ *api.AppendEntriesArgs_, callOptions ...callopt.Option) (r *api.AppendEntriesReply, err error)
 	SnapShot(ctx context.Context, args_ *api.SnapShotArgs_, callOptions ...callopt.Option) (r *api.SnapShotReply, err error)
+	Pingpong(ctx context.Context, req *api.PingPongArgs_, callOptions ...callopt.Option) (r *api.PingPongReply, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -58,4 +59,9 @@ func (p *kRaft_OperationsClient) AppendEntries(ctx context.Context, args_ *api.A
 func (p *kRaft_OperationsClient) SnapShot(ctx context.Context, args_ *api.SnapShotArgs_, callOptions ...callopt.Option) (r *api.SnapShotReply, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.SnapShot(ctx, args_)
+}
+
+func (p *kRaft_OperationsClient) Pingpong(ctx context.Context, req *api.PingPongArgs_, callOptions ...callopt.Option) (r *api.PingPongReply, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.Pingpong(ctx, req)
 }

@@ -106,11 +106,12 @@ type Options struct {
 type Top_Info struct {
 	TopicName  string
 	Partitions map[string]Part_Info
-	//Pnums    int64
+	Pnums      int
 }
 type Part_Info struct {
 	PartitionName string
 	Blocks        map[string]Block_Info
+	Bnums         int
 }
 type Block_Info struct {
 	StartIndex int64

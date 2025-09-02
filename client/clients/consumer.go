@@ -135,6 +135,7 @@ type InfoReq struct {
 	Option    int8
 	Bufs      map[int64]*api.PubRequest
 	Cli       server_operations.Client
+	Size      int8
 }
 
 func NewInfoReq(topic, partition string, offset int64) InfoReq {
@@ -201,7 +202,7 @@ func (con *Consumer) StartGetToBroker(parts []PartKey, info InfoReq) (ret string
 			continue
 		}
 		req := api.InfoGetRequest{
-			Cli_Name:       con.Name,
+			Consumer_Name:  con.Name,
 			Topic_Name:     info.Topic,
 			Partition_Name: part.Name,
 			Offset:         info.Offset,
@@ -237,6 +238,7 @@ func (con *Consumer) Pull(info InfoReq) (int64, int64, []Message, error) {
 		Key:        info.Partition,
 		Offset:     info.Offset,
 		Option:     info.Option,
+		Size:       info.Size,
 	})
 	if err != nil {
 		return 0, 0, nil, err

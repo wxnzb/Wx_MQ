@@ -14,7 +14,7 @@ type PushRequest struct {
 	Message    []byte `thrift:"message,4" frugal:"4,default,binary" json:"message"`
 	Size       int8   `thrift:"Size,5" frugal:"5,default,i8" json:"Size"`
 	Ack        int8   `thrift:"Ack,6" frugal:"6,default,i8" json:"Ack"`
-	Comindex   int64  `thrift:"Comindex,7" frugal:"7,default,i64" json:"Comindex"`
+	Cmdindex   int64  `thrift:"Cmdindex,7" frugal:"7,default,i64" json:"Cmdindex"`
 }
 
 func NewPushRequest() *PushRequest {
@@ -48,8 +48,8 @@ func (p *PushRequest) GetAck() (v int8) {
 	return p.Ack
 }
 
-func (p *PushRequest) GetComindex() (v int64) {
-	return p.Comindex
+func (p *PushRequest) GetCmdindex() (v int64) {
+	return p.Cmdindex
 }
 func (p *PushRequest) SetProducerId(val string) {
 	p.ProducerId = val
@@ -69,8 +69,8 @@ func (p *PushRequest) SetSize(val int8) {
 func (p *PushRequest) SetAck(val int8) {
 	p.Ack = val
 }
-func (p *PushRequest) SetComindex(val int64) {
-	p.Comindex = val
+func (p *PushRequest) SetCmdindex(val int64) {
+	p.Cmdindex = val
 }
 
 func (p *PushRequest) String() string {
@@ -87,7 +87,7 @@ var fieldIDToName_PushRequest = map[int16]string{
 	4: "message",
 	5: "Size",
 	6: "Ack",
-	7: "Comindex",
+	7: "Cmdindex",
 }
 
 type PushResponse struct {

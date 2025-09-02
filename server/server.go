@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	cl "github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/server"
 
 	//"github.com/docker/docker/client"
 	"context"
@@ -73,13 +74,24 @@ func NewServer(zkInfo zookeeper.ZKInfo) *Server {
 }
 
 // 这个broker先和zk建立联系，将这个broker向zk进行注册
-func (s *Server) make(opt Options) {
+func (s *Server) make(opt Options, opt_cli []server.Option) {
 	s.topics = make(map[string]*Topic)
 	s.consumers = make(map[string]*ToConsumer)
-	ip_name = GetIpPort() //本地ipport
+	s.brokers = make(map[string]*raft_operations.Client)
+	s.parts_fetch = make(map[string]string)
+	s.brokers_fetch = make(map[string]*server_operations.Client)
+	s.aplych = make(chan Info)
+
+	//ip_name = GetIpPort() //本地ipport
 	//为 当前 Broker 节点 创建一个 本地存储目录。目录名是 当前工作目录/ip_name,这是为了把broker的日志什么的存进去
 	s.CheckList()
 	s.name = opt.Name
+	s.me = opt.Me
+
+	//在这个节点的后台启动一个raft
+	s.parts_rafts = NewPartRaft()
+	go s.parts_rafts.make(opt.Name, opt_cli, s.aplych, s.me)
+	s.parts_rafts.StartServer()
 	//向zk注册自己，也就是让
 	s.zkclient, _ = zkserver_operations.NewClient(opt.Name, cl.WithHostPorts(opt.ZKServerHostPort))
 	resp, err := s.zkclient.BroInfo(context.Background(), &api.BroInfoRequest{
@@ -87,25 +99,63 @@ func (s *Server) make(opt Options) {
 		BroHostPort: opt.BrokerHostPort,
 	})
 	if resp.Ret == false || err != nil {
-		DEBUG(dError, "broker register failed")
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
 	//s.InitBroker()
 	//创建一个永久节点在zk中，/brokerroot/brokername里面存放了这个broker的json的name和ipport，作用：要是broker挂了，历史数据在者可以找到；用于其他节点的发现
 	err = s.zk.RegisterNode(zookeeper.BrokerNode{
-		Name:     s.name,
-		HostPort: opt.BrokerHostPort,
+		Name:         s.name,
+		Me:           s.me,
+		BroHostPort:  opt.BrokerHostPort,
+		RaftHostPort: opt.RaftHostPort,
 	})
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
 	//创建临时节点，表示当前Broker 是否在线，为什么要用，broker挂了，但是永久节点还在，其他节点无法判断这个broker的状态，所以可以通过这个函数检查这个broker的状态
 	err = s.zk.CreateState(s.name)
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
 	}
-	//在这个节点的后台启动一个raft//这里还需要详细了解
-	s.parts_rafts = NewPartRaft()
-	go s.parts_rafts.make(opt.Name, opt.RaftHostPort, s.aplych)
+	//开启获取管道中的内容，写入文件或更新leader
+	go s.GetApplych(s.aplych)
+}
+
+// 接收applych管道的内容
+// 写入partition文件中
+func (s *Server) GetApplych(applych chan Info) {
+
+	for msg := range applych {
+
+		if msg.producer == "Leader" {
+			s.BecomeLeader(msg) //成为leader
+		} else {
+			s.rmu.RLock()
+			topic, ok := s.topics[msg.topic]
+			s.rmu.RUnlock()
+
+			logger.DEBUG(logger.DLog, "S%d the message from applych is %v\n", s.me, msg)
+			if !ok {
+				logger.DEBUG(logger.DError, "topic(%v) is not in this broker\n", msg.topic)
+			} else {
+				msg.me = s.me
+				msg.BrokerName = s.name
+				msg.zkclient = &s.zkclient
+				msg.file_name = "NowBlock.txt"
+				topic.AddMessage(msg) //信息同步
+			}
+		}
+	}
+}
+func (s *Server) BecomeLeader(in Info) {
+	resp, err := s.zkclient.BecomeLeader(context.Background(), &api.BecomeLeaderRequest{
+		Broker: s.name,
+		Topic:  in.topic,
+		Part:   in.partition,
+	})
+	if err != nil || !resp.Ret {
+		logger.DEBUG(logger.DError, "%v\n", err.Error())
+	}
 }
 func (s *Server) InitBroker() {
 	s.rmu.Lock()
@@ -131,23 +181,14 @@ func (s *Server) InitBroker() {
 //下面这些是根据broker的信息重新分配t-p
 
 func (s *Server) HandleTopics(topics map[string]Top_Info) {
-	for topic_name, top := range topics {
+	for topic_name, topic := range topics {
 		_, ok := s.topics[topic_name]
 		if !ok {
-			s.HandlePartitions(topic_name, top.Partitions)
+			top := NewTopic(s.name, topic_name)
+			top.HandlePartitions(topic.Partitions)
+			s.topics[topic_name] = top
 		} else {
-			DEBUG(dWarn, "This topic(%v) had in s.topics\n", topic_name)
-		}
-	}
-}
-func (s *Server) HandlePartitions(topic_name string, partitions map[string]Part_Info) {
-	for partition_name, part := range partitions {
-		_, ok := s.topics[topic_name].Parts[partition_name]
-		if !ok {
-			s.topics[topic_name] = NewTopic(topic_name)
-			s.HandleBlocks(topic_name, partition_name, part.Blocks)
-		} else {
-			DEBUG(dWarn, "This partition(%v) had in s.topics[%v].Parts\n", partition_name, topic_name)
+			logger.DEBUG(logger.DWarn, "This topic(%v) had in s.topics\n", topic_name)
 		}
 	}
 }
@@ -223,7 +264,7 @@ func (s *Server) PushHandle(push Info) (ret string, err error) {
 
 	if !ok {
 		ret = "this topic is not in this broker"
-		logger.DEBUG(logger.DError, "Topic %v,is not in this broker", in.topicName)
+		logger.DEBUG(logger.DError, "Topic %v,is not in this broker", push.topic)
 		return ret, errors.New(ret)
 	}
 
@@ -255,7 +296,7 @@ type MSGS struct {
 }
 
 func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
-	logger.DEBUG(logger.DLog, "%v get pull request the in.op(%v) TOP_PTP_PULL(%v)\n", s.Name, in.option, TOPIC_NIL_PTP_PULL)
+	logger.DEBUG(logger.DLog, "%v get pull request the in.op(%v) TOP_PTP_PULL(%v)\n", s.name, pullRequest.option, TOPIC_NIL_PTP_PULL)
 	if pullRequest.option == TOPIC_NIL_PTP_PULL {
 		//更新消费者偏移量并写入zookeeper记录消费者这次读取的位置,也就是要从哪里开始拉取
 		s.zkclient.UpdateOffset(context.Background(), &api.UpdateOffsetRequest{
@@ -276,7 +317,7 @@ func (s *Server) PullHandle(pullRequest Info) (MSGS, error) {
 
 // 处理消费者的连接请求,将消费者添加到这个broker里面
 func (s *Server) InfoHandle(ip_port string) (err error) {
-	logger.DEBUG(logger.DLog, "get consumer's ip_port %v\n", ipport)
+	logger.DEBUG(logger.DLog, "get consumer's ip_port %v\n", ip_port)
 	s.rmu.Lock()
 	consumer, ok := s.consumers[ip_port]
 	if !ok {
@@ -350,7 +391,7 @@ func (s *Server) StartGet(req Info) (err error) {
 			s.rmu.RLock()
 			defer s.rmu.RUnlock()
 			sub_name := GetStringFromSub(req.topic, req.partition, req.option)
-			logger.DEBUG(logger.DLog, "consumer(%v) start to get topic(%v) partition(%v) offset(%v) in sub(%v)\n", in.consumer, in.topicName, in.partName, in.offset, sub_name)
+			logger.DEBUG(logger.DLog, "consumer(%v) start to get topic(%v) partition(%v) offset(%v) in sub(%v)\n", req.consumer, req.topic, req.partition, req.offset, sub_name)
 			return s.topics[req.topic].StartToGetHandle(sub_name, req, s.consumers[req.consumer_ipname].GetToConsumer())
 		}
 	default:
@@ -367,7 +408,7 @@ func (s *Server) PrepareAcceptHandle(in Info) (ret string, err error) {
 	topic, ok := s.topics[in.topic]
 	//创建一个新的topic
 	if !ok {
-		topic = NewTopic(in.topic)
+		topic = NewTopic(s.name, in.topic)
 		s.topics[in.topic] = topic
 	}
 	s.rmu.Unlock()
@@ -395,7 +436,7 @@ func (s *Server) PrepareSendHandle(in Info) (ret string, err error) {
 	topic, ok := s.topics[in.topic]
 	//创建一个新的topic
 	if !ok {
-		topic = NewTopic(in.topic)
+		topic = NewTopic(s.name, in.topic)
 		s.topics[in.topic] = topic
 	}
 	s.rmu.Unlock()
@@ -680,7 +721,7 @@ func (s *Server) CloseFetchPartitionHandle(in Info) (ret string, err error) {
 	_, ok := s.parts_fetch[str]
 	if !ok {
 		ret := "this topic-partition is not in this brpoker"
-		logger.DEBUG(logger.DError, "this topic(%v)-partition(%v) is not in this brpoker\n", in.topic_name, in.part_name)
+		logger.DEBUG(logger.DError, "this topic(%v)-partition(%v) is not in this brpoker\n", in.topic, in.partition)
 		return ret, errors.New(ret)
 	} else {
 		delete(s.parts_fetch, str)
@@ -703,7 +744,7 @@ func (s *Server) Sub2Handle(in Info) (err error) {
 	//这里还得先判断一下这个topic有没有
 	topic, ok := s.topics[in.topic]
 	if !ok {
-		topic = NewTopic(in.topic)
+		topic = NewTopic(s.name, in.topic)
 		return errors.New("topic not exist")
 	}
 	sub, err := topic.AddScription(in)

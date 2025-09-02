@@ -248,7 +248,7 @@ func (p *PushRequest) FastReadField7(buf []byte) (int, error) {
 		offset += l
 		_field = v
 	}
-	p.Comindex = _field
+	p.Cmdindex = _field
 	return offset, nil
 }
 
@@ -331,7 +331,7 @@ func (p *PushRequest) fastWriteField6(buf []byte, w thrift.NocopyWriter) int {
 func (p *PushRequest) fastWriteField7(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I64, 7)
-	offset += thrift.Binary.WriteI64(buf[offset:], p.Comindex)
+	offset += thrift.Binary.WriteI64(buf[offset:], p.Cmdindex)
 	return offset
 }
 

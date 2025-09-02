@@ -16,7 +16,6 @@ import (
 	"Wx_MQ/client/clients"
 
 	"github.com/cloudwego/kitex/client"
-	"github.com/docker/docker/client"
 )
 
 type ZKServer struct {
@@ -142,10 +141,10 @@ func (zks *ZKServer) ProGetBroHandle(req Info_in) Info_out {
 			ret = "Partition state is -2"
 		} else {
 			resp, err := bro_cli.PrepareState(context.Background(), &api.PrepareStateRequest{
-				TopicName:     block.Topic,
-				PartitionName: block.Partition,
-				State:         PartitionNode.Option,
-				Brokers:       data,
+				TopicName: block.Topic,
+				PartName:  block.Partition,
+				State:     PartitionNode.Option,
+				Brokers:   data,
 			})
 			if err != nil || !resp.Ret {
 				//
@@ -533,7 +532,7 @@ func (zks *ZKServer) ConGetBroHandle(info Info_in) (rets []byte, size int, err e
 	partkeys = zks.SendPrepare(Parts, info)
 	//没太看懂这里
 	parts := clients.Parts{
-		Parts: partkeys,
+		PartKeys: partkeys,
 	}
 	data, err := json.Marshal(parts)
 	var nodes clients.Parts
@@ -588,7 +587,7 @@ func (zks *ZKServer) SubHandle(sub Info_in) error {
 func (zks *ZKServer) BroInfoHandle(broname, brohostport string) error {
 	brocli, err := server_operations.NewClient(zks.Name, client.WithHostPorts(brohostport))
 	if err != nil {
-		DEBUG(dError, err.Error())
+		logger.DEBUG(logger.DError, "broker(%v) host_port(%v) can't connect %v", broname, brohostport, err.Error())
 	}
 	zks.rmu.Lock()
 	zks.brokers[broname] = brocli
@@ -665,7 +664,7 @@ func (zks *ZKServer) ConStartGetBroHandle(in Info_in) (rets []byte, size int, er
 	partkeys := zks.SendPrepare(Parts, in)
 	data, err := json.Marshal(partkeys)
 	if err != nil {
-		DEBUG(dError, "turn partkeys to json fail %v", err.Error())
+		logger.DEBUG(logger.DError, "marshal partkeys error %v", err.Error())
 	}
 	return data, len(partkeys), nil
 

@@ -60,7 +60,7 @@ func NewTopic(brokerName, topicName string) *Topic {
 	return t
 }
 func (t *Topic) AddPartition(partName string) {
-	part := NewPartition(t.Name, partName)
+	part := NewPartition(t.Broker, t.Name, partName)
 	t.rmu.Lock()
 	t.Parts[partName] = part
 	t.rmu.Unlock()
@@ -254,7 +254,7 @@ func (t *Topic) PullMessage(pullRequest Info) (MSGS, error) {
 	sub, ok := t.SubList[sub_name]
 	t.rmu.RUnlock()
 	if !ok {
-		str := fmt.Sprintf("%v this topic(%v) don't have sub(%v) the sublist is %v for %v\n", t.Broker, t.Name, sub_name, t.subList, in.consumer)
+		str := fmt.Sprintf("%v this topic(%v) don't have sub(%v) the sublist is %v for %v\n", t.Broker, t.Name, sub_name, t.SubList, pullRequest.consumer)
 		logger.DEBUG(logger.DError, "%v\n", str)
 		return MSGS{}, errors.New("no this sub")
 	}
@@ -555,14 +555,14 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 	sub.rmu.Lock()
 	switch sub.option {
 	//点对点就只有一个消费者组group[0],因此无需遍历直接删除就好，用下面那个我感觉也是没有问题的
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
 			sub.groups[0].DownConsumer(consumer_name)
 			//sub.consistent.Reduce(consumer_name) //为啥这个需要下面哪个不需要？？？？？
 
 		}
 		//因为广播的话有很多消费者组，你需要在这里面先找到消费者，然后将他标记为不活跃
-	case TOPIC_KEY_PSB:
+	case TOPIC_KEY_PSB_PUSH:
 		{
 			for _, group := range sub.groups {
 				group.DownConsumer(consumer_name)
@@ -576,13 +576,13 @@ func (sub *SubScription) shutDownConsumer(consumer_name string) string {
 func (sub *SubScription) ReduceConsumer(in Info) {
 	sub.rmu.Lock()
 	switch in.option {
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
 			sub.groups[0].DeleteConsumer(in.consumer)
 			sub.PTP_config.DeleteConsumer(in.partition, in.consumer)
 
 		}
-	case TOPIC_KEY_PSB:
+	case TOPIC_KEY_PSB_PUSH:
 		{
 			for _, group := range sub.groups {
 				group.DeleteConsumer(in.consumer)
@@ -596,12 +596,12 @@ func (sub *SubScription) ReduceConsumer(in Info) {
 func (sub *SubScription) RecoverConsumer(in Info) {
 	sub.rmu.Lock()
 	switch sub.option {
-	case TOPIC_NIL_PTP:
+	case TOPIC_NIL_PTP_PUSH:
 		{
 			sub.groups[0].RecoverConsumer(in.consumer)
 			//sub.consistent.Add(req.consumer)
 		}
-	case TOPIC_KEY_PSB:
+	case TOPIC_KEY_PSB_PUSH:
 		{
 			group := NewGroup(in.topic, in.consumer)
 			sub.groups = append(sub.groups, group)
@@ -905,7 +905,7 @@ func TurnConsistent(arry []string) *Consistent {
 	consistent := NewConsistent()
 	//这里还挺奇怪的，不就是string数组吗，为啥这里要多加一个_???
 	for _, name := range arry {
-		consistent.Add(name)
+		consistent.Add(name, 1)
 	}
 	return consistent
 }
@@ -970,22 +970,15 @@ func (c *Config) DeleteToconsumer(part, consumer string) {
 	c.rmu.Lock()
 	defer c.rmu.Unlock()
 	delete(c.toconsumers, consumer)
+
+	err := c.consistent.Reduce(consumer)
+	logger.DEBUG(logger.DError, "%v\n", err.Error())
+
 	for i, name := range c.PartToCon[part] {
 		if name == consumer {
 			//后面那三个点是什么
 			c.PartToCon[part] = append(c.PartToCon[part][:i], c.PartToCon[part][i+1:]...)
 			break
-		}
-	}
-	c.con_nums--
-	if c.con_nums < c.part_nums && !c.con_part {
-		c.con_part = true
-		c.consistent = TurnConsistent(GetConsArry(c.toconsumers))
-	}
-	if c.con_part == true {
-		err := c.consistent.Reduce(consumer)
-		if err != nil {
-			DEBUG(dERROR, err.Error())
 		}
 	}
 	c.RebalancePtoC() //更新配置
@@ -1008,4 +1001,17 @@ func NewPSBConfigPush(in Info, file *File, zkclient *zkserver_operations.Client)
 		part:       NewPart(in, file, zkclient),
 	}
 	return ret
+}
+func (t *Topic) HandlePartitions(Partitions map[string]Part_Info) {
+	for part_name := range Partitions {
+		_, ok := t.Parts[part_name]
+		if !ok {
+			part := NewPartition(t.Broker, t.Name, part_name)
+			// part.HandleBlocks(topic_name, part_name, partition.Blocks)
+
+			t.Parts[part_name] = part
+		} else {
+			logger.DEBUG(logger.DWarn, "This topic(%v) part(%v) had in s.topics\n", t.Name, part_name)
+		}
+	}
 }

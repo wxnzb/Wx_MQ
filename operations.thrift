@@ -12,7 +12,7 @@ struct PushRequest{
     5:i8 Size
 
     6:i8 Ack
-    7:i64 Comindex
+    7:i64 Cmdindex
 }
 //推送消息是否成功
 struct PushResponse{

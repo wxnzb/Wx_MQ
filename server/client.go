@@ -149,6 +149,22 @@ func NewGroup(topic, consumer string) *Group {
 	group.consumers[consumer] = true
 	return group
 }
+func (g *Group) RecoverConsumer(cli_name string) error {
+	g.rmu.Lock()
+	defer g.rmu.Unlock()
+
+	_, ok := g.consumers[cli_name]
+	if ok {
+		if g.consumers[cli_name] {
+			return errors.New("This client is alive before")
+		} else {
+			g.consumers[cli_name] = true
+			return nil
+		}
+	} else {
+		return errors.New("Do not have this client")
+	}
+}
 func (g *Group) AddConsumer(con_name string) error {
 	g.rmu.Lock()
 	defer g.rmu.Unlock()

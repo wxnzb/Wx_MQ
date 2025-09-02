@@ -95,6 +95,7 @@ func (r *Raft) SendRequestVote(server int, args *RequestVoteArgs) (*ResponseVote
 		Term:        int(resp.Term),
 	}, true
 }
+
 func (r *Raft) RequestVoteHandle(args *RequestVoteArgs) (reply *ResponseVoteReply) {
 	r.rmu.Lock()
 	defer r.rmu.Unlock()
@@ -103,6 +104,7 @@ func (r *Raft) RequestVoteHandle(args *RequestVoteArgs) (reply *ResponseVoteRepl
 	if args.Term < r.currentTerm {
 		reply.VoteGranted = false
 		reply.Term = r.currentTerm
+		DEBUG(dVote, "S%d  vote <- %d T(%d) < cT(%d) A\n", r.me, args.CandidateId, args.Term, r.currentTerm)
 		//感觉这里else后面不需要加if
 	} else if args.Term >= r.currentTerm {
 		if r.currentTerm < args.Term {
@@ -126,24 +128,29 @@ func (r *Raft) RequestVoteHandle(args *RequestVoteArgs) (reply *ResponseVoteRepl
 					r.currentTerm = args.Term
 					r.voteFor = args.CandidateId
 					r.state = 0
+					DEBUG(dLog, "S%d args.Term(%v)\n", r.me, args.Term)
+					DEBUG(dLog, "S%d reply.Term(%v)\n", r.me, reply.Term)
 					r.leaderId = -1
 					//-----
 					r.electionTimePass = 0
 					rand.Seed(time.Now().UnixNano())
 					r.electionTimeOut = rand.Intn(150) + 150
+					DEBUG(dVote, "S%d  vote <- %d T(%d) = LastlogT(%d) logi(%d) lastlogindex(%d)\n", r.me, args.CandidateId, r.log[i].LogTerm, args.LastLogTerm, i, args.LastLogIndex)
 					reply.VoteGranted = true
 				} else {
+					DEBUG(dVote, "S%d  vote <- %d not lastlogIn(%d) < rf.logIn(%d) vf(%d)\n", r.me, args.CandidateId, args.LastLogIndex, i, r.voteFor)
 					reply.VoteGranted = false
 					reply.Term = r.currentTerm
 				}
 
 			} else {
+				DEBUG(dVote, "S%d  vote <- %d not logT(%d) < rf.logT(%d) vf(%d)\n", r.me, args.CandidateId, args.LastLogTerm, r.log[i].LogTerm, r.voteFor)
 				reply.VoteGranted = false
 				//感觉reply.Term就应该写成这样
 				reply.Term = r.currentTerm
 			}
-			return ResponseVoteReply{VoteGranted: true, Term: args.Term}
 		} else {
+			DEBUG(dVote, "S%d  vote <- %d not T(%d) = cT(%d) vf(%d)\n", r.me, args.CandidateId, args.Term, r.currentTerm, r.voteFor)
 			reply.VoteGranted = false
 			reply.Term = r.currentTerm
 		}
@@ -175,11 +182,11 @@ type AppendEntriesReply struct {
 func (r *Raft) SendAppendEntries(server int, args *AppendEntriesArgs) (*AppendEntriesReply, bool) {
 	data, _ := json.Marshal(args.Entries)
 	resp, err := (*r.peers[server]).AppendEntries(context.Background(), &api.AppendEntriesArgs_{
-		Term:          args.Term,
-		LeaderId:      args.LeaderId,
-		PrevLogIndex:  args.PrevLogIndex,
-		PrevLogTerm:   args.PrevLogTerm,
-		LeaderCommit:  args.LeaderCommit,
+		Term:          int8(args.Term),
+		LeaderId:      int8(args.LeaderId),
+		PrevLogIndex:  int8(args.PrevLogIndex),
+		PrevLogTerm:   int8(args.PrevLogTerm),
+		LeaderCommit:  int8(args.LeaderCommit),
 		Entries:       data,
 		TopicName:     r.topicName,
 		PartitionName: r.partitionName,
@@ -190,9 +197,9 @@ func (r *Raft) SendAppendEntries(server int, args *AppendEntriesArgs) (*AppendEn
 	}
 	return &AppendEntriesReply{
 		Success:        resp.Success,
-		Term:           resp.Term,
-		LogTerm:        resp.LogTerm,
-		TermFirstIndex: resp.TermFirstIndex,
+		Term:           int(resp.Term),
+		LogTerm:        int(resp.LogTerm),
+		TermFirstIndex: int(resp.TermFirstIndex),
 	}, true
 }
 
@@ -204,7 +211,7 @@ func (r *Raft) AppendEntriesHandle(args *AppendEntriesArgs) (reply *AppendEntrie
 	if args.Term >= r.currentTerm {
 		r.currentTerm = args.Term
 		//这里不太理解，为什么只有大于才变成-1
-		if args.Term > r.currentTine {
+		if args.Term > int(r.currentTerm) {
 			r.voteFor = -1
 		}
 		r.state = 0
@@ -325,11 +332,57 @@ type SnapShotArgs struct {
 	LastIncludedLogIndex int
 	LastIncludedLogTerm  int
 	//日志片段和快照数据
-	Log      interface{}
+	Log      Op
 	SnapShot []byte
 }
 type SnapShotReply struct {
 	Term int
+}
+
+func (rf *Raft) Snapshot(index int, snapshot []byte) {
+	// Your code here (2D).
+	rf.rmu.Lock()
+	// fmt.Println("S", rf.me, "index", index, "rf.X", rf.X)
+	le := index - rf.X
+	if le <= 0 {
+		rf.rmu.Unlock()
+		return
+	}
+	rf.lastIndex = index
+	rf.lastTerm = rf.log[le].LogTerm
+	// if le < 0 {
+	// 	// fmt.Println("ERROR in snapshot in leader for le")
+	// }
+	rf.snapshot = snapshot
+	rf.log = rf.log[le:]
+	// if len(rf.log) <= 0 {
+	// 	// fmt.Println("ERROR in snapshot in leader for log")
+	// }
+	rf.X = index
+	for i := range rf.peers {
+		if rf.nextIndex[i]-le <= 0 {
+			rf.nextIndex[i] = len(rf.log)
+		} else {
+			rf.nextIndex[i] = rf.nextIndex[i] - le
+		}
+		// DEBUG(dLog, "S%d update nextindex[%d] to %d\n", rf.me, i, rf.nextIndex[i])
+		// DEBUG(dLog, "S%d the mathindex[%d] is %d\n", rf.me, i, rf.matchIndex[i])
+		// if rf.matchIndex[i]-le < 0 {
+		// 	rf.matchIndex[i] = 0
+		// } else {
+		// 	rf.matchIndex[i] = rf.matchIndex[i] - le
+		// }
+		// DEBUG(dLog, "S%d update mathindex[%d] to %d\n", rf.me, i, rf.matchIndex[i])
+	}
+	if rf.commitIndex < index {
+		DEBUG(dLeader, "S%d update commitindex(%d) to (%d)\n", rf.me, rf.commitIndex, index)
+		rf.commitIndex = index
+	}
+	rf.lastApplied = index
+
+	// DEBUG(dLog, "S%d index(%d) logindex(%d) len(%d)AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n", rf.me, index, rf.log[len(rf.log)-1].LogIndex, len(rf.log))
+	rf.rmu.Unlock()
+	go rf.Persist()
 }
 
 // 给praft用的
@@ -566,7 +619,7 @@ type Op struct {
 type LogNode struct {
 	LogTerm  int
 	LogIndex int
-	Log      interface{}
+	Log      Op
 	BeLeader bool
 	Leader   int
 }
@@ -805,30 +858,7 @@ func (r *Raft) appendentries(term int) {
 //	type SnapShotReply struct {
 //		Term int
 //	}
-func (r *Raft) sendsnapshot(term int, it int) {
-	args := SnapShotArgs{}
-	r.rmu.Lock()
-	args.Term = term
-	args.LeaderId = r.me
-	args.LastIncludedLogIndex = r.lastIndex
-	args.LastIncludedLogTerm = r.lastTerm
-	args.Log = r.log[0].Log
-	r.rmu.Unlock()
-	reply, ok := r.SendSnapShot(it, &args)
-	if ok {
-		r.rmu.Lock()
-		if reply.Term > r.currentTerm {
-			r.currentTerm = reply.Term
-			r.voteFor = -1
-			r.state = 0
-			r.leaderId = -1
-			r.electionTimePass = 0
-			rand.Seed(time.Now().UnixNano())
-			r.electionTimeOut = rand.Intn(150) + 150
-		}
-		r.rmu.Unlock()
-	}
-}
+
 func (r *Raft) requestvotes(term int) {
 	r.rmu.Lock()
 	peers := len(r.peers)

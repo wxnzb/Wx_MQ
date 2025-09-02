@@ -41,12 +41,12 @@ const (
 	ZKBROKER = "zkbroker"
 )
 
-func (s *RPCServer) Start(opts_cli, opts_bro []server.Option, opt Options) error {
+func (s *RPCServer) Start(opts_cli, opts_bro, opts_raf []server.Option, opt Options) error {
 	switch opt.Tag {
 	//初始化一个broker的server结构体，他在注册的时候就要向zk注册
 	case BROKER:
 		s.server = NewServer(s.zkInfo)
-		s.server.make(opt)
+		s.server.make(opt, opts_raf)
 		//面向客户端的服务端
 		srv_cli := server_operations.NewServer(s, opts_cli...)
 		s.srv_cli = &srv_cli

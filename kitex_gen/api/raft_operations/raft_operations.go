@@ -34,6 +34,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"pingpong": kitex.NewMethodInfo(
+		pingpongHandler,
+		newRaft_OperationsPingpongArgs,
+		newRaft_OperationsPingpongResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 }
 
 var (
@@ -154,6 +161,24 @@ func newRaft_OperationsSnapShotResult() interface{} {
 	return api.NewRaft_OperationsSnapShotResult()
 }
 
+func pingpongHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*api.Raft_OperationsPingpongArgs)
+	realResult := result.(*api.Raft_OperationsPingpongResult)
+	success, err := handler.(api.Raft_Operations).Pingpong(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newRaft_OperationsPingpongArgs() interface{} {
+	return api.NewRaft_OperationsPingpongArgs()
+}
+
+func newRaft_OperationsPingpongResult() interface{} {
+	return api.NewRaft_OperationsPingpongResult()
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -189,6 +214,16 @@ func (p *kClient) SnapShot(ctx context.Context, args_ *api.SnapShotArgs_) (r *ap
 	_args.Args_ = args_
 	var _result api.Raft_OperationsSnapShotResult
 	if err = p.c.Call(ctx, "SnapShot", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) Pingpong(ctx context.Context, req *api.PingPongArgs_) (r *api.PingPongReply, err error) {
+	var _args api.Raft_OperationsPingpongArgs
+	_args.Req = req
+	var _result api.Raft_OperationsPingpongResult
+	if err = p.c.Call(ctx, "pingpong", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

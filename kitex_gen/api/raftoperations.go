@@ -388,12 +388,72 @@ var fieldIDToName_SnapShotReply = map[int16]string{
 	1: "Term",
 }
 
+type PingPongArgs_ struct {
+	Ping bool `thrift:"ping,1" frugal:"1,default,bool" json:"ping"`
+}
+
+func NewPingPongArgs_() *PingPongArgs_ {
+	return &PingPongArgs_{}
+}
+
+func (p *PingPongArgs_) InitDefault() {
+}
+
+func (p *PingPongArgs_) GetPing() (v bool) {
+	return p.Ping
+}
+func (p *PingPongArgs_) SetPing(val bool) {
+	p.Ping = val
+}
+
+func (p *PingPongArgs_) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PingPongArgs_(%+v)", *p)
+}
+
+var fieldIDToName_PingPongArgs_ = map[int16]string{
+	1: "ping",
+}
+
+type PingPongReply struct {
+	Pong bool `thrift:"pong,1" frugal:"1,default,bool" json:"pong"`
+}
+
+func NewPingPongReply() *PingPongReply {
+	return &PingPongReply{}
+}
+
+func (p *PingPongReply) InitDefault() {
+}
+
+func (p *PingPongReply) GetPong() (v bool) {
+	return p.Pong
+}
+func (p *PingPongReply) SetPong(val bool) {
+	p.Pong = val
+}
+
+func (p *PingPongReply) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PingPongReply(%+v)", *p)
+}
+
+var fieldIDToName_PingPongReply = map[int16]string{
+	1: "pong",
+}
+
 type Raft_Operations interface {
 	RequestVote(ctx context.Context, args_ *RequestVoteArgs_) (r *ResponseVoteReply, err error)
 
 	AppendEntries(ctx context.Context, args_ *AppendEntriesArgs_) (r *AppendEntriesReply, err error)
 
 	SnapShot(ctx context.Context, args_ *SnapShotArgs_) (r *SnapShotReply, err error)
+
+	Pingpong(ctx context.Context, req *PingPongArgs_) (r *PingPongReply, err error)
 }
 
 type Raft_OperationsRequestVoteArgs struct {
@@ -621,5 +681,81 @@ func (p *Raft_OperationsSnapShotResult) String() string {
 }
 
 var fieldIDToName_Raft_OperationsSnapShotResult = map[int16]string{
+	0: "success",
+}
+
+type Raft_OperationsPingpongArgs struct {
+	Req *PingPongArgs_ `thrift:"req,1" frugal:"1,default,PingPongArgs_" json:"req"`
+}
+
+func NewRaft_OperationsPingpongArgs() *Raft_OperationsPingpongArgs {
+	return &Raft_OperationsPingpongArgs{}
+}
+
+func (p *Raft_OperationsPingpongArgs) InitDefault() {
+}
+
+var Raft_OperationsPingpongArgs_Req_DEFAULT *PingPongArgs_
+
+func (p *Raft_OperationsPingpongArgs) GetReq() (v *PingPongArgs_) {
+	if !p.IsSetReq() {
+		return Raft_OperationsPingpongArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *Raft_OperationsPingpongArgs) SetReq(val *PingPongArgs_) {
+	p.Req = val
+}
+
+func (p *Raft_OperationsPingpongArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *Raft_OperationsPingpongArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Raft_OperationsPingpongArgs(%+v)", *p)
+}
+
+var fieldIDToName_Raft_OperationsPingpongArgs = map[int16]string{
+	1: "req",
+}
+
+type Raft_OperationsPingpongResult struct {
+	Success *PingPongReply `thrift:"success,0,optional" frugal:"0,optional,PingPongReply" json:"success,omitempty"`
+}
+
+func NewRaft_OperationsPingpongResult() *Raft_OperationsPingpongResult {
+	return &Raft_OperationsPingpongResult{}
+}
+
+func (p *Raft_OperationsPingpongResult) InitDefault() {
+}
+
+var Raft_OperationsPingpongResult_Success_DEFAULT *PingPongReply
+
+func (p *Raft_OperationsPingpongResult) GetSuccess() (v *PingPongReply) {
+	if !p.IsSetSuccess() {
+		return Raft_OperationsPingpongResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *Raft_OperationsPingpongResult) SetSuccess(x interface{}) {
+	p.Success = x.(*PingPongReply)
+}
+
+func (p *Raft_OperationsPingpongResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *Raft_OperationsPingpongResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("Raft_OperationsPingpongResult(%+v)", *p)
+}
+
+var fieldIDToName_Raft_OperationsPingpongResult = map[int16]string{
 	0: "success",
 }

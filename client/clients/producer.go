@@ -17,6 +17,7 @@ type Producer struct {
 	Name            string
 	Topic_Partition map[string]server_operations.Client //这个topic的Partition是否是这个生产者负责
 	zkBrokerCli     zkserver_operations.Client
+	Top_Part_indexs map[string]int64 //这个是每个topic-partition的消息的索引
 }
 
 func NewProducer(zkBrokerIpport, name string) (*Producer, error) {
@@ -33,15 +34,20 @@ func NewProducer(zkBrokerIpport, name string) (*Producer, error) {
 type Message struct {
 	Topic_Name     string
 	Partition_Name string
-	Msg            string
+	Msg            []byte
 }
 
-func (pro *Producer) Push(msg Message) error {
+func (pro *Producer) Push(msg Message, ack int) error {
 	index := msg.Topic_Name + msg.Partition_Name
+	var i int64
+	var ok2 bool
 	pro.rmu.RLock()
-	cli, ok := pro.Topic_Partition[index]
+	cli, ok1 := pro.Topic_Partition[index]
+	if ack == -1 {
+		i, ok2 = pro.Top_Part_indexs[index]
+	}
 	pro.rmu.RUnlock()
-	if !ok {
+	if !ok1 {
 		//要是找不到，就说明这个topic-partition的broker还没有连接到生产者，先要进行连接
 		resp, err := pro.zkBrokerCli.ProGetBro(context.Background(), &api.ProGetBroRequest{
 			TopicName:     msg.Topic_Name,
@@ -58,11 +64,20 @@ func (pro *Producer) Push(msg Message) error {
 		pro.Topic_Partition[index] = cli
 		pro.rmu.RUnlock()
 	}
+	if ack == -1 {
+		if !ok2 {
+			pro.rmu.Lock()
+			pro.Top_Part_indexs[index] = 0
+			pro.rmu.Unlock()
+		}
+	}
 	resp, err := cli.Push(context.Background(), &api.PushRequest{
 		ProducerId: pro.Name,
 		Topic:      msg.Topic_Name,
 		Key:        msg.Partition_Name,
 		Message:    msg.Msg,
+		Ack:        int8(ack),
+		Cmdindex:   i,
 	})
 	if err == nil && resp.Ret {
 		return nil
@@ -72,7 +87,7 @@ func (pro *Producer) Push(msg Message) error {
 		pro.rmu.Lock()
 		delete(pro.Topic_Partition, index)
 		pro.rmu.Unlock()
-		return pro.Push(msg)
+		return pro.Push(msg, ack)
 	} else {
 		return errors.New("push message failed: " + resp.Err + ", " + err.Error())
 	}

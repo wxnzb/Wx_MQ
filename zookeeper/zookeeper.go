@@ -57,7 +57,7 @@ type SubscriptionNode struct {
 	Name          string `json:"name"`
 	TopicName     string `json:"topicname"`
 	PartitionName string `json:"partitionname"`
-	Option        int8 `json:"option"`
+	Option        int8   `json:"option"`
 	//这个还没有用到
 	Groups []byte `json:groups`
 }
@@ -117,12 +117,13 @@ func (z *ZK) RegisterNode(node interface{}) (err error) {
 		dNode = node.(DuplicateNode)
 		path = z.TopicRoot + "/" + dNode.Topic + "/" + dNode.Partition + "/" + dNode.Name
 		data, err = json.Marshal(dNode)
-	if err != nil {
-		return err
-	}
-	_, err = z.Con.Create(path, data, 0, zk.WorldACL(zk.PermAll))
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+		_, err = z.Con.Create(path, data, 0, zk.WorldACL(zk.PermAll))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
